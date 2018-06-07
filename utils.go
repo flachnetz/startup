@@ -43,6 +43,6 @@ func Panicf(msg string, args ...interface{}) {
 
 func PanicOnError(err error, msg string, args ...interface{}) {
 	if err != nil {
-		panic(Errorf(msg, args...))
+		panic(Errorf("%s: %s", err, fmt.Sprintf(msg, args...)))
 	}
 }
