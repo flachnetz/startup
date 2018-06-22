@@ -1,6 +1,5 @@
 package startup_postgres
 
-
 import (
 	"fmt"
 	"time"
@@ -15,20 +14,19 @@ import (
 
 type TransactionHelper struct {
 	*sqlx.DB
-	log  logrus.FieldLogger
-	loggingPrefix string
+	log                logrus.FieldLogger
+	loggingPrefix      string
 	tracingServiceName string
 }
 
 func NewTransactionHelper(db *sqlx.DB, loggingPrefix, tracingServiceName string) TransactionHelper {
 	return TransactionHelper{
-		DB:   db,
-		log:  logrus.WithField("prefix", loggingPrefix),
-		loggingPrefix: loggingPrefix,
+		DB:                 db,
+		log:                logrus.WithField("prefix", loggingPrefix),
+		loggingPrefix:      loggingPrefix,
 		tracingServiceName: tracingServiceName,
 	}
 }
-
 
 func (p *TransactionHelper) WithTransaction(tag string, fn func(tx *sqlx.Tx) error) error {
 	var err error
@@ -48,7 +46,7 @@ func (p *TransactionHelper) WithTransaction(tag string, fn func(tx *sqlx.Tx) err
 // Ends the given transaction. This method will either commit the transaction if
 // the given recoverValue is nil, or rollback the transaction if it is non nil.
 func (p *TransactionHelper) withTransaction(tag string, db *sqlx.DB, fn func(tx *sqlx.Tx) error) (err error) {
-	return tracing.TraceChild(p.tracingServiceName + "-db", func(span opentracing.Span) error {
+	return tracing.TraceChild(p.tracingServiceName+"-db", func(span opentracing.Span) error {
 		span.SetTag("dd.service", p.tracingServiceName)
 		span.SetTag("dd.resource", "tx:"+tag)
 
