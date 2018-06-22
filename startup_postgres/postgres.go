@@ -4,10 +4,14 @@ import (
 	"time"
 
 	"database/sql"
+	"fmt"
+	"github.com/facebookgo/clock"
 	"github.com/flachnetz/startup"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
+	"io"
 	"sync"
 )
 
@@ -89,4 +93,55 @@ func guessDriverName() string {
 	}
 
 	panic(startup.Errorf("No postgres database driver found"))
+}
+
+func (opts *PostgresOptions) StartVacuumTask(db *sqlx.DB, table string, interval time.Duration, clock clock.Clock) io.Closer {
+	if interval < 1*time.Second {
+		interval = 1 * time.Second
+	}
+
+	closeCh := make(chan bool)
+
+	go func() {
+		l := logrus.WithField("prefix", "vacuum")
+
+		for {
+			select {
+			case <-closeCh:
+				return
+
+			case <-clock.After(interval):
+				l.Infof("Running periodic vacuum on table %s now", table)
+
+				if _, err := db.Exec(fmt.Sprintf(`VACUUM "%s"`, table)); err != nil {
+					l.Warnf("Maintenance task failed: %s", err)
+				}
+			}
+		}
+	}()
+
+	return channelCloser(closeCh)
+}
+
+type channelCloser chan bool
+
+func (ch channelCloser) Close() error {
+	close(ch)
+	return nil
+}
+
+func ErrIsForeignKeyViolation(err error) bool {
+	if err, ok := err.(*pq.Error); ok {
+		return err.Code == "23503"
+	}
+
+	return false
+}
+
+func ErrIsUniqueViolation(err error) bool {
+	if err, ok := err.(*pq.Error); ok {
+		return err.Code == "23505"
+	}
+
+	return false
 }
