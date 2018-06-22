@@ -4,15 +4,15 @@ import (
 	"time"
 
 	"database/sql"
+	"fmt"
+	"github.com/facebookgo/clock"
 	"github.com/flachnetz/startup"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
-	"sync"
-	"github.com/facebookgo/clock"
-	"io"
-	"fmt"
 	"github.com/lib/pq"
+	_ "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
+	"io"
+	"sync"
 )
 
 type Initializer func(db *sqlx.DB) error
@@ -95,8 +95,7 @@ func guessDriverName() string {
 	panic(startup.Errorf("No postgres database driver found"))
 }
 
-
-func (opts *PostgresOptions) StartVacuumTask(db *sqlx.DB, table string, interval time.Duration, clock clock.Clock, ) io.Closer {
+func (opts *PostgresOptions) StartVacuumTask(db *sqlx.DB, table string, interval time.Duration, clock clock.Clock) io.Closer {
 	if interval < 1*time.Second {
 		interval = 1 * time.Second
 	}
