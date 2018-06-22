@@ -1,4 +1,4 @@
-package startup_postgres
+package transaction
 
 import (
 	"fmt"
@@ -12,15 +12,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type TransactionHelper struct {
+type Helper struct {
 	*sqlx.DB
 	log                logrus.FieldLogger
 	loggingPrefix      string
 	tracingServiceName string
 }
 
-func NewTransactionHelper(db *sqlx.DB, loggingPrefix, tracingServiceName string) TransactionHelper {
-	return TransactionHelper{
+func New(db *sqlx.DB, loggingPrefix, tracingServiceName string) Helper {
+	return Helper{
 		DB:                 db,
 		log:                logrus.WithField("prefix", loggingPrefix),
 		loggingPrefix:      loggingPrefix,
@@ -28,7 +28,7 @@ func NewTransactionHelper(db *sqlx.DB, loggingPrefix, tracingServiceName string)
 	}
 }
 
-func (p *TransactionHelper) WithTransaction(tag string, fn func(tx *sqlx.Tx) error) error {
+func (p *Helper) WithTransaction(tag string, fn func(tx *sqlx.Tx) error) error {
 	var err error
 
 	startTime := time.Now()
@@ -45,7 +45,7 @@ func (p *TransactionHelper) WithTransaction(tag string, fn func(tx *sqlx.Tx) err
 
 // Ends the given transaction. This method will either commit the transaction if
 // the given recoverValue is nil, or rollback the transaction if it is non nil.
-func (p *TransactionHelper) withTransaction(tag string, db *sqlx.DB, fn func(tx *sqlx.Tx) error) (err error) {
+func (p *Helper) withTransaction(tag string, db *sqlx.DB, fn func(tx *sqlx.Tx) error) (err error) {
 	return tracing.TraceChild(p.tracingServiceName+"-db", func(span opentracing.Span) error {
 		span.SetTag("dd.service", p.tracingServiceName)
 		span.SetTag("dd.resource", "tx:"+tag)
