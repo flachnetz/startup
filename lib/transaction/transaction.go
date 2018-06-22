@@ -28,7 +28,7 @@ func New(db *sqlx.DB, loggingPrefix, tracingServiceName string) Helper {
 	}
 }
 
-func (p *Helper) WithTracedTransaction(tag string, fn func(tx *sqlx.Tx) error) error {
+func (p *Helper) WithTransaction(tag string, fn func(tx *sqlx.Tx) error) error {
 	var err error
 
 	startTime := time.Now()
