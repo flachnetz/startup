@@ -28,14 +28,18 @@ func New(db *sqlx.DB, loggingPrefix, tracingServiceName string) Helper {
 	}
 }
 
-func (p *Helper) WithTransaction(tag string, fn func(tx *sqlx.Tx) error) error {
+func (p *Helper) WithTracedTransaction(tag string, fn func(tx *sqlx.Tx) error) error {
 	var err error
 
 	startTime := time.Now()
 
 	metric := fmt.Sprintf("pq.%s.transaction[tag:%s]", p.loggingPrefix, tag)
 	metrics.GetOrRegisterTimer(metric, nil).Time(func() {
-		err = p.WithTracedTransaction(tag, p.DB, fn)
+		err = tracing.TraceChild(p.tracingServiceName+"-db", func(span opentracing.Span) error {
+			span.SetTag("dd.service", p.tracingServiceName)
+			span.SetTag("dd.resource", "tx:"+tag)
+			return WithTransaction(p.DB, fn)
+		})
 	})
 
 	p.log.Debugf("Transaction '%s' took %s", tag, time.Since(startTime))
@@ -45,47 +49,43 @@ func (p *Helper) WithTransaction(tag string, fn func(tx *sqlx.Tx) error) error {
 
 // Ends the given transaction. This method will either commit the transaction if
 // the given recoverValue is nil, or rollback the transaction if it is non nil.
-func (p *Helper) WithTracedTransaction(tag string, db *sqlx.DB, fn func(tx *sqlx.Tx) error) (err error) {
-	return tracing.TraceChild(p.tracingServiceName+"-db", func(span opentracing.Span) error {
-		span.SetTag("dd.service", p.tracingServiceName)
-		span.SetTag("dd.resource", "tx:"+tag)
+func WithTransaction(db *sqlx.DB, fn func(tx *sqlx.Tx) error) (err error) {
 
-		var tx *sqlx.Tx
+	var tx *sqlx.Tx
 
-		tx, err = db.Beginx()
-		if err != nil {
-			return errors.WithMessage(err, "begin transaction")
-		}
+	tx, err = db.Beginx()
+	if err != nil {
+		return errors.WithMessage(err, "begin transaction")
+	}
 
-		defer func() {
-			r := recover()
-			if r == nil && err == nil {
-				metrics.GetOrRegisterTimer("pq.transaction.commit", nil).Time(func() {
-					// commit the transaction
-					if err = tx.Commit(); err != nil {
-						err = errors.WithMessage(err, "commit")
-					}
-				})
-
-			} else {
-				metrics.GetOrRegisterTimer("pq.transaction.rollback", nil).Time(func() {
-					tx.Rollback()
-				})
-
-				// convert recovered value into an error instance
-				var ok bool
-				if r != nil {
-					if err, ok = r.(error); !ok {
-						err = fmt.Errorf("%#v", err)
-					}
+	defer func() {
+		r := recover()
+		if r == nil && err == nil {
+			metrics.GetOrRegisterTimer("pq.transaction.commit", nil).Time(func() {
+				// commit the transaction
+				if err = tx.Commit(); err != nil {
+					err = errors.WithMessage(err, "commit")
 				}
+			})
 
-				// and give context to the error
-				err = errors.WithMessage(err, "transaction")
+		} else {
+			metrics.GetOrRegisterTimer("pq.transaction.rollback", nil).Time(func() {
+				tx.Rollback()
+			})
+
+			// convert recovered value into an error instance
+			var ok bool
+			if r != nil {
+				if err, ok = r.(error); !ok {
+					err = fmt.Errorf("%#v", err)
+				}
 			}
-		}()
 
-		err = fn(tx)
-		return err
-	})
+			// and give context to the error
+			err = errors.WithMessage(err, "transaction")
+		}
+	}()
+
+	err = fn(tx)
+	return err
 }
