@@ -43,6 +43,12 @@
   version = "v1.1.0"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/facebookgo/clock"
+  packages = ["."]
+  revision = "600d898af40aa09a7a93ecb9265d87b0504b6f03"
+
+[[projects]]
   name = "github.com/flachnetz/go-admin"
   packages = ["."]
   revision = "5eb277fd024764ac95fec7fce753738a651a2c55"
@@ -317,6 +323,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "1cbc6ada686faedcdc04537b2b0cce31acef3d6efc5c9274561b60477b689496"
+  inputs-digest = "c0c1b9321b5b5623c295bd32441fed4971a4b44ea85cc34ea168a487f9ad0c43"
   solver-name = "gps-cdcl"
   solver-version = 1
