@@ -35,7 +35,7 @@ func (p *Helper) WithTransaction(tag string, fn func(tx *sqlx.Tx) error) error {
 
 	metric := fmt.Sprintf("pq.%s.transaction[tag:%s]", p.loggingPrefix, tag)
 	metrics.GetOrRegisterTimer(metric, nil).Time(func() {
-		err = p.withTransaction(tag, p.DB, fn)
+		err = p.WithTracedTransaction(tag, p.DB, fn)
 	})
 
 	p.log.Debugf("Transaction '%s' took %s", tag, time.Since(startTime))
@@ -45,7 +45,7 @@ func (p *Helper) WithTransaction(tag string, fn func(tx *sqlx.Tx) error) error {
 
 // Ends the given transaction. This method will either commit the transaction if
 // the given recoverValue is nil, or rollback the transaction if it is non nil.
-func (p *Helper) withTransaction(tag string, db *sqlx.DB, fn func(tx *sqlx.Tx) error) (err error) {
+func (p *Helper) WithTracedTransaction(tag string, db *sqlx.DB, fn func(tx *sqlx.Tx) error) (err error) {
 	return tracing.TraceChild(p.tracingServiceName+"-db", func(span opentracing.Span) error {
 		span.SetTag("dd.service", p.tracingServiceName)
 		span.SetTag("dd.resource", "tx:"+tag)
