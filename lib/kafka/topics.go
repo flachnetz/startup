@@ -1,14 +1,18 @@
 package kafka
 
 import (
+	"time"
+
 	"github.com/Shopify/sarama"
 	"github.com/pkg/errors"
-	"time"
+	"github.com/sirupsen/logrus"
 )
 
 type Topics []Topic
 
 type TopicsFunc func(replicationFactor int16) Topics
+
+var logger = logrus.WithField("prefix", "kafka-topics")
 
 func EnsureTopics(client sarama.Client, topics Topics) error {
 	var err error
@@ -35,6 +39,8 @@ func EnsureTopics(client sarama.Client, topics Topics) error {
 			err = errors.WithMessage(err, "create topics request")
 			continue
 		}
+
+		logger.Infof("Created topics %+v", topics)
 
 		return nil
 	}
