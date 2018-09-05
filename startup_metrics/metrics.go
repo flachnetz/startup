@@ -41,7 +41,7 @@ func (opts *MetricsOptions) Initialize() {
 
 		if prefix := strings.TrimSuffix(opts.Inputs.MetricsPrefix, "."); prefix != "" {
 			log.Debugf("Prefixing all metrics with '%s'", prefix)
-			registry = metrics.NewPrefixedChildRegistry(registry, prefix+".")
+			registry = prefixRegistry(registry, prefix+".")
 			metrics.DefaultRegistry = registry
 
 		} else {
@@ -90,4 +90,26 @@ func (opts *MetricsOptions) setupDatadogMetricsReporter(registry metrics.Registr
 
 func isCommaOrSpace(r rune) bool {
 	return r == ',' || unicode.IsSpace(r)
+}
+
+func prefixRegistry(r metrics.Registry, prefix string) metrics.Registry {
+	// remove the "." at the end
+	prefix = strings.TrimRight(prefix, ".")
+
+	// get a copy of all metrics
+	copy := make(map[string]interface{})
+	r.Each(func(name string, metric interface{}) {
+		copy[name] = metric
+	})
+
+	// clear the original registry
+	r.UnregisterAll()
+
+	// insert them all into the prefixed registry
+	prefixed := metrics.NewPrefixedRegistry(prefix + ".")
+	for name, metric := range copy {
+		prefixed.Register(name, metric)
+	}
+
+	return prefixed
 }

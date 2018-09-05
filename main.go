@@ -19,7 +19,7 @@ func init() {
 	}
 }
 
-func MustParseCommandLine(opts interface{}, providers ...interface{}) {
+func MustParseCommandLine(opts interface{}) {
 	if err := ParseCommandLine(opts); err != nil {
 		cause := errors.Cause(err)
 
