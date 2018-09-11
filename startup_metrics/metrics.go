@@ -97,17 +97,18 @@ func prefixRegistry(r metrics.Registry, prefix string) metrics.Registry {
 	prefix = strings.TrimRight(prefix, ".")
 
 	// get a copy of all metrics
-	copy := make(map[string]interface{})
+	backup := make(map[string]interface{})
 	r.Each(func(name string, metric interface{}) {
-		copy[name] = metric
+		backup[name] = metric
 	})
 
-	// clear the original registry
-	r.UnregisterAll()
+	// We must not unregister everything from this metrics, as this would
+	// stop the Meters from updating.
+	// r.UnregisterAll()
 
 	// insert them all into the prefixed registry
 	prefixed := metrics.NewPrefixedRegistry(prefix + ".")
-	for name, metric := range copy {
+	for name, metric := range backup {
 		prefixed.Register(name, metric)
 	}
 
