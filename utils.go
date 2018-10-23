@@ -50,6 +50,6 @@ func PanicOnError(err error, msg string, args ...interface{}) {
 
 func Close(closer io.Closer, onErrorMessage string) {
 	if err := closer.Close(); err != nil {
-		logrus.WithError(err).Error(onErrorMessage)
+		logrus.WithError(err).Warn(onErrorMessage)
 	}
 }
