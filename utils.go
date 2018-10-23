@@ -2,6 +2,7 @@ package startup
 
 import (
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"os"
@@ -44,5 +45,11 @@ func Panicf(msg string, args ...interface{}) {
 func PanicOnError(err error, msg string, args ...interface{}) {
 	if err != nil {
 		panic(Errorf("%s: %s", err, fmt.Sprintf(msg, args...)))
+	}
+}
+
+func Close(closer io.Closer, onErrorMessage string) {
+	if err := closer.Close(); err != nil {
+		logrus.WithError(err).Error(onErrorMessage)
 	}
 }
