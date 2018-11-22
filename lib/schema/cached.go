@@ -47,10 +47,11 @@ func (r *cachedRegistry) Set(schema string) (key string, err error) {
 
 	if codec, exists := r.schemaCache[key]; !exists {
 		key, err := r.registry.Set(schema)
-		if err != nil {
+		if err == nil {
 			r.schemaCache[key] = codec
 		}
 	}
+
 	return key, err
 }
 
