@@ -123,6 +123,27 @@ func ExtractAndCall(target interface{}, w http.ResponseWriter, r *http.Request, 
 	WriteResponseValue(w, value, err)
 }
 
+func ExtractAndCallWithBody(
+	target interface{},
+	body interface{},
+	w http.ResponseWriter,
+	r *http.Request,
+	params httprouter.Params,
+	handler func() (interface{}, error)) {
+
+	ExtractAndCall(target, w, r, params, func() (interface{}, error) {
+		if err := json.NewDecoder(r.Body).Decode(body); err != nil {
+			return nil, errors.WithMessage(err, "parsing request body as json")
+		}
+
+		if err := parameterValidator.Struct(body); err != nil {
+			return nil, errors.WithMessage(err, "validating request body")
+		}
+
+		return handler()
+	})
+}
+
 var parameterValidator = validator.New()
 
 type paramsSource httprouter.Params
