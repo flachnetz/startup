@@ -37,7 +37,8 @@ require (
 	github.com/modern-go/reflect2 v0.0.0-20180228065516-1df9eeb2bb81
 	github.com/opentracing-contrib/go-observer v0.0.0-20170622124052-a52f23424492
 	github.com/opentracing/opentracing-go v1.0.2
-	github.com/openzipkin/zipkin-go-opentracing v0.3.4
+	github.com/openzipkin-contrib/zipkin-go-opentracing v0.3.5 // indirect
+	github.com/openzipkin/zipkin-go-opentracing v0.3.5
 	github.com/pierrec/lz4 v0.0.0-20171218195038-2fcda4cb7018
 	github.com/pierrec/xxHash v0.1.1
 	github.com/pkg/errors v0.8.0
