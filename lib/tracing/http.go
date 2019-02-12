@@ -65,7 +65,7 @@ func responseLoggerOf(w http.ResponseWriter) *responseLogger {
 	if rl, ok := w.(*responseLogger); ok {
 		return rl
 	} else {
-		return &responseLogger{ResponseWriter: w}
+		return &responseLogger{ResponseWriter: w, status: http.StatusOK}
 	}
 }
 
