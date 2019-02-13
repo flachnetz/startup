@@ -94,6 +94,9 @@ func (opts HTTPOptions) Serve(config Config) {
 	// merge handlers
 	handler = mergeWithAdminHandler(adminHandler, handler)
 
+	// don't let a panic crash the server.
+	handler = handlers.RecoveryHandler(handlers.PrintRecoveryStack(true))(handler)
+	
 	if opts.AccessLog == "" {
 		// log all requests using logrus logger
 		handler = handlers.LoggingHandler(
@@ -107,9 +110,6 @@ func (opts HTTPOptions) Serve(config Config) {
 		// write events directly to log file
 		handler = handlers.LoggingHandler(fp, handler)
 	}
-
-	// don't let a panic crash the server.
-	handler = handlers.RecoveryHandler(handlers.PrintRecoveryStack(true))(handler)
 
 	server := &http.Server{
 		Addr:              opts.Address,
