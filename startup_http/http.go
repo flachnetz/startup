@@ -96,7 +96,7 @@ func (opts HTTPOptions) Serve(config Config) {
 
 	// don't let a panic crash the server.
 	handler = handlers.RecoveryHandler(handlers.PrintRecoveryStack(true))(handler)
-	
+
 	if opts.AccessLog == "" {
 		// log all requests using logrus logger
 		handler = handlers.LoggingHandler(
