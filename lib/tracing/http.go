@@ -2,6 +2,7 @@ package tracing
 
 import (
 	"github.com/modern-go/gls"
+	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/sirupsen/logrus"
 	"net/http"
