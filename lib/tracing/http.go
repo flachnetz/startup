@@ -2,7 +2,6 @@ package tracing
 
 import (
 	"github.com/modern-go/gls"
-	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/sirupsen/logrus"
 	"net/http"
@@ -118,4 +117,48 @@ func Execute(op string, r *http.Request, client *http.Client) (*http.Response, e
 	})
 
 	return response, err
+}
+
+// Returns a new http.Client that has automatic propagation
+// of zipkin trace ids enabled.
+func WithSpanPropagation(client *http.Client) *http.Client {
+	transport := client.Transport
+	if transport == nil {
+		transport = http.DefaultTransport
+	}
+
+	clientCopy := *client
+	clientCopy.Transport = NewPropagatingRoundTripper(transport)
+	return &clientCopy
+}
+
+func NewPropagatingRoundTripper(rt http.RoundTripper) http.RoundTripper {
+	return tracingRoundTripper{delegate: rt}
+}
+
+type tracingRoundTripper struct {
+	delegate http.RoundTripper
+}
+
+func (rt tracingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	span := opentracing.SpanFromContext(req.Context())
+	if span == nil {
+		return rt.delegate.RoundTrip(req)
+	}
+
+	// create a copy of the original headers object
+	headers := make(http.Header, len(req.Header))
+	for key, value := range req.Header {
+		headers[key] = value
+	}
+
+	// inject zipkin context headers, ignore errors
+	_ = opentracing.GlobalTracer().Inject(span.Context(),
+		opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(headers))
+
+	// create a copy of the original request and update the headers
+	reqCopy := *req
+	reqCopy.Header = headers
+
+	return rt.delegate.RoundTrip(&reqCopy)
 }
