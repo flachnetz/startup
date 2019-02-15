@@ -107,11 +107,11 @@ func findInitializerMethod(v reflect.Value) reflect.Value {
 	return m
 }
 
-type FlagURL struct {
+type URL struct {
 	*url.URL
 }
 
-func (flag *FlagURL) MarshalFlag() (string, error) {
+func (flag *URL) MarshalFlag() (string, error) {
 	if flag.URL == nil {
 		return "", errors.New("url flag not set")
 	} else {
@@ -119,8 +119,20 @@ func (flag *FlagURL) MarshalFlag() (string, error) {
 	}
 }
 
-func (flag *FlagURL) UnmarshalFlag(value string) error {
+func (flag *URL) UnmarshalFlag(value string) error {
 	parsed, err := url.Parse(value)
+	if err != nil {
+		return err
+	}
+
+	if parsed.Scheme == "" {
+		return errors.New("url is missing a scheme")
+	}
+
+	if parsed.Hostname() == "" {
+		return errors.New("url is missing a hostname")
+	}
+
 	flag.URL = parsed
 	return err
 }
