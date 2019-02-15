@@ -7,6 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/go-playground/validator.v9"
 	"net"
+	"net/url"
 	"os"
 	"reflect"
 )
@@ -104,4 +105,22 @@ func findInitializerMethod(v reflect.Value) reflect.Value {
 	}
 
 	return m
+}
+
+type FlagURL struct {
+	*url.URL
+}
+
+func (flag *FlagURL) MarshalFlag() (string, error) {
+	if flag.URL == nil {
+		return "", errors.New("url flag not set")
+	} else {
+		return flag.String(), nil
+	}
+}
+
+func (flag *FlagURL) UnmarshalFlag(value string) error {
+	parsed, err := url.Parse(value)
+	flag.URL = parsed
+	return err
 }
