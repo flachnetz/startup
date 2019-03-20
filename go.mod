@@ -11,7 +11,6 @@ require (
 	github.com/go-playground/locales v0.12.1 // indirect
 	github.com/go-playground/universal-translator v0.16.0 // indirect
 	github.com/go-sql-driver/mysql v1.4.1 // indirect
-	github.com/gobuffalo/packr v1.22.0 // indirect
 	github.com/gogo/protobuf v1.2.1 // indirect
 	github.com/goji/httpauth v0.0.0-20160601135302-2da839ab0f4d
 	github.com/golang/protobuf v1.3.0 // indirect
