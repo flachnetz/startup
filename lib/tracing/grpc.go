@@ -14,14 +14,14 @@ import (
 	"google.golang.org/grpc"
 )
 
-type AuthFunc func(ctx context.Context, req interface{}, md metadata.MD) (context.Context, error)
+type PreCheckFunc func(ctx context.Context, req interface{}, md metadata.MD) (context.Context, error)
 
-func AuthInterceptor(authFunc AuthFunc) grpc.UnaryServerInterceptor {
+func TracedInterceptor(preCheck PreCheckFunc) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 
 		meta, _ := metadata.FromIncomingContext(ctx)
 		logrus.WithField("prefix", "auth-interceptor").Debugf("incoming md: %+v", meta)
-		if authContext, err := authFunc(ctx, req, meta); err != nil {
+		if authContext, err := preCheck(ctx, req, meta); err != nil {
 			return nil, err
 		} else {
 			ctx = authContext
