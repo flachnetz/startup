@@ -1,4 +1,4 @@
-package tracing
+package startup_tracing
 
 import (
 	"github.com/modern-go/gls"
