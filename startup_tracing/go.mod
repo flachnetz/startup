@@ -4,7 +4,7 @@ go 1.12
 
 require (
 	github.com/apache/thrift v0.12.0
-	github.com/flachnetz/startup v1.5.4
+	github.com/flachnetz/startup v1.5.7
 	github.com/go-logfmt/logfmt v0.4.0 // indirect
 	github.com/go-playground/locales v0.12.1 // indirect
 	github.com/go-playground/universal-translator v0.16.0 // indirect
