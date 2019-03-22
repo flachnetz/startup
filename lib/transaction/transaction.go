@@ -3,8 +3,7 @@ package transaction
 import (
 	"fmt"
 	"time"
-
-	"github.com/flachnetz/startup/lib/tracing"
+	"github.com/flachnetz/startup_tracing"
 	"github.com/jmoiron/sqlx"
 	"github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
@@ -28,24 +27,6 @@ func New(db *sqlx.DB, loggingPrefix, tracingServiceName string) Helper {
 	}
 }
 
-func (p *Helper) WithTransaction(tag string, fn func(tx *sqlx.Tx) error) error {
-	var err error
-
-	startTime := time.Now()
-
-	metric := fmt.Sprintf("pq.%s.transaction[tag:%s]", p.loggingPrefix, tag)
-	metrics.GetOrRegisterTimer(metric, nil).Time(func() {
-		err = tracing.TraceChild(p.tracingServiceName+"-db", func(span opentracing.Span) error {
-			span.SetTag("dd.service", p.tracingServiceName)
-			span.SetTag("dd.resource", "tx:"+tag)
-			return WithTransaction(p.DB, fn)
-		})
-	})
-
-	p.log.Debugf("Transaction '%s' took %s", tag, time.Since(startTime))
-
-	return err
-}
 
 // Ends the given transaction. This method will either commit the transaction if
 // the given recoverValue is nil, or rollback the transaction if it is non nil.
