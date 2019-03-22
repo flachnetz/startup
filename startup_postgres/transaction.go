@@ -5,25 +5,21 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/rcrowley/go-metrics"
-	"github.com/sirupsen/logrus"
 )
 
 type Helper struct {
 	*sqlx.DB
-	log                logrus.FieldLogger
-	loggingPrefix      string
-	tracingServiceName string
 }
 
-func New(db *sqlx.DB, loggingPrefix, tracingServiceName string) Helper {
+func New(db *sqlx.DB) Helper {
 	return Helper{
-		DB:                 db,
-		log:                logrus.WithField("prefix", loggingPrefix),
-		loggingPrefix:      loggingPrefix,
-		tracingServiceName: tracingServiceName,
+		DB: db,
 	}
 }
 
+func (h *Helper) WithTransaction(fn func(tx *sqlx.Tx) error) (err error) {
+	return WithTransaction(h.DB, fn)
+}
 
 // Ends the given transaction. This method will either commit the transaction if
 // the given recoverValue is nil, or rollback the transaction if it is non nil.
