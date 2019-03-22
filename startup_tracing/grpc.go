@@ -14,21 +14,23 @@ import (
 	"google.golang.org/grpc"
 )
 
-type PreCheckFunc func(ctx context.Context, req interface{}, md metadata.MD) (context.Context, error)
+type PreCheckFunc func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (context.Context, interface{}, error)
 
-func TracedInterceptor(preCheck PreCheckFunc) grpc.UnaryServerInterceptor {
+func TracedInterceptor(checkFunc PreCheckFunc) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 
 		meta, _ := metadata.FromIncomingContext(ctx)
-		logrus.WithField("prefix", "auth-interceptor").Debugf("incoming md: %+v", meta)
-		if authContext, err := preCheck(ctx, req, meta); err != nil {
-			return nil, err
-		} else {
-			ctx = authContext
+		logrus.WithField("prefix", "traced-interceptor").Debugf("incoming md: %+v", meta)
+		if checkFunc != nil {
+			if authContext, _, err := checkFunc(ctx, req, info, handler); err != nil {
+				return nil, err
+			} else {
+				ctx = authContext
+			}
 		}
 		wireContext, err := opentracing.GlobalTracer().Extract(opentracing.TextMap, MdCarrier(meta))
 		if err != nil {
-			logrus.WithField("prefix", "auth-interceptor").Errorf("error %s", err)
+			logrus.WithField("prefix", "traced-interceptor").Errorf("error %s", err)
 			return handler(ctx, req)
 		}
 
