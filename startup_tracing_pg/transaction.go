@@ -2,7 +2,7 @@ package startup_tracing_pg
 
 import (
 	"fmt"
-	"github.com/flachnetz/startup/lib/transaction"
+	"github.com/flachnetz/startup/startup_postgres"
 	"github.com/flachnetz/startup/startup_tracing"
 	"github.com/jmoiron/sqlx"
 	"github.com/opentracing/opentracing-go"
@@ -13,10 +13,22 @@ import (
 
 
 type TracedHelper struct {
-	transaction.Helper
+	*sqlx.DB
+	log                logrus.FieldLogger
+	loggingPrefix      string
+	tracingServiceName string
 }
 
-func (p *Helper) WithTransaction(tag string, fn func(tx *sqlx.Tx) error) error {
+func New(db *sqlx.DB, loggingPrefix, tracingServiceName string) TracedHelper {
+	return TracedHelper{
+		DB:                 db,
+		log:                logrus.WithField("prefix", loggingPrefix),
+		loggingPrefix:      loggingPrefix,
+		tracingServiceName: tracingServiceName,
+	}
+}
+
+func (p *TracedHelper) WithTransaction(tag string, fn func(tx *sqlx.Tx) error) error {
 	var err error
 
 	startTime := time.Now()
@@ -26,7 +38,7 @@ func (p *Helper) WithTransaction(tag string, fn func(tx *sqlx.Tx) error) error {
 		err = startup_tracing.TraceChild(p.tracingServiceName+"-db", func(span opentracing.Span) error {
 			span.SetTag("dd.service", p.tracingServiceName)
 			span.SetTag("dd.resource", "tx:"+tag)
-			return WithTransaction(p.DB, fn)
+			return startup_postgres.WithTransaction(p.DB, fn)
 		})
 	})
 
