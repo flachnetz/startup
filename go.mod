@@ -6,12 +6,12 @@ require (
 	github.com/eSailors/go-datadog v1.1.4
 	github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a
 	github.com/flachnetz/go-admin v1.5.3
+	github.com/flachnetz/startup/lib/tracing v0.0.0-20190322073437-6ab7bb8f368d
 	github.com/gchaincl/sqlhooks v0.0.0-20180427182109-0ce9882095c1
 	github.com/go-logfmt/logfmt v0.4.0 // indirect
 	github.com/go-playground/locales v0.12.1 // indirect
 	github.com/go-playground/universal-translator v0.16.0 // indirect
 	github.com/go-sql-driver/mysql v1.4.1 // indirect
-	github.com/gogo/protobuf v1.2.1 // indirect
 	github.com/goji/httpauth v0.0.0-20160601135302-2da839ab0f4d
 	github.com/golang/protobuf v1.3.0 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
@@ -35,9 +35,7 @@ require (
 	github.com/miekg/dns v1.1.4 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/go-testing-interface v1.0.0 // indirect
-	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/gls v0.0.0-20180301095631-18e3a666c380
-	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/opentracing-contrib/go-observer v0.0.0-20170622124052-a52f23424492 // indirect
 	github.com/opentracing/opentracing-go v1.0.2
 	github.com/openzipkin-contrib/zipkin-go-opentracing v0.3.5 // indirect
@@ -45,7 +43,7 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a
 	github.com/rubenv/sql-migrate v0.0.0-20190212093014-1007f53448d7
-	github.com/sirupsen/logrus v1.3.0
+	github.com/sirupsen/logrus v1.4.0
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	github.com/ziutek/mymysql v1.5.4 // indirect
 	golang.org/x/crypto v0.0.0-20190225124518-7f87c0fbb88b // indirect
