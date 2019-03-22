@@ -1,6 +1,7 @@
 package startup_tracing
 
 import (
+	"github.com/flachnetz/startup/startup_base"
 	"github.com/opentracing/opentracing-go"
 	zipkin "github.com/openzipkin/zipkin-go-opentracing"
 	"github.com/sirupsen/logrus"
@@ -8,7 +9,6 @@ import (
 	// dummy import, see
 	// https://github.com/golang/dep/blob/master/docs/FAQ.md#how-do-i-constrain-a-transitive-dependency-s-version
 	_ "github.com/apache/thrift/lib/go/thrift"
-	"github.com/flachnetz/startup"
 	"sync"
 )
 
@@ -45,7 +45,7 @@ func (opts *TracingOptions) Initialize() {
 
 		// create collector
 		collector, err := zipkin.NewHTTPCollector(opts.Zipkin, zipkin.HTTPLogger(httpLogger))
-		startup.PanicOnError(err, "unable to create zipkin http collector")
+		startup_base.PanicOnError(err, "unable to create zipkin http collector")
 
 		// create recorder
 		recorder := zipkin.NewRecorder(collector, false, "", opts.Inputs.ServiceName)
@@ -56,7 +56,7 @@ func (opts *TracingOptions) Initialize() {
 			zipkin.ClientServerSameSpan(true),
 			zipkin.TraceID128Bit(false))
 
-		startup.PanicOnError(err, "Unable to create zipkin tracer")
+		startup_base.PanicOnError(err, "Unable to create zipkin tracer")
 
 		// explicitly set our tracer to be the default tracer.
 		opentracing.InitGlobalTracer(tracer)
