@@ -3,7 +3,7 @@ package startup_tracing_pg
 import (
 	"database/sql"
 	"github.com/flachnetz/startup/startup_base"
-	tracing "github.com/flachnetz/startup/startup_tracing"
+	"github.com/flachnetz/startup/startup_tracing"
 	"github.com/gchaincl/sqlhooks"
 	"github.com/lib/pq"
 	"sync"
@@ -13,7 +13,7 @@ type PostgresTracingOptions struct {
 	once sync.Once
 }
 
-func (opts *PostgresTracingOptions) Initialize(tops *tracing.TracingOptions) {
+func (opts *PostgresTracingOptions) Initialize(tops *startup_tracing.TracingOptions) {
 	opts.once.Do(func() {
 		if tops.IsActive() {
 			for _, driver := range sql.Drivers() {
