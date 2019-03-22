@@ -2,7 +2,7 @@ package startup_tracing_pg
 
 import (
 	"database/sql"
-	"github.com/flachnetz/startup"
+	"github.com/flachnetz/startup/startup_base"
 	tracing "github.com/flachnetz/startup/startup_tracing"
 	"github.com/gchaincl/sqlhooks"
 	"github.com/lib/pq"
@@ -18,7 +18,7 @@ func (opts *PostgresTracingOptions) Initialize(tops *tracing.TracingOptions) {
 		if tops.IsActive() {
 			for _, driver := range sql.Drivers() {
 				if driver == "pgx" {
-					startup.Panicf("Cannot setup tracing: 'pgx' driver already registered.")
+					startup_base.Panicf("Cannot setup tracing: 'pgx' driver already registered.")
 					return
 				}
 			}
