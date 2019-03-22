@@ -1,5 +1,7 @@
 module github.com/flachnetz/startup/startup_tracing
 
+// version
+
 go 1.12
 
 require (
