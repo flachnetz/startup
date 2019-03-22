@@ -5,6 +5,7 @@ require (
 	github.com/eSailors/go-datadog v1.1.4
 	github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a
 	github.com/flachnetz/go-admin v1.5.3
+	github.com/flachnetz/startup/startup_base v1.0.0
 	github.com/flachnetz/startup/startup_tracing v1.5.10
 	github.com/flachnetz/startup/startup_tracing_pg v0.0.0-20190322121500-b7aabef90e02
 	github.com/gchaincl/sqlhooks v0.0.0-20180427182109-0ce9882095c1
