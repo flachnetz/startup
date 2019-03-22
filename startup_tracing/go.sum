@@ -32,8 +32,11 @@ github.com/flachnetz/startup v1.5.3/go.mod h1:ZwstFgHIPUz/XdbfeNu2SN0BEy/lH1Abgy
 github.com/flachnetz/startup v1.5.4 h1:Y2Pq4PlvlK8i8QrXXIcvnF6rfjIQRsHP8AjB9gtCU3Y=
 github.com/flachnetz/startup v1.5.4/go.mod h1:/JXv3vBTvwbZlDNlsw9evIONKUE0sBiWlLNPNVbqeIE=
 github.com/flachnetz/startup v1.5.7/go.mod h1:/JXv3vBTvwbZlDNlsw9evIONKUE0sBiWlLNPNVbqeIE=
+github.com/flachnetz/startup v1.5.8/go.mod h1:RUys7TtMl6Kz6YLY2hOpNQAqn9fbVwqQHA5grXf6kd0=
 github.com/flachnetz/startup/lib/tracing v0.0.0-20190322073437-6ab7bb8f368d/go.mod h1:ZB2e1mkGWwscA0krFaobH80ByTj0p0iL+HRXt4/pvek=
 github.com/flachnetz/startup/startup_tracing v0.0.0-20190322090025-65ad0ad0e12e/go.mod h1:vYjLUCNS1PTbe0aw61QUhDe27XsC1AStKRMBk33VwUM=
+github.com/flachnetz/startup/startup_tracing v1.5.10/go.mod h1:APirr48N7Wx1TSx/9B9eXBbvfNPanmsjKt4M8uxq9+Q=
+github.com/flachnetz/startup/startup_tracing_pg v0.0.0-20190322121500-b7aabef90e02/go.mod h1:kIVWZuW7I54OVlQ7zLO3iWnAkFnP8LgOvU+H7uZlMlY=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/gchaincl/sqlhooks v0.0.0-20180427182109-0ce9882095c1/go.mod h1:kvcSeiqN3dMcwlPcJIeNNqIvrUpk+G0mmXDv5qPF5IU=
@@ -206,6 +209,7 @@ golang.org/x/net v0.0.0-20181201002055-351d144fa1fc/go.mod h1:mL1N/T3taQHkDXs73r
 golang.org/x/net v0.0.0-20181220203305-927f97764cc3/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
 golang.org/x/net v0.0.0-20190311183353-d8887717615a h1:oWX7TPOiFAMXLq8o0ikBYfCJVlRHBcsciT5bXOrH628=
 golang.org/x/net v0.0.0-20190311183353-d8887717615a/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=
+golang.org/x/net v0.0.0-20190322120337-addf6b3196f6/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=
 golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be/go.mod h1:N/0e6XlmueqKjAGxoOufVs8QHGRruUQn6yWY3a++T0U=
 golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.0.0-20181221193216-37e7f081c4d4/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=

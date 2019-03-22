@@ -1,4 +1,4 @@
-package startup
+package startup_base
 
 import (
 	"fmt"

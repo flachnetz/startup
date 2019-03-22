@@ -2,7 +2,7 @@ package startup_metrics
 
 import (
 	"github.com/eSailors/go-datadog"
-	"github.com/flachnetz/startup"
+	"github.com/flachnetz/startup/startup_base"
 	"github.com/pkg/errors"
 	"github.com/rcrowley/go-metrics"
 	"github.com/sirupsen/logrus"
@@ -45,7 +45,7 @@ func (opts *MetricsOptions) Initialize() {
 			metrics.DefaultRegistry = registry
 
 		} else {
-			startup.Panicf("Metrics prefix must be set")
+			startup_base.Panicf("Metrics prefix must be set")
 			return
 		}
 
@@ -55,7 +55,7 @@ func (opts *MetricsOptions) Initialize() {
 
 		if opts.Datadog.ApiKey != "" {
 			err := opts.setupDatadogMetricsReporter(registry)
-			startup.PanicOnError(err, "Cannot start datadog metrics reporter")
+			startup_base.PanicOnError(err, "Cannot start datadog metrics reporter")
 		}
 	})
 }

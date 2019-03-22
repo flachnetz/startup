@@ -2,6 +2,7 @@ package startup
 
 import (
 	"fmt"
+	"github.com/flachnetz/startup/startup_base"
 	"github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -83,7 +84,7 @@ func ParseCommandLine(opts interface{}) error {
 			for idx := 0; idx < initType.NumIn(); idx++ {
 				inputValue := seen[initType.In(idx)]
 				if !inputValue.IsValid() {
-					Panicf("Can not find value of type %s to inject into %s",
+					startup_base.Panicf("Can not find value of type %s to inject into %s",
 						initType.In(idx).String(), fieldValue.Type())
 				}
 

@@ -1,12 +1,12 @@
 package startup_postgres
 
 import (
+	"github.com/flachnetz/startup/startup_base"
 	"time"
 
 	"database/sql"
 	"fmt"
 	"github.com/facebookgo/clock"
-	"github.com/flachnetz/startup"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
@@ -55,7 +55,7 @@ func (opts *PostgresOptions) Connection() *sqlx.DB {
 		log.Debugf("Opening database using driver %s", driverName)
 
 		db, err := sqlx.Connect(driverName, opts.URL)
-		startup.PanicOnError(err, "Cannot connect to postgres")
+		startup_base.PanicOnError(err, "Cannot connect to postgres")
 
 		db.SetMaxOpenConns(opts.PoolSize)
 		db.SetMaxIdleConns(opts.PoolSize)
@@ -67,7 +67,7 @@ func (opts *PostgresOptions) Connection() *sqlx.DB {
 			if err := opts.Inputs.Initializer(db); err != nil {
 				// close database on error
 				defer db.Close()
-				startup.PanicOnError(err, "Database initialization failed")
+				startup_base.PanicOnError(err, "Database initialization failed")
 			}
 		}
 
@@ -92,7 +92,7 @@ func guessDriverName() string {
 		return "postgres"
 	}
 
-	panic(startup.Errorf("No postgres database driver found"))
+	panic(startup_base.Errorf("No postgres database driver found"))
 }
 
 func (opts *PostgresOptions) StartVacuumTask(db *sqlx.DB, table string, interval time.Duration, clock clock.Clock) io.Closer {

@@ -1,8 +1,8 @@
 package startup_schema
 
 import (
-	"github.com/flachnetz/startup"
 	"github.com/flachnetz/startup/lib/schema"
+	"github.com/flachnetz/startup/startup_base"
 	"github.com/flachnetz/startup/startup_consul"
 	"github.com/flachnetz/startup/startup_kafka"
 	"github.com/sirupsen/logrus"
@@ -42,7 +42,7 @@ func (opts *SchemaRegistryOptions) Initialize(kafka *startup_kafka.KafkaOptions,
 			opts.registry = kafka.SchemaRegistry(opts.Kafka.Topic, opts.Kafka.ReplFactor)
 
 		default:
-			startup.Panicf("Invalid option given for schema backend type: %s", opts.SchemaBackend)
+			startup_base.Panicf("Invalid option given for schema backend type: %s", opts.SchemaBackend)
 		}
 	})
 }

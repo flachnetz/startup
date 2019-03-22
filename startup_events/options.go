@@ -1,8 +1,8 @@
 package startup_events
 
 import (
-	"github.com/flachnetz/startup"
 	"github.com/flachnetz/startup/lib/events"
+	"github.com/flachnetz/startup/startup_base"
 	"github.com/sirupsen/logrus"
 	"os"
 	"strings"
@@ -46,7 +46,7 @@ func (opts *EventOptions) EventSender(kafkaClient KafkaClientProvider, registry 
 func (opts *EventOptions) newEventSender(kafkaClient KafkaClientProvider, registry SchemaRegistryProvider) events.EventSender {
 	topics := opts.Inputs.Topics(opts.KafkaReplicationFactor)
 	if topics.Fallback == "" {
-		startup.Panicf("Cannot create kafka event sender: no fallback topic was specified.")
+		startup_base.Panicf("Cannot create kafka event sender: no fallback topic was specified.")
 	}
 
 	log.Infof("Using event sender %s", opts.Sender)
@@ -73,7 +73,7 @@ func (opts *EventOptions) newEventSender(kafkaClient KafkaClientProvider, regist
 			encoder = events.NewAvroEncoder(registry.SchemaRegistry())
 
 		default:
-			startup.Errorf("Invalid event encoder specified: %s", opts.KafkaEncoder)
+			startup_base.Errorf("Invalid event encoder specified: %s", opts.KafkaEncoder)
 		}
 
 		kafkaConfig := events.KafkaSenderConfig{
@@ -83,7 +83,7 @@ func (opts *EventOptions) newEventSender(kafkaClient KafkaClientProvider, regist
 		}
 
 		kafkaSender, err := events.NewKafkaSender(kafkaClient.KafkaClient(), kafkaConfig)
-		startup.PanicOnError(err, "Cannot create kafka event sender")
+		startup_base.PanicOnError(err, "Cannot create kafka event sender")
 
 		log.Info("Event sender for kafka initialized")
 		return kafkaSender
@@ -92,12 +92,12 @@ func (opts *EventOptions) newEventSender(kafkaClient KafkaClientProvider, regist
 		if strings.HasPrefix(opts.Sender, "file:") {
 			filename := strings.TrimPrefix(opts.Sender, "file:")
 			sender, err := events.GZIPEventSender(filename)
-			startup.PanicOnError(err, "Could not open events file")
+			startup_base.PanicOnError(err, "Could not open events file")
 
 			return sender
 		}
 
-		panic(startup.Errorf("Invalid option given for event sender type: %s", opts.Sender))
+		panic(startup_base.Errorf("Invalid option given for event sender type: %s", opts.Sender))
 	}
 }
 

@@ -1,7 +1,7 @@
 package startup_postgres
 
 import (
-	"github.com/flachnetz/startup"
+	"github.com/flachnetz/startup/startup_base"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/rubenv/sql-migrate"
@@ -14,7 +14,7 @@ import (
 // name to store the migration progress
 func Migration(table, directory string) Initializer {
 	if _, err := os.Stat(directory); os.IsNotExist(err) {
-		startup.PanicOnError(err, "No database migration files found")
+		startup_base.PanicOnError(err, "No database migration files found")
 	}
 
 	return func(db *sqlx.DB) error {
@@ -49,5 +49,5 @@ func guessMigrationDirectory() string {
 		return name
 	}
 
-	panic(startup.Errorf("No sql directory found not found"))
+	panic(startup_base.Errorf("No sql directory found not found"))
 }
