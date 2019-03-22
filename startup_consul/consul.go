@@ -1,8 +1,8 @@
 package startup_consul
 
 import (
-	"github.com/flachnetz/startup"
 	"github.com/flachnetz/startup/lib/schema"
+	"github.com/flachnetz/startup/startup_base"
 	consul "github.com/hashicorp/consul/api"
 	"github.com/sirupsen/logrus"
 	"sync"
@@ -35,7 +35,7 @@ func (opts *ConsulOptions) ConsulClient() *consul.Client {
 		}
 
 		consulClient, err := consul.NewClient(consulConfig)
-		startup.PanicOnError(err, "Could not create consul client")
+		startup_base.PanicOnError(err, "Could not create consul client")
 
 		opts.client = consulClient
 	})

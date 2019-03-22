@@ -2,9 +2,9 @@ package startup_kafka
 
 import (
 	"github.com/Shopify/sarama"
-	"github.com/flachnetz/startup"
 	"github.com/flachnetz/startup/lib/kafka"
 	"github.com/flachnetz/startup/lib/schema"
+	"github.com/flachnetz/startup/startup_base"
 	"github.com/sirupsen/logrus"
 	"sync"
 	"time"
@@ -42,14 +42,14 @@ func (opts *KafkaOptions) KafkaClient() sarama.Client {
 		}
 
 		kafkaClient, err := sarama.NewClient(opts.Addresses, config)
-		startup.PanicOnError(err, "Cannot create kafka client")
+		startup_base.PanicOnError(err, "Cannot create kafka client")
 
 		if opts.Inputs.Topics != nil {
 			topics := opts.Inputs.Topics(opts.DefaultReplication)
 			log.Infof("Ensure that %d topics exist", len(topics))
 
 			err := kafka.EnsureTopics(kafkaClient, topics)
-			startup.PanicOnError(err, "Cannot create topics on kafka broker")
+			startup_base.PanicOnError(err, "Cannot create topics on kafka broker")
 		}
 
 		opts.kafkaClient = kafkaClient
@@ -61,7 +61,7 @@ func (opts *KafkaOptions) KafkaClient() sarama.Client {
 func (opts *KafkaOptions) SchemaRegistry(topic string, replicationFactor int) schema.Registry {
 	opts.schemaRegistryOnce.Do(func() {
 		registry, err := kafka.NewSchemaRegistry(opts.KafkaClient(), topic, int16(replicationFactor))
-		startup.PanicOnError(err, "Cannot create kafka based schema registry")
+		startup_base.PanicOnError(err, "Cannot create kafka based schema registry")
 
 		opts.schemaRegistry = registry
 	})

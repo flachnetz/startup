@@ -3,7 +3,7 @@ package startup_http
 import (
 	"context"
 	"github.com/flachnetz/go-admin"
-	"github.com/flachnetz/startup"
+	"github.com/flachnetz/startup/startup_base"
 	"github.com/goji/httpauth"
 	"github.com/gorilla/handlers"
 	"github.com/julienschmidt/httprouter"
@@ -60,15 +60,15 @@ func (opts HTTPOptions) Serve(config Config) {
 		admin.WithMetrics(metrics.DefaultRegistry),
 	}
 
-	if startup.BuildGitHash != "" {
+	if startup_base.BuildGitHash != "" {
 		var buildTime string
-		if ts, err := strconv.Atoi(startup.BuildUnixTimestamp); err == nil {
+		if ts, err := strconv.Atoi(startup_base.BuildUnixTimestamp); err == nil {
 			buildTime = time.Unix(int64(ts), 0).String()
 		}
 
 		routeConfigs = append(routeConfigs, admin.WithBuildInfo(admin.BuildInfo{
-			Version:   startup.BuildVersion,
-			GitHash:   startup.BuildGitHash,
+			Version:   startup_base.BuildVersion,
+			GitHash:   startup_base.BuildGitHash,
 			BuildTime: buildTime,
 		}))
 	}
@@ -104,8 +104,8 @@ func (opts HTTPOptions) Serve(config Config) {
 			handler)
 
 	} else if opts.AccessLog != "/dev/null" {
-		fp, err := startup.OpenWriter(opts.AccessLog)
-		startup.PanicOnError(err, "Could not open log file")
+		fp, err := startup_base.OpenWriter(opts.AccessLog)
+		startup_base.PanicOnError(err, "Could not open log file")
 
 		// write events directly to log file
 		handler = handlers.LoggingHandler(fp, handler)
@@ -137,7 +137,7 @@ func (opts HTTPOptions) Serve(config Config) {
 		<-waitCh
 
 	} else if err != nil {
-		startup.PanicOnError(err, "Could not start server")
+		startup_base.PanicOnError(err, "Could not start server")
 		return
 	}
 
