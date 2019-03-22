@@ -31,6 +31,7 @@ github.com/flachnetz/startup v1.5.3 h1:WlyORyA4tExHzgNKGlB/LP9ptGGm2S7uoy5GNf4vk
 github.com/flachnetz/startup v1.5.3/go.mod h1:ZwstFgHIPUz/XdbfeNu2SN0BEy/lH1AbgyWGf3M2Lxg=
 github.com/flachnetz/startup v1.5.4 h1:Y2Pq4PlvlK8i8QrXXIcvnF6rfjIQRsHP8AjB9gtCU3Y=
 github.com/flachnetz/startup v1.5.4/go.mod h1:/JXv3vBTvwbZlDNlsw9evIONKUE0sBiWlLNPNVbqeIE=
+github.com/flachnetz/startup v1.5.7/go.mod h1:/JXv3vBTvwbZlDNlsw9evIONKUE0sBiWlLNPNVbqeIE=
 github.com/flachnetz/startup/lib/tracing v0.0.0-20190322073437-6ab7bb8f368d/go.mod h1:ZB2e1mkGWwscA0krFaobH80ByTj0p0iL+HRXt4/pvek=
 github.com/flachnetz/startup/startup_tracing v0.0.0-20190322090025-65ad0ad0e12e/go.mod h1:vYjLUCNS1PTbe0aw61QUhDe27XsC1AStKRMBk33VwUM=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=
