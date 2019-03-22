@@ -10,7 +10,7 @@ import (
 
 func FatalOnError(err error, reason string, args ...interface{}) {
 	if err != nil {
-		log.Fatalf("%s: %s", fmt.Sprintf(reason, args...), err)
+		logrus.Fatalf("%s: %s", fmt.Sprintf(reason, args...), err)
 		return
 	}
 }
