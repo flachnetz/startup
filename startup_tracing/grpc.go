@@ -14,7 +14,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-type PreCheckFunc func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (context.Context, interface{}, error)
+type PreCheckFunc func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (context.Context, error)
 
 func TracedInterceptor(checkFunc PreCheckFunc) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
@@ -22,10 +22,10 @@ func TracedInterceptor(checkFunc PreCheckFunc) grpc.UnaryServerInterceptor {
 		meta, _ := metadata.FromIncomingContext(ctx)
 		logrus.WithField("prefix", "traced-interceptor").Debugf("incoming md: %+v", meta)
 		if checkFunc != nil {
-			if authContext, _, err := checkFunc(ctx, req, info, handler); err != nil {
+			if checkedContext, err := checkFunc(ctx, req, info, handler); err != nil {
 				return nil, err
 			} else {
-				ctx = authContext
+				ctx = checkedContext
 			}
 		}
 		wireContext, err := opentracing.GlobalTracer().Extract(opentracing.TextMap, MdCarrier(meta))
