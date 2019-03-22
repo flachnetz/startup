@@ -2,7 +2,7 @@ package startup_tracing_pg
 
 import (
 	"context"
-	"github.com/flachnetz/startup/lib/tracing"
+	"github.com/flachnetz/startup/startup_tracing"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"strings"
@@ -13,7 +13,7 @@ type dbHook struct {
 }
 
 func (h *dbHook) Before(ctx context.Context, query string, args ...interface{}) (context.Context, error) {
-	parent := tracing.CurrentSpan()
+	parent := startup_tracing.CurrentSpan()
 	if parent == nil {
 		return ctx, nil
 	}

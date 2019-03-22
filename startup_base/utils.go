@@ -8,9 +8,11 @@ import (
 	"os"
 )
 
+var log = logrus.WithField("prefix", "startup-base")
+
 func FatalOnError(err error, reason string, args ...interface{}) {
 	if err != nil {
-		logrus.Fatalf("%s: %s", fmt.Sprintf(reason, args...), err)
+		log.Fatalf("%s: %s", fmt.Sprintf(reason, args...), err)
 		return
 	}
 }
@@ -50,6 +52,6 @@ func PanicOnError(err error, msg string, args ...interface{}) {
 
 func Close(closer io.Closer, onErrorMessage string) {
 	if err := closer.Close(); err != nil {
-		logrus.WithError(err).Warn(onErrorMessage)
+		log.WithError(err).Warn(onErrorMessage)
 	}
 }

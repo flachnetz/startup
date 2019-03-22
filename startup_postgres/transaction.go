@@ -1,11 +1,8 @@
-package transaction
+package startup_postgres
 
 import (
 	"fmt"
-	"time"
-	"github.com/flachnetz/startup_tracing"
 	"github.com/jmoiron/sqlx"
-	"github.com/opentracing/opentracing-go"
 	"github.com/pkg/errors"
 	"github.com/rcrowley/go-metrics"
 	"github.com/sirupsen/logrus"
