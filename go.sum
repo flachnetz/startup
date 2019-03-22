@@ -40,6 +40,8 @@ github.com/flachnetz/startup/startup_tracing v0.0.0-20190322090025-65ad0ad0e12e 
 github.com/flachnetz/startup/startup_tracing v0.0.0-20190322090025-65ad0ad0e12e/go.mod h1:vYjLUCNS1PTbe0aw61QUhDe27XsC1AStKRMBk33VwUM=
 github.com/flachnetz/startup/startup_tracing v1.5.10 h1:BeP5yu5a0qwpqtRqzcCKBXTUt1DLfYOGTZIaNEBptwM=
 github.com/flachnetz/startup/startup_tracing v1.5.10/go.mod h1:APirr48N7Wx1TSx/9B9eXBbvfNPanmsjKt4M8uxq9+Q=
+github.com/flachnetz/startup/startup_tracing_pg v0.0.0-20190322121500-b7aabef90e02 h1:eWuwDKIqEMr5MDcwL+q1rrTt3iu1TG9v68kd3Qv9L74=
+github.com/flachnetz/startup/startup_tracing_pg v0.0.0-20190322121500-b7aabef90e02/go.mod h1:kIVWZuW7I54OVlQ7zLO3iWnAkFnP8LgOvU+H7uZlMlY=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/gchaincl/sqlhooks v0.0.0-20180427182109-0ce9882095c1 h1:SKcow3tUlTIgWh9hyIO7+vXeEm3iXERrZYFooYAlPHo=
@@ -273,6 +275,7 @@ golang.org/x/sys v0.0.0-20180905080454-ebe1bf3edb33/go.mod h1:STP8DvDyc/dI5b8T5h
 golang.org/x/sys v0.0.0-20180909124046-d0be0721c37e/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
 golang.org/x/sys v0.0.0-20181026203630-95b1ffbd15a5/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
 golang.org/x/sys v0.0.0-20181107165924-66b7b1311ac8/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
+golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a h1:1BGLXjeY4akVXGgbC9HugT3Jv3hCI0z56oJR5vAMgBU=
 golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
 golang.org/x/sys v0.0.0-20190222072716-a9d3bda3a223/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
 golang.org/x/sys v0.0.0-20190226215855-775f8194d0f9 h1:N26gncmS+iqc/W/SKhX3ElI5pkt72XYoRLgi5Z70LSc=
