@@ -19,8 +19,6 @@ type PreCheckFunc func(ctx context.Context, req interface{}, info *grpc.UnarySer
 func TracedInterceptor(checkFunc PreCheckFunc) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 
-		meta, _ := metadata.FromIncomingContext(ctx)
-		logrus.WithField("prefix", "traced-interceptor").Debugf("incoming md: %+v", meta)
 		if checkFunc != nil {
 			if checkedContext, err := checkFunc(ctx, req, info, handler); err != nil {
 				return nil, err
@@ -28,6 +26,8 @@ func TracedInterceptor(checkFunc PreCheckFunc) grpc.UnaryServerInterceptor {
 				ctx = checkedContext
 			}
 		}
+		meta, _ := metadata.FromIncomingContext(ctx)
+		logrus.WithField("prefix", "traced-interceptor").Debugf("incoming md: %+v", meta)
 		wireContext, err := opentracing.GlobalTracer().Extract(opentracing.TextMap, MdCarrier(meta))
 		if err != nil {
 			logrus.WithField("prefix", "traced-interceptor").Errorf("error %s", err)
