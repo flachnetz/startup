@@ -1,11 +1,19 @@
 package startup_postgres
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/rcrowley/go-metrics"
+	"github.com/sirupsen/logrus"
 )
+
+type BeginTxer interface {
+	Beginx() (*sqlx.Tx, error)
+	BeginTxx(ctx context.Context, opts *sql.TxOptions) (*sqlx.Tx, error)
+}
 
 type Helper struct {
 	*sqlx.DB
@@ -23,7 +31,7 @@ func (h *Helper) WithTransaction(fn func(tx *sqlx.Tx) error) (err error) {
 
 // Ends the given transaction. This method will either commit the transaction if
 // the given recoverValue is nil, or rollback the transaction if it is non nil.
-func WithTransaction(db *sqlx.DB, fn func(tx *sqlx.Tx) error) (err error) {
+func WithTransaction(db BeginTxer, fn func(tx *sqlx.Tx) error) (err error) {
 
 	var tx *sqlx.Tx
 
@@ -44,7 +52,9 @@ func WithTransaction(db *sqlx.DB, fn func(tx *sqlx.Tx) error) (err error) {
 
 		} else {
 			metrics.GetOrRegisterTimer("pq.transaction.rollback", nil).Time(func() {
-				tx.Rollback()
+				if err := tx.Rollback(); err != nil {
+					logrus.Warnf("Could not rollback transaction: %s", err)
+				}
 			})
 
 			// convert recovered value into an error instance
