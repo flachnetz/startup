@@ -13,7 +13,10 @@ type dbHook struct {
 }
 
 func (h *dbHook) Before(ctx context.Context, query string, args ...interface{}) (context.Context, error) {
-	parent := startup_tracing.CurrentSpan()
+	// lookup if we have a parent span
+	parent := startup_tracing.CurrentSpanFromContext(ctx)
+
+	// if we dont have a parent span, we don't do tracing
 	if parent == nil {
 		return ctx, nil
 	}

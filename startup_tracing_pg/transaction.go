@@ -1,48 +1,41 @@
 package startup_tracing_pg
 
 import (
-	"fmt"
+	"context"
 	"github.com/flachnetz/startup/startup_postgres"
 	"github.com/flachnetz/startup/startup_tracing"
 	"github.com/jmoiron/sqlx"
 	"github.com/opentracing/opentracing-go"
-	"github.com/rcrowley/go-metrics"
-	"github.com/sirupsen/logrus"
-	"time"
 )
-
 
 type TracedHelper struct {
 	*sqlx.DB
-	log                logrus.FieldLogger
-	loggingPrefix      string
 	tracingServiceName string
 }
 
-func New(db *sqlx.DB, loggingPrefix, tracingServiceName string) TracedHelper {
+func New(db *sqlx.DB, serviceName string) TracedHelper {
 	return TracedHelper{
 		DB:                 db,
-		log:                logrus.WithField("prefix", loggingPrefix),
-		loggingPrefix:      loggingPrefix,
-		tracingServiceName: tracingServiceName,
+		tracingServiceName: serviceName,
 	}
 }
 
 func (p *TracedHelper) WithTransaction(tag string, fn func(tx *sqlx.Tx) error) error {
-	var err error
+	ctx := context.Background()
 
-	startTime := time.Now()
+	span := startup_tracing.CurrentSpan()
+	if span == nil {
+		ctx = opentracing.ContextWithSpan(ctx, span)
+	}
 
-	metric := fmt.Sprintf("pq.%s.transaction[tag:%s]", p.loggingPrefix, tag)
-	metrics.GetOrRegisterTimer(metric, nil).Time(func() {
-		err = startup_tracing.TraceChild(p.tracingServiceName+"-db", func(span opentracing.Span) error {
-			span.SetTag("dd.service", p.tracingServiceName)
-			span.SetTag("dd.resource", "tx:"+tag)
-			return startup_postgres.WithTransaction(p.DB, fn)
-		})
+	return startup_postgres.NewTransactionContext(ctx, p.DB,
+		func(ctx context.Context, tx *sqlx.Tx) error { return fn(tx) })
+}
+
+func (p *TracedHelper) Traced(ctx context.Context, tag string, fn func(ctx context.Context) error) error {
+	return startup_tracing.TraceChildContext(ctx, p.tracingServiceName+"-db", func(ctx context.Context, span opentracing.Span) error {
+		span.SetTag("dd.service", p.tracingServiceName)
+		span.SetTag("dd.resource", "tx:"+tag)
+		return fn(ctx)
 	})
-
-	p.log.Debugf("Transaction '%s' took %s", tag, time.Since(startTime))
-
-	return err
 }
