@@ -9,7 +9,6 @@ require (
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/lib/pq v1.0.0
 	github.com/pkg/errors v0.8.1
-	github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a
 	github.com/rubenv/sql-migrate v0.0.0-20190212093014-1007f53448d7
 	github.com/sirupsen/logrus v1.4.0
 	github.com/ziutek/mymysql v1.5.4 // indirect
