@@ -1,6 +1,7 @@
 package startup_tracing
 
 import (
+	"context"
 	"github.com/modern-go/gls"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
@@ -16,6 +17,23 @@ var activeSpanKey = activeSpan{}
 // Returns the current span, or nil, if no span is currently set
 // in local storage.
 func CurrentSpan() opentracing.Span {
+	if g := gls.GetGls(gls.GoID()); g != nil {
+		if span, ok := g[activeSpanKey].(opentracing.Span); ok {
+			return span
+		}
+	}
+
+	return nil
+}
+
+// Returns the current span, or nil, if no span is currently set
+// in local storage.
+func CurrentSpanFromContext(ctx context.Context) opentracing.Span {
+	span := opentracing.SpanFromContext(ctx)
+	if span != nil {
+		return span
+	}
+
 	if g := gls.GetGls(gls.GoID()); g != nil {
 		if span, ok := g[activeSpanKey].(opentracing.Span); ok {
 			return span
@@ -86,5 +104,29 @@ func trace(op string, always bool, fn func(span opentracing.Span) error) (err er
 	}
 
 	err = fn(span)
+	return
+}
+
+// Trace a child call while propagating the span using the context.
+func TraceChildContext(ctx context.Context, op string, fn func(ctx context.Context, span opentracing.Span) error) (err error) {
+	parentSpan := opentracing.SpanFromContext(ctx)
+	if parentSpan == nil {
+		return fn(ctx, noopSpan)
+	}
+
+	span := parentSpan.Tracer().StartSpan(op,
+		ext.SpanKindRPCClient,
+		opentracing.ChildOf(parentSpan.Context()))
+
+	defer func() {
+		if err != nil {
+			span.SetTag("error", true)
+			span.SetTag("error_message", err.Error())
+		}
+
+		span.Finish()
+	}()
+
+	err = fn(opentracing.ContextWithSpan(ctx, span), span)
 	return
 }
