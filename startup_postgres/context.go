@@ -1,0 +1,82 @@
+package startup_postgres
+
+import (
+	"context"
+	"fmt"
+	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+)
+
+var ErrNoTransaction = errors.New("no transaction in context")
+
+type TransactionFn func(ctx context.Context, tx *sqlx.Tx) error
+
+type transactionKey struct{}
+
+// Gets the current transaction from the context
+//
+func TransactionFromContext(ctx context.Context) *sqlx.Tx {
+	return ctx.Value(transactionKey{}).(*sqlx.Tx)
+}
+
+// Puts a transaction into a context and returns
+// the new context with the transaction
+func ContextWithTransaction(ctx context.Context, tx *sqlx.Tx) context.Context {
+	return context.WithValue(ctx, transactionKey{}, tx)
+}
+
+// Calls the given operation with the transaction that is
+// currently stored in the context. Will fail with ErrNoTransaction if there
+// is no transaction stored in the context.
+func WithTransactionFromContext(ctx context.Context, operation func(tx *sqlx.Tx) error) error {
+	tx := TransactionFromContext(ctx)
+	if tx == nil {
+		return ErrNoTransaction
+	}
+
+	return operation(tx)
+}
+
+// Creates a new transaction, puts it into the context and runs the given operation
+// with the context and the transaction.
+func NewTransactionContext(ctx context.Context, db BeginTxer, operation TransactionFn) (err error) {
+	var tx *sqlx.Tx
+
+	// begin a new transaction
+	tx, err = db.BeginTxx(ctx, nil)
+	if err != nil {
+		return errors.WithMessage(err, "begin transaction")
+	}
+
+	defer func() {
+		r := recover()
+
+		if r == nil && err == nil {
+			// commit the transaction
+			if err = tx.Commit(); err != nil {
+				err = errors.WithMessage(err, "commit")
+			}
+
+		} else {
+			if err := tx.Rollback(); err != nil {
+				logrus.Warnf("Could not rollback transaction: %s", err)
+			}
+
+			// convert recovered value into an error instance
+			if r != nil {
+				var ok bool
+				if err, ok = r.(error); !ok {
+					err = fmt.Errorf("%#v", err)
+				}
+			}
+
+			// and give context to the error
+			err = errors.WithMessage(err, "transaction")
+		}
+	}()
+
+	err = operation(ContextWithTransaction(ctx, tx), tx)
+
+	return
+}
