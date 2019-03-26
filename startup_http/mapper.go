@@ -1,4 +1,4 @@
-package mapper
+package startup_http
 
 import (
 	"fmt"
