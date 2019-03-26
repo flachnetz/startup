@@ -24,12 +24,11 @@ github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a h1:yDWHCSQ40h88yi
 github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a/go.mod h1:7Ga40egUymuWXxAe151lTNnCv97MddSOVsjpPPkityA=
 github.com/flachnetz/startup/startup_base v1.0.0 h1:rRo57w8DY2NZG3u3Vkc152hI9npD1ogZ8FlwESmyObM=
 github.com/flachnetz/startup/startup_base v1.0.0/go.mod h1:konmOUtT1WORNuAcKinsHc9/9z40OLqIyYmnqmaRi+4=
-github.com/flachnetz/startup/startup_postgres v1.1.0 h1:Xkl8s7t8nzvGYTJajqdXRPQ2n1UA7M4HUlmPKY2Hafg=
-github.com/flachnetz/startup/startup_postgres v1.1.0/go.mod h1:zMUXLinZojbg/bhv4KMLh6GFcSdXrhYFBoYeIJDfPq8=
-github.com/flachnetz/startup/startup_tracing v1.5.11 h1:1bdPd9QPxJ/Q3JIwTCNZL15rL6OZ5zkgY3B5+M4sqwg=
-github.com/flachnetz/startup/startup_tracing v1.5.11/go.mod h1:s4d8HOWXdPEnxjcQp/s4M2g0LLBtP7x9QjBqcFJggX8=
+github.com/flachnetz/startup/startup_postgres v1.1.1 h1:gRhFPGqmPtl+cKKksxPhgEOm56IvNa0I/NnqLmaGExA=
+github.com/flachnetz/startup/startup_postgres v1.1.1/go.mod h1:Ab2MvhslhnIYkUmwywEl/h9aMiRnGx8xYSc/TF3WZ8U=
 github.com/flachnetz/startup/startup_tracing v1.6.0 h1:TOH9uTJpz4tljP4Q4uKJq1Yhp7mcQm3Aovo8nobL8/M=
 github.com/flachnetz/startup/startup_tracing v1.6.0/go.mod h1:s4d8HOWXdPEnxjcQp/s4M2g0LLBtP7x9QjBqcFJggX8=
+github.com/flachnetz/startup/startup_tracing v1.6.1/go.mod h1:s4d8HOWXdPEnxjcQp/s4M2g0LLBtP7x9QjBqcFJggX8=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
@@ -47,8 +46,6 @@ github.com/gobuffalo/logger v0.0.0-20190315122211-86e12af44bc2/go.mod h1:QdxcLw5
 github.com/gobuffalo/mapi v1.0.1/go.mod h1:4VAGh89y6rVOvm5A8fKFxYG+wIW6LO1FMTG9hnKStFc=
 github.com/gobuffalo/packd v0.0.0-20190315122247-83d601d65093 h1:ESaUc+p2J31vealRlSsQpvrt/WuqzLx0cS2akYj/kQE=
 github.com/gobuffalo/packd v0.0.0-20190315122247-83d601d65093/go.mod h1:LpEu7OkoplvlhztyAEePkS6JwcGgANdgGL5pB4Knxaw=
-github.com/gobuffalo/packd v0.0.0-20190315124812-a385830c7fc0 h1:P6naWPiHm/7R3eYx/ub3VhaW9G+1xAMJ6vzACePaGPI=
-github.com/gobuffalo/packd v0.0.0-20190315124812-a385830c7fc0/go.mod h1:M2Juc+hhDXf/PnmBANFCqx4DM3wRbgDvnVWeG2RIxq4=
 github.com/gobuffalo/packr v1.24.0 h1:pnDU7VZ1gPbkIEDiXzWPtUZr/RgWSpq9x7PE7uQB8zo=
 github.com/gobuffalo/packr v1.24.0/go.mod h1:p9Sgang00I1hlr1ub+tgI9AQdFd4f+WH1h62jYpzetM=
 github.com/gobuffalo/packr/v2 v2.0.6/go.mod h1:/TYKOjadT7P9jRWZtj4BRTgeXy2tIYntifGkD+aM2KY=
