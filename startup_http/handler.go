@@ -1,6 +1,7 @@
 package startup_http
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"io/ioutil"
@@ -295,7 +296,8 @@ func AdaptMiddlewareForHttpRouter(w HttpMiddleware) HttpRouterMiddleware {
 		}))
 
 		return func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
-			middleware.ServeHTTP(writer, request)
+			ctx := context.WithValue(request.Context(), httprouter.ParamsKey, params)
+			middleware.ServeHTTP(writer, request.WithContext(ctx))
 		}
 	}
 }
