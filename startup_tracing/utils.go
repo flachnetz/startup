@@ -104,7 +104,7 @@ func trace(op string, always bool, fn func(span opentracing.Span) error) (err er
 
 // Trace a child call while propagating the span using the context.
 func TraceChildContext(ctx context.Context, op string, fn func(ctx context.Context, span opentracing.Span) error) (err error) {
-	parentSpan := spanFromContextOrGLS(ctx)
+	parentSpan := CurrentSpanFromContextOrGLS(ctx)
 	if parentSpan == nil {
 		return fn(ctx, noopSpan)
 	}
@@ -129,7 +129,7 @@ func TraceChildContext(ctx context.Context, op string, fn func(ctx context.Conte
 // Returns the current span, or nil, if no span is currently set
 // in local storage.
 //
-func spanFromContextOrGLS(ctx context.Context) opentracing.Span {
+func CurrentSpanFromContextOrGLS(ctx context.Context) opentracing.Span {
 	span := opentracing.SpanFromContext(ctx)
 	if span != nil {
 		return span
