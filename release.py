@@ -44,16 +44,16 @@ def main():
     # get the canonical submodule name
     submodule = str(mod_path.relative_to(root).parent)
     if submodule == ".":
-        tag_prefix = ""
+        tag_prefix = "v"
     else:
-        tag_prefix = submodule + "/"
+        tag_prefix = submodule + "/v"
 
     print("Synchronize git tags with remote")
     subprocess.check_call(["git", "fetch"], cwd=str(root))
 
     print("Lookup version of go module")
     git_tags_output = subprocess.check_output(["git", "tag"], cwd=str(root)).decode("utf8")
-    module_versions = re.findall("^" + re.escape(tag_prefix) + r'v(\d+.\d+.\d+)$', git_tags_output, re.MULTILINE)
+    module_versions = re.findall("^" + re.escape(tag_prefix) + r'(\d+.\d+.\d+)$', git_tags_output, re.MULTILINE)
     module_version = max(parse_semver(v) for v in module_versions)
 
     major, minor, patch = module_version
