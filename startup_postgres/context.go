@@ -17,7 +17,12 @@ type transactionKey struct{}
 // Gets the current transaction from the context or nil, if the context
 // does not contain a transaction.
 func TransactionFromContext(ctx context.Context) *sqlx.Tx {
-	return ctx.Value(transactionKey{}).(*sqlx.Tx)
+	txValue := ctx.Value(transactionKey{})
+	if txValue == nil {
+		return nil
+	}
+
+	return txValue.(*sqlx.Tx)
 }
 
 // Puts a transaction into a context and returns
