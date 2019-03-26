@@ -29,6 +29,10 @@ type Config struct {
 
 	// Extra admin handlers to register on the admin page
 	AdminHandlers []admin.RouteConfig
+
+	// Registers a shutdown handler for the http server. If not set,
+	// a default signal handler for clean shutdown on SIGINT and SIGTERM is used.
+	RegisterSignalHandlerForServer func(*http.Server) <-chan struct{}
 }
 
 type HTTPOptions struct {
@@ -118,7 +122,12 @@ func (opts HTTPOptions) Serve(config Config) {
 		IdleTimeout:       60 * time.Second,
 	}
 
-	waitCh := registerSignalHandlerForServer(server)
+	registerSignalHandler := config.RegisterSignalHandlerForServer
+	if registerSignalHandler == nil {
+		registerSignalHandler = RegisterSignalHandlerForServer
+	}
+
+	waitCh := registerSignalHandler(server)
 
 	var err error
 	if opts.TLSCertFile == "" && opts.TLSKeyFile == "" {
@@ -144,7 +153,7 @@ func (opts HTTPOptions) Serve(config Config) {
 	log.Info("Server shutdown completed.")
 }
 
-func registerSignalHandlerForServer(server *http.Server) <-chan struct{} {
+func RegisterSignalHandlerForServer(server *http.Server) <-chan struct{} {
 	waitCh := make(chan struct{})
 
 	signalCh := make(chan os.Signal)
@@ -157,7 +166,11 @@ func registerSignalHandlerForServer(server *http.Server) <-chan struct{} {
 		<-signalCh
 
 		log.WithField("prefix", "httpd").Info("Signal received, shutting down")
-		server.Shutdown(context.Background())
+
+		err := server.Shutdown(context.Background())
+		if err != nil {
+			log.WithField("prefix", "httpd").Warnf("Server shutdown")
+		}
 
 		close(waitCh)
 	}()
