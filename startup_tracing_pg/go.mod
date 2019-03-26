@@ -5,9 +5,8 @@ go 1.12
 require (
 	github.com/flachnetz/startup/startup_base v1.0.0
 	github.com/flachnetz/startup/startup_postgres v1.1.1
-	github.com/flachnetz/startup/startup_tracing v1.6.1
+	github.com/flachnetz/startup/startup_tracing v1.6.2
 	github.com/gchaincl/sqlhooks v1.1.0
-	github.com/jmoiron/sqlx v1.2.0
 	github.com/lib/pq v1.0.0
 	github.com/mattn/go-isatty v0.0.7 // indirect
 	github.com/opentracing/opentracing-go v1.0.2
