@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/flachnetz/startup"
 	"github.com/flachnetz/startup/lib/events"
+	"github.com/flachnetz/startup/startup_base"
 	"github.com/flachnetz/startup/startup_consul"
 	"github.com/flachnetz/startup/startup_events"
 	"github.com/flachnetz/startup/startup_http"
@@ -20,7 +21,7 @@ import (
 
 func main() {
 	var opts struct {
-		Base            startup.BaseOptions
+		Base            startup_base.BaseOptions
 		Metrics         startup_metrics.MetricsOptions
 		Consul          startup_consul.ConsulOptions
 		Tracing         startup_tracing.TracingOptions
