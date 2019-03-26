@@ -14,8 +14,8 @@ type TransactionFn func(ctx context.Context, tx *sqlx.Tx) error
 
 type transactionKey struct{}
 
-// Gets the current transaction from the context
-//
+// Gets the current transaction from the context or nil, if the context
+// does not contain a transaction.
 func TransactionFromContext(ctx context.Context) *sqlx.Tx {
 	return ctx.Value(transactionKey{}).(*sqlx.Tx)
 }
@@ -39,8 +39,9 @@ func WithTransactionFromContext(ctx context.Context, operation func(tx *sqlx.Tx)
 }
 
 // Creates a new transaction, puts it into the context and runs the given operation
-// with the context and the transaction.
-func NewTransactionContext(ctx context.Context, db BeginTxer, operation TransactionFn) (err error) {
+// with the context and the transaction. This is a var so that you are able to replace
+// it with your own function to enable tracing during initialization of your application.
+var WithTransactionContext = func(ctx context.Context, db TxStarter, operation TransactionFn) (err error) {
 	var tx *sqlx.Tx
 
 	// begin a new transaction

@@ -6,29 +6,37 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-type BeginTxer interface {
-	Beginx() (*sqlx.Tx, error)
+type TxStarter interface {
 	BeginTxx(ctx context.Context, opts *sql.TxOptions) (*sqlx.Tx, error)
 }
 
-type Helper struct {
+type TxHelper struct {
 	*sqlx.DB
 }
 
-func New(db *sqlx.DB) Helper {
-	return Helper{
+func NewTxHelper(db *sqlx.DB) TxHelper {
+	return TxHelper{
 		DB: db,
 	}
 }
 
-func (h *Helper) WithTransaction(fn func(tx *sqlx.Tx) error) (err error) {
+// Deprecated: Stop using this and start using the WithTransaction
+// function that includes the context argument
+func (h *TxHelper) WithTransaction(fn func(tx *sqlx.Tx) error) (err error) {
 	return WithTransaction(h.DB, fn)
+}
+
+func (h *TxHelper) WithTransactionContext(ctx context.Context, operation TransactionFn) error {
+	return WithTransactionContext(ctx, h.DB, operation)
 }
 
 // Ends the given transaction. This method will either commit the transaction if
 // the given recoverValue is nil, or rollback the transaction if it is non nil.
-func WithTransaction(db BeginTxer, fn func(tx *sqlx.Tx) error) (err error) {
-	return NewTransactionContext(context.Background(), db, func(ctx context.Context, tx *sqlx.Tx) error {
+//
+// Deprecated: Use a variant of this function that includes a context argument.
+//
+func WithTransaction(db TxStarter, fn func(tx *sqlx.Tx) error) (err error) {
+	return WithTransactionContext(context.Background(), db, func(ctx context.Context, tx *sqlx.Tx) error {
 		return fn(tx)
 	})
 }
