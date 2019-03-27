@@ -10,12 +10,10 @@ import (
 	"strings"
 )
 
-type Middleware func(http.Handler) http.Handler
-
 // Returns a middleware that adds tracing to an http handler.
 // This will create a new and empty local storage for the current go routine
 // to propagate the tracing context.
-func Tracing(service string, op string) Middleware {
+func Tracing(service string, op string) func(http.Handler) http.Handler {
 	log := logrus.WithField("prefix", "tracing")
 
 	reClean := regexp.MustCompile(`/(?:tenants|sites|games|customers)/[^/]+`)
@@ -50,13 +48,16 @@ func Tracing(service string, op string) Middleware {
 				ext.HTTPStatusCode.Set(serverSpan, uint16(rl.status))
 			}()
 
-			gls.WithEmptyGls(func() {
-				ctx := opentracing.ContextWithSpan(req.Context(), serverSpan)
-
-				WithSpan(serverSpan, func() {
-					handle.ServeHTTP(rl, req.WithContext(ctx))
-				})
-			})()
+			ctx := opentracing.ContextWithSpan(req.Context(), serverSpan)
+			if UseGLS {
+				gls.WithEmptyGls(func() {
+					WithSpan(serverSpan, func() {
+						handle.ServeHTTP(rl, req.WithContext(ctx))
+					})
+				})()
+			} else {
+				handle.ServeHTTP(rl, req.WithContext(ctx))
+			}
 		})
 	}
 }

@@ -7,6 +7,9 @@ import (
 	"github.com/opentracing/opentracing-go/ext"
 )
 
+// Use the legacy GLS way to forward spans using goroutine-local storage.
+var UseGLS = true
+
 // a span that does nothing
 var noopSpan = opentracing.NoopTracer{}.StartSpan("")
 
@@ -20,9 +23,11 @@ var activeSpanKey = activeSpan{}
 // Deprecated: Start using the version with an explicit context parameter.
 //
 func CurrentSpan() opentracing.Span {
-	if g := gls.GetGls(gls.GoID()); g != nil {
-		if span, ok := g[activeSpanKey].(opentracing.Span); ok {
-			return span
+	if UseGLS {
+		if g := gls.GetGls(gls.GoID()); g != nil {
+			if span, ok := g[activeSpanKey].(opentracing.Span); ok {
+				return span
+			}
 		}
 	}
 
@@ -36,15 +41,16 @@ func CurrentSpan() opentracing.Span {
 // Deprecated: Please propagate spans using contexts.
 //
 func WithSpan(span opentracing.Span, fn func()) {
-	if g := gls.GetGls(gls.GoID()); g != nil {
-		previousSpan := g[activeSpanKey]
-		g[activeSpanKey] = span
+	if UseGLS {
+		if g := gls.GetGls(gls.GoID()); g != nil {
+			previousSpan := g[activeSpanKey]
+			g[activeSpanKey] = span
 
-		// restore previous span later
-		defer func() {
-			g[activeSpanKey] = previousSpan
-		}()
-
+			// restore previous span later
+			defer func() {
+				g[activeSpanKey] = previousSpan
+			}()
+		}
 	}
 
 	fn()
@@ -71,31 +77,33 @@ func TraceOrCreate(op string, fn func(span opentracing.Span) error) (err error) 
 func trace(op string, always bool, fn func(span opentracing.Span) error) (err error) {
 	span := noopSpan
 
-	if g := gls.GetGls(gls.GoID()); g != nil {
-		previousSpan, ok := g[activeSpanKey].(opentracing.Span)
+	if UseGLS {
+		if g := gls.GetGls(gls.GoID()); g != nil {
+			previousSpan, ok := g[activeSpanKey].(opentracing.Span)
 
-		if ok && previousSpan != nil {
-			// build a child span
-			span = previousSpan.Tracer().StartSpan(op,
-				ext.SpanKindRPCClient,
-				opentracing.ChildOf(previousSpan.Context()))
-		} else if always {
-			// start a new one
-			span = opentracing.StartSpan(op, ext.SpanKindRPCClient)
-		}
-
-		g[activeSpanKey] = span
-
-		defer func() {
-			g[activeSpanKey] = previousSpan
-
-			if err != nil {
-				span.SetTag("error", true)
-				span.SetTag("error_message", err.Error())
+			if ok && previousSpan != nil {
+				// build a child span
+				span = previousSpan.Tracer().StartSpan(op,
+					ext.SpanKindRPCClient,
+					opentracing.ChildOf(previousSpan.Context()))
+			} else if always {
+				// start a new one
+				span = opentracing.StartSpan(op, ext.SpanKindRPCClient)
 			}
 
-			span.Finish()
-		}()
+			g[activeSpanKey] = span
+
+			defer func() {
+				g[activeSpanKey] = previousSpan
+
+				if err != nil {
+					span.SetTag("error", true)
+					span.SetTag("error_message", err.Error())
+				}
+
+				span.Finish()
+			}()
+		}
 	}
 
 	err = fn(span)
@@ -135,9 +143,11 @@ func CurrentSpanFromContextOrGLS(ctx context.Context) opentracing.Span {
 		return span
 	}
 
-	if g := gls.GetGls(gls.GoID()); g != nil {
-		if span, ok := g[activeSpanKey].(opentracing.Span); ok {
-			return span
+	if UseGLS {
+		if g := gls.GetGls(gls.GoID()); g != nil {
+			if span, ok := g[activeSpanKey].(opentracing.Span); ok {
+				return span
+			}
 		}
 	}
 

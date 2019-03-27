@@ -16,7 +16,9 @@ import (
 
 type PreCheckFunc func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (context.Context, error)
 
-func TracedInterceptor(checkFunc PreCheckFunc) grpc.UnaryServerInterceptor {
+func GRPCTraceInterceptor(checkFunc PreCheckFunc) grpc.UnaryServerInterceptor {
+	log := logrus.WithField("prefix", "traced-interceptor")
+
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 
 		if checkFunc != nil {
@@ -26,16 +28,17 @@ func TracedInterceptor(checkFunc PreCheckFunc) grpc.UnaryServerInterceptor {
 				ctx = checkedContext
 			}
 		}
+
 		meta, _ := metadata.FromIncomingContext(ctx)
-		logrus.WithField("prefix", "traced-interceptor").Debugf("incoming md: %+v", meta)
 		wireContext, err := opentracing.GlobalTracer().Extract(opentracing.TextMap, MdCarrier(meta))
 		if err != nil {
-			logrus.WithField("prefix", "traced-interceptor").Errorf("error %s", err)
+			log.Warnf("Could not extract spanf rom parent: %s", err)
 			return handler(ctx, req)
 		}
 
 		span := opentracing.GlobalTracer().StartSpan(info.FullMethod, ext.RPCServerOption(wireContext))
 		defer span.Finish()
+
 		ctxWithSpan := opentracing.ContextWithSpan(ctx, span)
 
 		gls.WithGls(func() {
