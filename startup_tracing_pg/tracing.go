@@ -46,19 +46,19 @@ func installTransactionTracingHook(serviceName string) {
 
 		// get the first method in the stack outside of the startup package
 		pcSlice := [10]uintptr{}
-		n := runtime.Callers(0, pcSlice[:])
+		n := runtime.Callers(1, pcSlice[:])
 		if n > 0 {
 			frames := runtime.CallersFrames(pcSlice[:])
 			for {
 				frame, more := frames.Next()
 
 				// take first one out of startup
-				if strings.Contains(frame.Function, "flachnetz/startup_") {
+				if !strings.Contains(frame.Function, "flachnetz/startup/") {
 					tag = frame.Function
 					break
 				}
 
-				if ! more {
+				if !more {
 					break
 				}
 			}
