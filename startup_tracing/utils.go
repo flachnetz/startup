@@ -112,14 +112,16 @@ func trace(op string, always bool, fn func(span opentracing.Span) error) (err er
 
 // Trace a child call while propagating the span using the context.
 func TraceChildContext(ctx context.Context, op string, fn func(ctx context.Context, span opentracing.Span) error) (err error) {
+	var parentContext opentracing.SpanContext
+
 	parentSpan := CurrentSpanFromContextOrGLS(ctx)
-	if parentSpan == nil {
-		return fn(ctx, noopSpan)
+	if parentSpan != nil {
+		parentContext = parentSpan.Context()
 	}
 
-	span := parentSpan.Tracer().StartSpan(op,
+	span := opentracing.GlobalTracer().StartSpan(op,
 		ext.SpanKindRPCClient,
-		opentracing.ChildOf(parentSpan.Context()))
+		opentracing.ChildOf(parentContext))
 
 	defer func() {
 		if err != nil {
