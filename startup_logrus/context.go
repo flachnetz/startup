@@ -14,6 +14,10 @@ func WithLogger(ctx context.Context, logger *logrus.Entry) context.Context {
 
 // returns the current logger with the given prefix from the context.
 func GetLogger(ctx context.Context, prefix string) *logrus.Entry {
+	if ctx == nil {
+		return emptyEntry.WithField("prefix", prefix)
+	}
+
 	logger := ctx.Value(loggerKey{})
 	if logger == nil {
 		return emptyEntry.WithField("prefix", prefix)
