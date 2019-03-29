@@ -16,7 +16,7 @@ func WithLogger(ctx context.Context, logger *logrus.Entry) context.Context {
 
 // returns the current logger with the given prefix or type name from the context.
 func GetLogger(ctx context.Context, object interface{}) *logrus.Entry {
-	log := loggerOf(ctx)
+	log := loggerOf(ctx).WithContext(ctx)
 
 	prefix := prefixOf(object)
 	if prefix == "" {
@@ -46,6 +46,9 @@ func prefixOf(object interface{}) string {
 
 	case fmt.Stringer:
 		return object.String()
+
+	case nil:
+		return ""
 
 	default:
 		t := reflect.ValueOf(object).Type()
