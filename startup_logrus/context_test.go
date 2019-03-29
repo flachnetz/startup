@@ -34,6 +34,14 @@ func TestPrefixOf(t *testing.T) {
 	if prefix := prefixOf(myService{}); prefix != "myService" {
 		t.Fatalf("expected prefix 'myService' but got '%s'", prefix)
 	}
+
+	if prefix := prefixOf(&someStringer{}); prefix != "From Stringer" {
+		t.Fatalf("expected prefix 'From Stringer' but got '%s'", prefix)
+	}
+
+	if prefix := prefixOf(&myService{}); prefix != "myService" {
+		t.Fatalf("expected prefix 'myService' but got '%s'", prefix)
+	}
 }
 
 type someStringer struct{}
