@@ -56,6 +56,8 @@ github.com/flachnetz/startup/startup_schema v1.0.0 h1:MW0nfbKB8aP2aTJkO5lQ8wW05p
 github.com/flachnetz/startup/startup_schema v1.0.0/go.mod h1:7jUJZjLe/NxidLurgDZdX+YwvFPXikHxzjYHHx0XOK0=
 github.com/flachnetz/startup/startup_tracing v1.6.2 h1:xOC/EBhiKlelJMH4CHit+qQiLjeTevPa5AVmeuya0g4=
 github.com/flachnetz/startup/startup_tracing v1.6.2/go.mod h1:s4d8HOWXdPEnxjcQp/s4M2g0LLBtP7x9QjBqcFJggX8=
+github.com/flachnetz/startup/startup_tracing v1.6.4 h1:F0kBiNDl+EcoM6pGAYLx8+SRw7tMBt1a8CSXb6Cojhs=
+github.com/flachnetz/startup/startup_tracing v1.6.4/go.mod h1:edNfNMdipZ7BgDuKFIummC8IRdYWuD8lko+of5NiTjQ=
 github.com/flachnetz/startup/startup_tracing_pg v1.1.2 h1:znXaFe30w/SRDHDOS7v+s4VtQK9EJ0w6VRigLsMf7KQ=
 github.com/flachnetz/startup/startup_tracing_pg v1.1.2/go.mod h1:GJLIcuQ106HKWcemrUvbM8Y+YH/cKVqacmreTxXhlX4=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=
@@ -91,6 +93,7 @@ github.com/golang/protobuf v1.2.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5y
 github.com/golang/protobuf v1.3.0/go.mod h1:Qd/q+1AKNOZr9uGQzbzCmRO6sUih6GTPZv6a1/R87v0=
 github.com/golang/protobuf v1.3.1 h1:YF8+flBXS5eO826T4nzqPrxfhQThhXl0YzfuUPu4SBg=
 github.com/golang/protobuf v1.3.1/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
+github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db h1:woRePGFeVFfLKN/pOkfl+p/TAqKOfFu+7KPlMVpok/w=
 github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEWrmP2Q=
 github.com/golang/snappy v0.0.1 h1:Qgr9rKW7uDUkrbSmQeiDsGa8SjGyCOGtuasMWwvp2P4=
 github.com/golang/snappy v0.0.1/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEWrmP2Q=

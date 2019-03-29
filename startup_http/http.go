@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/flachnetz/go-admin"
 	"github.com/flachnetz/startup/startup_base"
+	. "github.com/flachnetz/startup/startup_logrus"
 	"github.com/goji/httpauth"
 	"github.com/gorilla/handlers"
 	"github.com/julienschmidt/httprouter"
@@ -33,6 +34,10 @@ type Config struct {
 	// Registers a shutdown handler for the http server. If not set,
 	// a default signal handler for clean shutdown on SIGINT and SIGTERM is used.
 	RegisterSignalHandlerForServer func(*http.Server) <-chan struct{}
+
+	// Wrap the http server with this middleware in the end. A good example would
+	// be to use a tracing middleware at this point.
+	UseMiddleware HttpMiddleware
 }
 
 type HTTPOptions struct {
@@ -103,16 +108,28 @@ func (opts HTTPOptions) Serve(config Config) {
 
 	if opts.AccessLog == "" {
 		// log all requests using logrus logger
-		handler = handlers.LoggingHandler(
-			log.WithField("prefix", "httpd").WriterLevel(log.DebugLevel),
-			handler)
+		handler = loggingHandler{
+			handler: handler,
+			log: func(ctx context.Context, line string) {
+				GetLogger(ctx, "httpd").Debug(line)
+			},
+		}
 
 	} else if opts.AccessLog != "/dev/null" {
 		fp, err := startup_base.OpenWriter(opts.AccessLog)
 		startup_base.PanicOnError(err, "Could not open log file")
 
 		// write events directly to log file
-		handler = handlers.LoggingHandler(fp, handler)
+		handler = loggingHandler{
+			handler: handler,
+			log: func(ctx context.Context, line string) {
+				_, _ = fp.Write([]byte(line + "\n"))
+			},
+		}
+	}
+
+	if config.UseMiddleware != nil {
+		handler = config.UseMiddleware(handler)
 	}
 
 	server := &http.Server{

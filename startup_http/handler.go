@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	. "github.com/flachnetz/startup/startup_logrus"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -12,8 +13,6 @@ import (
 	"fmt"
 	"github.com/julienschmidt/httprouter"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-
 	"gopkg.in/go-playground/validator.v9"
 	"net/url"
 )
@@ -66,7 +65,11 @@ func WriteJSON(w http.ResponseWriter, status int, value interface{}) {
 }
 
 func WriteError(writer http.ResponseWriter, status int, err error) {
-	logrus.Warn("Writing response error: ", err)
+	WriteErrorContext(context.Background(), writer, status, err)
+}
+
+func WriteErrorContext(ctx context.Context, writer http.ResponseWriter, status int, err error) {
+	GetLogger(ctx, "httpd").Warn("Writing response error: ", err)
 
 	if status < 400 {
 		status = http.StatusInternalServerError
@@ -191,7 +194,7 @@ func ExtractAndCall(target interface{}, w http.ResponseWriter, r *http.Request, 
 		// parse 'path' and 'url' parameters
 		err := ExtractParameters(target, r, params)
 		if err != nil {
-			WriteError(w, http.StatusBadRequest, err)
+			WriteErrorContext(r.Context(), w, http.StatusBadRequest, err)
 			return
 		}
 	}
@@ -267,37 +270,4 @@ func ExtractParameters(target interface{}, r *http.Request, params httprouter.Pa
 	}
 
 	return nil
-}
-
-type HttpMiddleware func(http.Handler) http.Handler
-
-// Takes a httprouter.Handle middleware and wraps it so it can  be used
-// with http.Handler functions.
-func AdaptMiddlewareForHttp(middleware HttpRouterMiddleware) HttpMiddleware {
-	return func(handler http.Handler) http.Handler {
-		wrapped := middleware(func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
-			handler.ServeHTTP(writer, request)
-		})
-
-		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			wrapped(writer, request, httprouter.ParamsFromContext(request.Context()))
-		})
-	}
-}
-
-type HttpRouterMiddleware func(httprouter.Handle) httprouter.Handle
-
-// Takes a normal http.Handler middleware and wraps it so it can  be used
-// with httprouter.Handle functions.
-func AdaptMiddlewareForHttpRouter(w HttpMiddleware) HttpRouterMiddleware {
-	return func(handle httprouter.Handle) httprouter.Handle {
-		middleware := w(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			handle(writer, request, httprouter.ParamsFromContext(request.Context()))
-		}))
-
-		return func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
-			ctx := context.WithValue(request.Context(), httprouter.ParamsKey, params)
-			middleware.ServeHTTP(writer, request.WithContext(ctx))
-		}
-	}
 }
