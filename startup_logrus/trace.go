@@ -53,10 +53,10 @@ func spanContextOf(ctx context.Context) opentracing.SpanContext {
 	return span.Context()
 }
 
-func traceIdOf(spanContext opentracing.SpanContext) string {
+func traceIdOf(spanContext interface{}) string {
 	type hexer interface{ ToHex() string }
 
-	rSpanContext := reflect.ValueOf(spanContext).Elem()
+	rSpanContext := reflect.ValueOf(spanContext)
 	if !rSpanContext.IsValid() || rSpanContext.Kind() != reflect.Struct {
 		return ""
 	}
@@ -67,7 +67,7 @@ func traceIdOf(spanContext opentracing.SpanContext) string {
 	}
 
 	traceId, ok := fieldTraceId.Interface().(hexer)
-	if ! ok {
+	if !ok {
 		return ""
 	}
 
