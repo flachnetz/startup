@@ -53,6 +53,10 @@ func prefixOf(object interface{}) string {
 	default:
 		t := reflect.ValueOf(object).Type()
 
+		for t.Kind() == reflect.Ptr || t.Kind() == reflect.Interface {
+			t = t.Elem()
+		}
+
 		prefix := t.Name()
 		if prefix == "" {
 			prefix = t.PkgPath()
