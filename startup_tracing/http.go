@@ -1,30 +1,53 @@
 package startup_tracing
 
 import (
+	"context"
+	"github.com/flachnetz/startup/startup_http"
+	. "github.com/flachnetz/startup/startup_logrus"
 	"github.com/modern-go/gls"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
-	"github.com/sirupsen/logrus"
 	"net/http"
 	"regexp"
 	"strings"
 )
 
+var reNumber = regexp.MustCompile(`/[0-9]+`)
+var reClean = regexp.MustCompile(`/(?:tenants|sites|games|customers|tickets)/[^/]+`)
+var reUUID = regexp.MustCompile(`/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}`)
+
 // Returns a middleware that adds tracing to an http handler.
 // This will create a new and empty local storage for the current go routine
 // to propagate the tracing context.
-func Tracing(service string, op string) func(http.Handler) http.Handler {
-	log := logrus.WithField("prefix", "tracing")
+//
+// You can use the tracing middleware multiple time. Using it a second time
+// will not start a new trace but will update 'service' and 'operation'.
+//
+func Tracing(service string, op string) startup_http.HttpMiddleware {
 
-	reClean := regexp.MustCompile(`/(?:tenants|sites|games|customers)/[^/]+`)
-
-	return func(handle http.Handler) http.Handler {
+	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			ctx := req.Context()
+
+			// Check if we already have a span. This happens when the user is
+			// chaining multiple tracing middleware
+			if existingSpan := opentracing.SpanFromContext(ctx); existingSpan != nil {
+				// update existing span
+				existingSpan.SetOperationName(op)
+				existingSpan.SetTag("dd.service", service)
+
+				// continue
+				handler.ServeHTTP(w, req)
+				return
+			}
+
+			// extract a span from the incoming request
 			wireContext, err := opentracing.GlobalTracer().Extract(
 				opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(req.Header))
 
 			if err != nil && err != opentracing.ErrSpanContextNotFound {
-				// ignore errors
+				// ignore errors but show a small warning.
+				log := GetLogger(ctx, "http")
 				log.Warnf("Could not extract tracer from http headers: %s", err)
 			}
 
@@ -33,33 +56,46 @@ func Tracing(service string, op string) func(http.Handler) http.Handler {
 			defer serverSpan.Finish()
 
 			// use a clean url as resource
-			url := reClean.ReplaceAllStringFunc(req.URL.String(), func(s string) string {
-				idx := strings.LastIndexByte(s, '/')
-				return s[:idx] + strings.ToUpper(s[:idx])
-			})
-
 			serverSpan.SetTag("dd.service", service)
-			ext.HTTPUrl.Set(serverSpan, url)
 			ext.HTTPMethod.Set(serverSpan, req.Method)
+			ext.HTTPUrl.Set(serverSpan, cleanUrl(req.URL.String()))
 
 			// record and log the status code of the response
 			rl := responseLoggerOf(w)
-			defer func() {
-				ext.HTTPStatusCode.Set(serverSpan, uint16(rl.status))
-			}()
+			defer rl.addStatusToSpan(serverSpan)
 
-			ctx := opentracing.ContextWithSpan(req.Context(), serverSpan)
+			// put the span into the context
+			ctx = opentracing.ContextWithSpan(ctx, serverSpan)
+
 			if UseGLS {
-				gls.WithEmptyGls(func() {
+				// if we are using GLS, we need to run the real handler function in
+				// a newly created GLS and tear it down after that
+				wrapped := gls.WithEmptyGls(func() {
 					WithSpan(serverSpan, func() {
-						handle.ServeHTTP(rl, req.WithContext(ctx))
+						handler.ServeHTTP(rl, req.WithContext(ctx))
 					})
-				})()
+				})
+
+				wrapped()
+
 			} else {
-				handle.ServeHTTP(rl, req.WithContext(ctx))
+				handler.ServeHTTP(rl, req.WithContext(ctx))
 			}
 		})
 	}
+}
+
+func cleanUrl(url string) string {
+	url = reClean.ReplaceAllStringFunc(url, func(s string) string {
+		idx := strings.LastIndexByte(s, '/')
+		return s[:idx] + strings.ToUpper(s[:idx])
+	})
+
+	// clean uuid and numbers
+	url = reUUID.ReplaceAllString(url, "/UUID")
+	url = reNumber.ReplaceAllString(url, "/N")
+
+	return url
 }
 
 func responseLoggerOf(w http.ResponseWriter) *responseLogger {
@@ -89,6 +125,10 @@ func (l *responseLogger) Flush() {
 	}
 }
 
+func (l *responseLogger) addStatusToSpan(span opentracing.Span) {
+	ext.HTTPStatusCode.Set(span, uint16(l.status))
+}
+
 func Execute(op string, r *http.Request, client *http.Client) (*http.Response, error) {
 	if client == nil {
 		client = http.DefaultClient
@@ -97,10 +137,10 @@ func Execute(op string, r *http.Request, client *http.Client) (*http.Response, e
 	var err error
 	var response *http.Response
 
-	err = TraceChild(op, func(span opentracing.Span) error {
+	err = TraceChildContext(r.Context(), op, func(ctx context.Context, span opentracing.Span) error {
 		// inject the spans information into the request so that the
 		// other party can pick it up and continue the request.
-		span.Tracer().Inject(
+		_ = span.Tracer().Inject(
 			span.Context(),
 			opentracing.HTTPHeaders,
 			opentracing.HTTPHeadersCarrier(r.Header))
