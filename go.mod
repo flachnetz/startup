@@ -4,6 +4,7 @@ exclude github.com/golang/lint v0.0.0-20190313153728-d0100b6bd8b3
 
 require (
 	github.com/flachnetz/startup/startup_base v1.0.0
+	github.com/flachnetz/startup/startup_tracing v1.6.4 // indirect
 	github.com/go-playground/locales v0.12.1 // indirect
 	github.com/go-playground/universal-translator v0.16.0 // indirect
 	github.com/jessevdk/go-flags v1.4.0
