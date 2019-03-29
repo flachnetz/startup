@@ -3,6 +3,7 @@ package startup_logrus
 import (
 	"context"
 	"github.com/sirupsen/logrus"
+	"reflect"
 )
 
 type loggerKey struct{}
@@ -24,4 +25,15 @@ func GetLogger(ctx context.Context, prefix string) *logrus.Entry {
 	}
 
 	return logger.(*logrus.Entry).WithField("prefix", prefix)
+}
+
+func GetLoggerForObject(ctx context.Context, object interface{}) *logrus.Entry {
+	t := reflect.ValueOf(object).Type()
+
+	prefix := t.Name()
+	if prefix == "" {
+		prefix = t.PkgPath()
+	}
+
+	return GetLogger(ctx, prefix)
 }
