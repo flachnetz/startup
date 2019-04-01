@@ -1,6 +1,7 @@
 package startup_events
 
 import (
+	"github.com/Landoop/schema-registry"
 	"github.com/Shopify/sarama"
 	"github.com/flachnetz/startup/lib/schema"
 )
@@ -11,4 +12,8 @@ type KafkaClientProvider interface {
 
 type SchemaRegistryProvider interface {
 	SchemaRegistry() schema.Registry
+}
+
+type ConfluentClientProvider interface {
+	ConfluentClient() *schemaregistry.Client
 }

@@ -14,7 +14,7 @@ var log = logrus.WithField("prefix", "events")
 type EventOptions struct {
 	Sender string `long:"event-sender" default:"none" description:"Event sender to use. Can be 'none', 'stdout', 'file:name.gz' or 'kafka'."`
 
-	KafkaEncoder           string `long:"event-kafka-encoder" default:"avro" description:"Event encoder to use with kafka. Valid options are 'json' and 'avro'."`
+	KafkaEncoder           string `long:"event-kafka-encoder" default:"avro" description:"Event encoder to use with kafka. Valid options are 'json', 'avro' and 'confluent'."`
 	KafkaReplicationFactor int16  `long:"event-kafka-replication-factor" validate:"min=1" default:"1" description:"Replication factor for kafka topics."`
 
 	Inputs struct {
@@ -30,9 +30,9 @@ type EventOptions struct {
 	eventSender     events.EventSender
 }
 
-func (opts *EventOptions) EventSender(kafkaClient KafkaClientProvider, registry SchemaRegistryProvider) events.EventSender {
+func (opts *EventOptions) EventSender(kafkaClient KafkaClientProvider, registry SchemaRegistryProvider, confluent ConfluentClientProvider) events.EventSender {
 	opts.eventSenderOnce.Do(func() {
-		eventSender := opts.newEventSender(kafkaClient, registry)
+		eventSender := opts.newEventSender(kafkaClient, registry, confluent)
 
 		// register as global event sender
 		events.Events = eventSender
@@ -43,7 +43,7 @@ func (opts *EventOptions) EventSender(kafkaClient KafkaClientProvider, registry 
 	return opts.eventSender
 }
 
-func (opts *EventOptions) newEventSender(kafkaClient KafkaClientProvider, registry SchemaRegistryProvider) events.EventSender {
+func (opts *EventOptions) newEventSender(kafkaClient KafkaClientProvider, registry SchemaRegistryProvider, confluentClient ConfluentClientProvider) events.EventSender {
 	topics := opts.Inputs.Topics(opts.KafkaReplicationFactor)
 	if topics.Fallback == "" {
 		startup_base.Panicf("Cannot create kafka event sender: no fallback topic was specified.")
@@ -71,6 +71,9 @@ func (opts *EventOptions) newEventSender(kafkaClient KafkaClientProvider, regist
 
 		case "avro":
 			encoder = events.NewAvroEncoder(registry.SchemaRegistry())
+
+		case "confluent":
+			encoder = events.NewAvroConfluentEncoder(confluentClient.ConfluentClient())
 
 		default:
 			startup_base.Errorf("Invalid event encoder specified: %s", opts.KafkaEncoder)
