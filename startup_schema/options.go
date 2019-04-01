@@ -1,6 +1,8 @@
 package startup_schema
 
 import (
+	confluent "github.com/Landoop/schema-registry"
+	"github.com/flachnetz/startup"
 	"github.com/flachnetz/startup/lib/schema"
 	"github.com/flachnetz/startup/startup_base"
 	"github.com/flachnetz/startup/startup_consul"
@@ -45,4 +47,22 @@ func (opts *SchemaRegistryOptions) Initialize(kafka *startup_kafka.KafkaOptions,
 			startup_base.Panicf("Invalid option given for schema backend type: %s", opts.SchemaBackend)
 		}
 	})
+}
+
+type ConfluentClientOptions struct {
+	ConfluentUrl startup.URL `long:"confluent-url" description:"URL to the confluent schema registry."`
+
+	clientOnce sync.Once
+	client     *confluent.Client
+}
+
+func (opts *ConfluentClientOptions) ConfluentClient() *confluent.Client {
+	opts.clientOnce.Do(func() {
+		client, err := confluent.NewClient(opts.ConfluentUrl.String())
+		startup_base.PanicOnError(err, "Cannot initialize confluent client.")
+
+		opts.client = client
+	})
+
+	return opts.client
 }
