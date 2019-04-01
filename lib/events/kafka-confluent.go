@@ -8,17 +8,22 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"reflect"
+	"sync"
 )
 
 type avroConfluentEncoder struct {
 	log      logrus.FieldLogger
-	registry schemaregistry.Client
+	registry *schemaregistry.Client
+
+	cacheMutex sync.Mutex
+	cache      map[string]uint32
 }
 
-func NewAvroConfluentEncoder(registry schemaregistry.Client) Encoder {
+func NewAvroConfluentEncoder(registry *schemaregistry.Client) Encoder {
 	return &avroConfluentEncoder{
 		log:      logrus.WithField("prefix", "confluent"),
 		registry: registry,
+		cache:    map[string]uint32{},
 	}
 }
 
@@ -48,14 +53,29 @@ func (enc *avroConfluentEncoder) Encode(event Event) ([]byte, error) {
 }
 
 func (enc *avroConfluentEncoder) registerSchema(event Event) (uint32, error) {
-	subject := nameOf(event)
+	// lookup in cache first
+	enc.cacheMutex.Lock()
+	cached, ok := enc.cache[event.Schema()]
+	enc.cacheMutex.Unlock()
 
-	gid, err := enc.registry.RegisterNewSchema(subject, event.Schema())
+	if ok {
+		return cached, nil
+	}
+
+	subject := nameOf(event)
+	enc.log.Debugf("Registering schema for subject %s", subject)
+
+	schemaId, err := enc.registry.RegisterNewSchema(subject, event.Schema())
 	if err != nil {
 		return 0, errors.WithMessage(err, "register new schema")
 	}
 
-	return uint32(gid), nil
+	// cache it for lookups
+	enc.cacheMutex.Lock()
+	enc.cache[event.Schema()] = uint32(schemaId)
+	enc.cacheMutex.Unlock()
+
+	return uint32(schemaId), nil
 }
 
 func (enc *avroConfluentEncoder) Close() error {
