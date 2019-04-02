@@ -16,25 +16,7 @@ type Registry interface {
 	Close() error
 }
 
-func NewNoopRegistry() Registry {
-	return noopRegistry{}
-}
-
 func Hash(schema string) string {
 	md5sum := md5.Sum([]byte(schema))
 	return hex.EncodeToString(md5sum[:])
-}
-
-type noopRegistry struct{}
-
-func (noopRegistry) Get(key string) (string, error) {
-	return "", nil
-}
-
-func (noopRegistry) Set(schema string) (string, error) {
-	return "", nil
-}
-
-func (noopRegistry) Close() error {
-	return nil
 }
