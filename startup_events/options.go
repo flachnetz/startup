@@ -1,38 +1,40 @@
 package startup_events
 
 import (
+	"github.com/Shopify/sarama"
 	"github.com/flachnetz/startup/lib/events"
 	"github.com/flachnetz/startup/startup_base"
 	"github.com/sirupsen/logrus"
-	"os"
-	"strings"
 	"sync"
+	"time"
 )
 
 var log = logrus.WithField("prefix", "events")
 
 type EventOptions struct {
-	Sender string `long:"event-sender" default:"none" description:"Event sender to use. Can be 'none', 'stdout', 'file:name.gz' or 'kafka'."`
-
-	KafkaEncoder           string `long:"event-kafka-encoder" default:"avro" description:"Event encoder to use with kafka. Valid options are 'json', 'avro' and 'confluent'."`
-	KafkaReplicationFactor int16  `long:"event-kafka-replication-factor" validate:"min=1" default:"1" description:"Replication factor for kafka topics."`
+	EventSenderConfig string `long:"event-sender" default:"" description:"Event sender to use. Event sender type followed by arguments, e.g: consul,address=<consul address>,kafka=<kafka address>"`
 
 	Inputs struct {
-		// Enable blocking. This should normally not be used for production and only
-		// be used in batch cli tools
-		KafkaBlocking bool
-
 		// A function to create the event topics. This option must be specified.
 		Topics events.TopicsFunc `validate:"required"`
+
+		// optional kafka config to use with the kafka events producer
+		KafkaConfig *sarama.Config
 	}
 
 	eventSenderOnce sync.Once
 	eventSender     events.EventSender
 }
 
-func (opts *EventOptions) EventSender(kafkaClient KafkaClientProvider, registry SchemaRegistryProvider, confluent ConfluentClientProvider) events.EventSender {
+func (opts *EventOptions) EventSender() events.EventSender {
 	opts.eventSenderOnce.Do(func() {
-		eventSender := opts.newEventSender(kafkaClient, registry, confluent)
+		providers := events.Providers{
+			Kafka:  kafkaClientProvider{opts.Inputs.KafkaConfig},
+			Topics: opts.Inputs.Topics,
+		}
+
+		eventSender, err := events.ParseEventSenders(providers, opts.EventSenderConfig)
+		startup_base.PanicOnError(err, "initialize event sender")
 
 		// register as global event sender
 		events.Events = eventSender
@@ -43,71 +45,30 @@ func (opts *EventOptions) EventSender(kafkaClient KafkaClientProvider, registry 
 	return opts.eventSender
 }
 
-func (opts *EventOptions) newEventSender(kafkaClient KafkaClientProvider, registry SchemaRegistryProvider, confluentClient ConfluentClientProvider) events.EventSender {
-	topics := opts.Inputs.Topics(opts.KafkaReplicationFactor)
-	if topics.Fallback == "" {
-		startup_base.Panicf("Cannot create kafka event sender: no fallback topic was specified.")
-	}
-
-	log.Infof("Using event sender %s", opts.Sender)
-
-	switch opts.Sender {
-	case "none":
-		return &events.NoopEventSender{}
-
-	case "logrus", "logging":
-		return events.LogrusEventSender{FieldLogger: logrus.WithField("prefix", "events")}
-
-	case "stdout":
-		return nopCloser{events.WriterEventSender{WriteCloser: os.Stdout}}
-
-	case "kafka":
-
-		var encoder events.Encoder
-
-		switch opts.KafkaEncoder {
-		case "json":
-			encoder = events.NewJSONEncoder()
-
-		case "avro":
-			encoder = events.NewAvroEncoder(registry.SchemaRegistry())
-
-		case "confluent":
-			encoder = events.NewAvroConfluentEncoder(confluentClient.ConfluentClient())
-
-		default:
-			startup_base.Errorf("Invalid event encoder specified: %s", opts.KafkaEncoder)
-		}
-
-		kafkaConfig := events.KafkaSenderConfig{
-			Encoder:       encoder,
-			TopicsConfig:  topics,
-			AllowBlocking: opts.Inputs.KafkaBlocking,
-		}
-
-		kafkaSender, err := events.NewKafkaSender(kafkaClient.KafkaClient(), kafkaConfig)
-		startup_base.PanicOnError(err, "Cannot create kafka event sender")
-
-		log.Info("Event sender for kafka initialized")
-		return kafkaSender
-
-	default:
-		if strings.HasPrefix(opts.Sender, "file:") {
-			filename := strings.TrimPrefix(opts.Sender, "file:")
-			sender, err := events.GZIPEventSender(filename)
-			startup_base.PanicOnError(err, "Could not open events file")
-
-			return sender
-		}
-
-		panic(startup_base.Errorf("Invalid option given for event sender type: %s", opts.Sender))
-	}
+type kafkaClientProvider struct {
+	config *sarama.Config
 }
 
-type nopCloser struct {
-	events.EventSender
+func (p kafkaClientProvider) KafkaClient(addresses []string) (sarama.Client, error) {
+	config := p.config
+	if config == nil {
+		log.Debugf("No kafka config supplied, using default config")
+		config = defaultConfig()
+	}
+
+	return sarama.NewClient(addresses, config)
 }
 
-func (nopCloser) Close() error {
-	return nil
+func defaultConfig() *sarama.Config {
+	config := sarama.NewConfig()
+	config.Net.MaxOpenRequests = 16
+	config.Net.DialTimeout = 10 * time.Second
+	config.Producer.Timeout = 3 * time.Second
+	config.Producer.Retry.Max = 16
+	config.Producer.Retry.Backoff = 250 * time.Millisecond
+	config.ChannelBufferSize = 4
+
+	config.Version = sarama.V1_1_1_0
+
+	return config
 }
