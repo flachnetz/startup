@@ -58,17 +58,6 @@ func (opts *KafkaOptions) KafkaClient() sarama.Client {
 	return opts.kafkaClient
 }
 
-func (opts *KafkaOptions) SchemaRegistry(topic string, replicationFactor int) schema.Registry {
-	opts.schemaRegistryOnce.Do(func() {
-		registry, err := kafka.NewSchemaRegistry(opts.KafkaClient(), topic, int16(replicationFactor))
-		startup_base.PanicOnError(err, "Cannot create kafka based schema registry")
-
-		opts.schemaRegistry = registry
-	})
-
-	return opts.schemaRegistry
-}
-
 func defaultConfig() *sarama.Config {
 	config := sarama.NewConfig()
 	config.Net.MaxOpenRequests = 16
