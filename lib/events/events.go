@@ -18,10 +18,12 @@ type Event interface {
 type EventSender interface {
 	// Send the given event. This method should be non blocking and
 	// must never fail. You might want to use a channel for buffering
-	// events internally
+	// events internally. Errors will be logged to the terminal
+	// but otherwise ignored.
 	Send(event Event)
 
 	// Close the event sender and flush all pending events.
+	// Waits for all events to be send out.
 	Close() error
 }
 
