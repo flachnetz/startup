@@ -1,7 +1,6 @@
-package startup_consul
+package schema
 
 import (
-	"github.com/flachnetz/startup/lib/schema"
 	consul "github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -10,6 +9,13 @@ import (
 type consulSchemaRegistry struct {
 	consul *consul.Client
 	log    *logrus.Entry
+}
+
+func NewConsulSchemaRegistry(client *consul.Client) Registry {
+	return &consulSchemaRegistry{
+		consul: client,
+		log:    logrus.WithField("prefix", "schema-registry"),
+	}
 }
 
 func (r *consulSchemaRegistry) Get(key string) (string, error) {
@@ -26,7 +32,7 @@ func (r *consulSchemaRegistry) Get(key string) (string, error) {
 }
 
 func (r *consulSchemaRegistry) Set(schemaString string) (string, error) {
-	hash := schema.Hash(schemaString)
+	hash := Hash(schemaString)
 
 	// check if already know this hash
 	key := "avro-schemas/" + hash
@@ -36,7 +42,7 @@ func (r *consulSchemaRegistry) Set(schemaString string) (string, error) {
 	}
 
 	if kv == nil {
-		r.log.Debugf("Writing schema %s to consul", hash)
+		r.log.Debugf("Writing schema '%s' to consul", hash)
 
 		// the kv entry does not exist, create it now.
 		kv = &consul.KVPair{Key: key, Value: []byte(schemaString)}
