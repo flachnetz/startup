@@ -4,7 +4,6 @@ import (
 	"github.com/flachnetz/startup/lib/schema"
 	"github.com/flachnetz/startup/startup_base"
 	consul "github.com/hashicorp/consul/api"
-	"github.com/sirupsen/logrus"
 	"sync"
 )
 
@@ -45,10 +44,7 @@ func (opts *ConsulOptions) ConsulClient() *consul.Client {
 
 func (opts *ConsulOptions) SchemaRegistry() schema.Registry {
 	opts.registryOnce.Do(func() {
-		opts.registry = schema.NewCachedRegistry(&consulSchemaRegistry{
-			consul: opts.ConsulClient(),
-			log:    logrus.WithField("prefix", "schema-registry"),
-		})
+		opts.registry = schema.NewCachedRegistry(schema.NewConsulSchemaRegistry(opts.ConsulClient()))
 	})
 
 	return opts.registry
