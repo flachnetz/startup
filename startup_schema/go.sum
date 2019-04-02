@@ -27,10 +27,12 @@ github.com/flachnetz/startup/lib/kafka v1.0.0 h1:6Q4lZiIhCDylAcbciaCuuz+lrxNFYMs
 github.com/flachnetz/startup/lib/kafka v1.0.0/go.mod h1:vkmicUk+/1Jpx6/X3tMxwzCloxRPAPszlYy/JSGLu+k=
 github.com/flachnetz/startup/lib/schema v1.0.0 h1:7PQslGMDUD9R1iytudHXJL7nAWTwTiOtmlcda3XR2O8=
 github.com/flachnetz/startup/lib/schema v1.0.0/go.mod h1:NG5538r/5p+P2jKSDWmyxD84R3jII3cwGGcQmYP66Vc=
+github.com/flachnetz/startup/lib/schema v1.1.0/go.mod h1:YQ9xq7Vum21hCB57EqwxLxJYItKO3wocfcc846VtVpk=
 github.com/flachnetz/startup/startup_base v1.0.0 h1:rRo57w8DY2NZG3u3Vkc152hI9npD1ogZ8FlwESmyObM=
 github.com/flachnetz/startup/startup_base v1.0.0/go.mod h1:konmOUtT1WORNuAcKinsHc9/9z40OLqIyYmnqmaRi+4=
 github.com/flachnetz/startup/startup_consul v1.0.0 h1:w4KP+HCx7ASOKi3jfggv9f6T+A+yklk2lz3vhg2kfcI=
 github.com/flachnetz/startup/startup_consul v1.0.0/go.mod h1:5W6611LU9CUjTQBtVU7jL7VFYq4jO3IZ4pfuSHoMDuQ=
+github.com/flachnetz/startup/startup_consul v1.0.1/go.mod h1:Iv12Nb2hEHBGlT9/r1vOacN+4y3ko5V+PIpBwz2mq2o=
 github.com/flachnetz/startup/startup_kafka v1.0.0 h1:LV3Hc4WeXGl1U4BsH4EifeHTksNty3VXMR1vgHxlVYo=
 github.com/flachnetz/startup/startup_kafka v1.0.0/go.mod h1:u9Dx9iSaER/hIOrzUDgp0PHtnYFeo4xIy2kmn8DZ4q0=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=
@@ -47,6 +49,8 @@ github.com/google/btree v0.0.0-20180813153112-4030bb1f1f0c h1:964Od4U6p2jUkFxvCy
 github.com/google/btree v0.0.0-20180813153112-4030bb1f1f0c/go.mod h1:lNA+9X1NB3Zf8V7Ke586lFgjr2dZNuvo3lPJSGZ5JPQ=
 github.com/hashicorp/consul v1.4.4 h1:DR1+5EGgnPsd/LIsK3c9RDvajcsV5GOkGQBSNd3dpn8=
 github.com/hashicorp/consul v1.4.4/go.mod h1:mFrjN1mfidgJfYP1xrJCF+AfRhr6Eaqhb2+sfyn/OOI=
+github.com/hashicorp/consul/api v1.0.1/go.mod h1:LQlewHPiuaRhn1mP2XE4RrjnlRgOeWa/ZM0xWLCen2M=
+github.com/hashicorp/consul/sdk v0.1.0/go.mod h1:VKf9jXwCTEY1QZP2MOLRhb5i/I/ssyNV1vwHyQBF0x8=
 github.com/hashicorp/errwrap v1.0.0 h1:hLrqtEDnRye3+sgx6z4qVLNuviH3MR5aQ0ykNJa/UYA=
 github.com/hashicorp/errwrap v1.0.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
 github.com/hashicorp/go-cleanhttp v0.5.1 h1:dH3aiDG9Jvb5r5+bYHsikaOUIpcM0xvgMXVoDkXMzJM=
