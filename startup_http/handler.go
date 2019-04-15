@@ -138,7 +138,7 @@ func marshalResponseValue(body interface{}) ([]byte, string, error) {
 func WriteResponseValue(w http.ResponseWriter, value interface{}, err error) {
 	if err != nil {
 		// handle ErrorResponse errors correctly
-		if errorValue, ok := value.(ErrorResponse); ok {
+		if errorValue, ok := err.(ErrorResponse); ok {
 			WriteError(w, errorValue.Status, errorValue)
 			return
 		}
