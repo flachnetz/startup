@@ -6,8 +6,8 @@ require (
 	github.com/Shopify/sarama v1.21.0 // indirect
 	github.com/apache/thrift v0.12.0
 	github.com/flachnetz/startup/startup_base v1.0.0
-	github.com/flachnetz/startup/startup_http v1.0.0 // indirect
-	github.com/flachnetz/startup/startup_logrus v1.0.5 // indirect
+	github.com/flachnetz/startup/startup_http v1.0.0
+	github.com/flachnetz/startup/startup_logrus v1.0.5
 	github.com/go-logfmt/logfmt v0.4.0 // indirect
 	github.com/gogo/protobuf v1.2.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
@@ -19,3 +19,5 @@ require (
 	github.com/openzipkin/zipkin-go-opentracing v0.3.5
 	github.com/sirupsen/logrus v1.4.0
 )
+
+replace github.com/openzipkin/zipkin-go-opentracing v0.3.5 => github.com/flachnetz/zipkin-go-opentracing v0.3.5
