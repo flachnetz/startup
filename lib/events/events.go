@@ -30,3 +30,7 @@ type EventSender interface {
 // Global instance to send events. Defaults to a simple sender that prints
 // events using a logger instance.
 var Events EventSender = LogrusEventSender{logrus.WithField("prefix", "events")}
+
+func ConvertTimestamp(ts time.Time) int64 {
+	return ts.UnixNano() / int64(time.Millisecond)
+}
