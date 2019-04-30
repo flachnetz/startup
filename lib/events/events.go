@@ -3,6 +3,7 @@ package events
 import (
 	"github.com/sirupsen/logrus"
 	"io"
+	"time"
 )
 
 var log = logrus.WithField("prefix", "events")
