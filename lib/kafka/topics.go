@@ -46,6 +46,7 @@ type Topic struct {
 	Name              string
 	NumPartitions     int32
 	ReplicationFactor int16
+	Config            map[string]*string
 }
 
 // Creates a TopicDetail map that can be used to create the topics on the
@@ -67,6 +68,7 @@ func (topics Topics) details() map[string]*sarama.TopicDetail {
 		details[topic.Name] = &sarama.TopicDetail{
 			NumPartitions:     partitionCount,
 			ReplicationFactor: replicationFactor,
+			ConfigEntries:     topic.Config,
 		}
 	}
 
