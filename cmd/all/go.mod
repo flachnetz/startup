@@ -5,6 +5,7 @@ go 1.12
 require (
 	github.com/flachnetz/startup v1.6.1
 	github.com/flachnetz/startup/lib/events v1.0.1
+	github.com/flachnetz/startup/startup_base v1.0.0
 	github.com/flachnetz/startup/startup_consul v1.0.0
 	github.com/flachnetz/startup/startup_events v1.0.0
 	github.com/flachnetz/startup/startup_http v0.0.0-20190326145052-c3bfae325350
