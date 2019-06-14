@@ -1,11 +1,12 @@
 package startup_metrics
 
 import (
-	"github.com/eSailors/go-datadog"
+	"github.com/DataDog/datadog-go/statsd"
 	"github.com/flachnetz/startup/startup_base"
 	"github.com/pkg/errors"
 	"github.com/rcrowley/go-metrics"
 	"github.com/sirupsen/logrus"
+	"github.com/flachnetz/go-datadog"
 	"os"
 	"strings"
 	"sync"
@@ -19,9 +20,10 @@ type MetricsPrefix string
 
 type MetricsOptions struct {
 	Datadog struct {
-		ApiKey   string        `long:"datadog-apikey" description:"Datadog app key to enable datadog metrics reporting."`
-		Tags     string        `long:"datadog-tags" description:"Extra datadog tags to add to every metric. Comma or space separated list of key:value pairs."`
-		Interval time.Duration `long:"datadog-report-interval" default:"60s" description:"Data collection and reporting interval."`
+		ApiKey        string        `long:"datadog-apikey" description:"Datadog app key to enable datadog metrics reporting."`
+		Tags          string        `long:"datadog-tags" description:"Extra datadog tags to add to every metric. Comma or space separated list of key:value pairs."`
+		Interval      time.Duration `long:"datadog-report-interval" default:"60s" description:"Data collection and reporting interval."`
+		StatsDAddress string        `long:"datadog-statsd-address" description:"Address of statsd,e.g. 127.0.0.1:8125"`
 	}
 
 	Inputs struct {
@@ -54,8 +56,18 @@ func (opts *MetricsOptions) Initialize() {
 		}
 
 		if opts.Datadog.ApiKey != "" {
-			err := opts.setupDatadogMetricsReporter(registry)
-			startup_base.PanicOnError(err, "Cannot start datadog metrics reporter")
+
+			if opts.Datadog.StatsDAddress != "" {
+				c, err := statsd.New(opts.Datadog.StatsDAddress)
+				startup_base.PanicOnError(err, "Cannot start datadog metrics reporter with statsd client")
+
+				r, err := datadog.NewReporter(registry, c, opts.Datadog.Interval)
+				startup_base.PanicOnError(err, "Cannot start datadog metrics reporter")
+				go r.Flush()
+			} else {
+				err := opts.setupDatadogMetricsReporter(registry)
+				startup_base.PanicOnError(err, "Cannot start datadog metrics reporter")
+			}
 		}
 	})
 }

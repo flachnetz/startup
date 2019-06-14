@@ -3,6 +3,7 @@ module github.com/flachnetz/startup
 exclude github.com/golang/lint v0.0.0-20190313153728-d0100b6bd8b3
 
 require (
+	github.com/DataDog/datadog-go v2.2.0+incompatible // indirect
 	github.com/flachnetz/startup/startup_base v1.0.0
 	github.com/go-playground/locales v0.12.1 // indirect
 	github.com/go-playground/universal-translator v0.16.0 // indirect
@@ -13,8 +14,10 @@ require (
 	github.com/leodido/go-urn v1.1.0 // indirect
 	github.com/mattn/go-isatty v0.0.7 // indirect
 	github.com/pkg/errors v0.8.1
+	github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a
 	github.com/sirupsen/logrus v1.4.0
 	github.com/stretchr/testify v1.3.0 // indirect
+	github.com/syntaqx/go-metrics-datadog v0.0.0-20181220201509-312b31920cc5
 	golang.org/x/crypto v0.0.0-20190325154230-a5d413f7728c // indirect
 	golang.org/x/net v0.0.0-20190328230028-74de082e2cca // indirect
 	golang.org/x/sys v0.0.0-20190329044733-9eb1bfa1ce65 // indirect
