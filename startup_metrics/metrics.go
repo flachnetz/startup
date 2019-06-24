@@ -69,7 +69,7 @@ func (opts *MetricsOptions) Initialize() {
 			go r.Flush()
 		}
 
-		if opts.Datadog.ApiKey != "" && if opts.Datadog.StatsDAddress != "" {
+		if opts.Datadog.ApiKey != "" && opts.Datadog.StatsDAddress != "" {
 			log.Warn("there are two datadog reports active now: statsd address has been configured and api key has been set")
 		}
 	})
