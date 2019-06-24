@@ -56,18 +56,21 @@ func (opts *MetricsOptions) Initialize() {
 		}
 
 		if opts.Datadog.ApiKey != "" {
+			err := opts.setupDatadogMetricsReporter(registry)
+			startup_base.PanicOnError(err, "Cannot start datadog metrics reporter")
+		}
 
-			if opts.Datadog.StatsDAddress != "" {
-				c, err := statsd.New(opts.Datadog.StatsDAddress)
-				startup_base.PanicOnError(err, "Cannot start datadog metrics reporter with statsd client")
+		if opts.Datadog.StatsDAddress != "" {
+			c, err := statsd.New(opts.Datadog.StatsDAddress)
+			startup_base.PanicOnError(err, "Cannot start datadog metrics reporter with statsd client")
+			log.Infof("Activating statsd for metrics: '%s'", opts.Datadog.StatsDAddress)
+			r, err := datadog.NewReporter(registry, c, opts.Datadog.Interval)
+			startup_base.PanicOnError(err, "Cannot start datadog metrics reporter")
+			go r.Flush()
+		}
 
-				r, err := datadog.NewReporter(registry, c, opts.Datadog.Interval)
-				startup_base.PanicOnError(err, "Cannot start datadog metrics reporter")
-				go r.Flush()
-			} else {
-				err := opts.setupDatadogMetricsReporter(registry)
-				startup_base.PanicOnError(err, "Cannot start datadog metrics reporter")
-			}
+		if opts.Datadog.ApiKey != "" && if opts.Datadog.StatsDAddress != "" {
+			log.Warn("there are two datadog reports active now: statsd address has been configured and api key has been set")
 		}
 	})
 }
