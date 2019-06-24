@@ -61,11 +61,15 @@ func (opts *MetricsOptions) Initialize() {
 		}
 
 		if opts.Datadog.StatsDAddress != "" {
-			c, err := statsd.New(opts.Datadog.StatsDAddress)
-			startup_base.PanicOnError(err, "Cannot start datadog metrics reporter with statsd client")
+			tags, err := opts.baseTags()
+			startup_base.PanicOnError(err, "cannot create base datadog tags")
+
+			c, err := statsd.New(opts.Datadog.StatsDAddress, statsd.WithTags(tags))
+			startup_base.PanicOnError(err, "cannot create statsd client")
+
 			log.Infof("Activating statsd for metrics: '%s'", opts.Datadog.StatsDAddress)
 			r, err := datadog.NewReporter(registry, c, opts.Datadog.Interval)
-			startup_base.PanicOnError(err, "Cannot start datadog metrics reporter")
+			startup_base.PanicOnError(err, "cannot start datadog statsd metrics reporter")
 			go r.Flush()
 		}
 
@@ -84,23 +88,28 @@ func captureRuntimeMetrics(registry metrics.Registry) {
 }
 
 func (opts *MetricsOptions) setupDatadogMetricsReporter(registry metrics.Registry) error {
-	node, err := os.Hostname()
+	tags, err := opts.baseTags()
 	if err != nil {
-		return errors.WithMessage(err, "get hostname of machine")
+		return err
 	}
 
+	log.Infof("Starting datadog metrics reporting with tags: %s", strings.Join(tags, ", "))
 	client := datadog.New("", opts.Datadog.ApiKey)
-
-	tags := strings.FieldsFunc(opts.Datadog.Tags, isCommaOrSpace)
-	tags = append(tags, "node:"+node)
-
-	log.Infof("Starting datadog metrics reporting with tags: %s",
-		strings.Join(tags, ", "))
-
 	reporter := datadog.Reporter(client, registry, tags)
 	go reporter.Start(opts.Datadog.Interval)
 
 	return nil
+}
+
+func (opts *MetricsOptions) baseTags() ([]string, error) {
+	node, err := os.Hostname()
+	if err != nil {
+		return nil, errors.WithMessage(err, "get hostname of machine")
+	}
+
+	tags := strings.FieldsFunc(opts.Datadog.Tags, isCommaOrSpace)
+	tags = append(tags, "node:"+node)
+	return tags, nil
 }
 
 func isCommaOrSpace(r rune) bool {
