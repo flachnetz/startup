@@ -10,7 +10,7 @@ import (
 
 var ErrNoTransaction = errors.New("no transaction in context")
 
-type TransactionFn func(ctx context.Context, tx *sqlx.Tx) error
+type TransactionFn func(ctx context.Context, tx *sqlx.Tx) (commit bool, err error)
 
 type transactionKey struct{}
 
@@ -48,6 +48,7 @@ func WithTransactionFromContext(ctx context.Context, operation func(tx *sqlx.Tx)
 // it with your own function to enable tracing during initialization of your application.
 var WithTransactionContext = func(ctx context.Context, db TxStarter, operation TransactionFn) (err error) {
 	var tx *sqlx.Tx
+	var commit bool
 
 	// begin a new transaction
 	tx, err = db.BeginTxx(ctx, nil)
@@ -60,8 +61,10 @@ var WithTransactionContext = func(ctx context.Context, db TxStarter, operation T
 
 		if r == nil && err == nil {
 			// commit the transaction
-			if err = tx.Commit(); err != nil {
-				err = errors.WithMessage(err, "commit")
+			if commit {
+				if err = tx.Commit(); err != nil {
+					err = errors.WithMessage(err, "commit")
+				}
 			}
 
 		} else {
@@ -82,7 +85,7 @@ var WithTransactionContext = func(ctx context.Context, db TxStarter, operation T
 		}
 	}()
 
-	err = operation(ContextWithTransaction(ctx, tx), tx)
+	commit, err = operation(ContextWithTransaction(ctx, tx), tx)
 
 	return
 }
