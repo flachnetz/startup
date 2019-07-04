@@ -26,8 +26,12 @@ func (h *TxHelper) WithTransaction(fn func(tx *sqlx.Tx) error) (err error) {
 	return WithTransaction(h.DB, fn)
 }
 
-func (h *TxHelper) WithTransactionContext(ctx context.Context, operation TransactionFn) error {
+func (h *TxHelper) WithTransactionContext(ctx context.Context, operation TransactionCommitFn) error {
 	return WithTransactionContext(ctx, h.DB, operation)
+}
+
+func (h *TxHelper) WithTransactionContextAutoCommit(ctx context.Context, operation TransactionFn) error {
+	return WithTransactionAutoCommitContext(ctx, h.DB, operation)
 }
 
 // Ends the given transaction. This method will either commit the transaction if
@@ -36,7 +40,7 @@ func (h *TxHelper) WithTransactionContext(ctx context.Context, operation Transac
 // Deprecated: Use a variant of this function that includes a context argument.
 //
 func WithTransaction(db TxStarter, fn func(tx *sqlx.Tx) error) (err error) {
-	return WithTransactionContext(context.Background(), db, func(ctx context.Context, tx *sqlx.Tx) error {
+	return WithTransactionAutoCommitContext(context.Background(), db, func(ctx context.Context, tx *sqlx.Tx) error {
 		return fn(tx)
 	})
 }
