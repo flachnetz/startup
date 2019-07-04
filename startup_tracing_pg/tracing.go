@@ -54,7 +54,7 @@ func (opts *PostgresTracingOptions) installTransactionTracingHook(serviceName st
 		}
 	}
 
-	WithTransactionContext = func(ctx context.Context, db TxStarter, operation TransactionFn) (err error) {
+	WithTransactionContext = func(ctx context.Context, db TxStarter, operation TransactionCommitFn) (err error) {
 		var tag string
 
 		// get the first method in the stack outside of the startup package
