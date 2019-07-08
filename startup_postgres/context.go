@@ -44,7 +44,7 @@ func WithTransactionFromContext(ctx context.Context, operation func(tx *sqlx.Tx)
 	return operation(tx)
 }
 
-var WithTransactionAutoCommitContext = func(ctx context.Context, db TxStarter, operation TransactionFn) (err error) {
+func WithTransactionAutoCommitContext(ctx context.Context, db TxStarter, operation TransactionFn) (err error) {
 	return WithTransactionContext(ctx, db, func(ctx context.Context, tx *sqlx.Tx) (commit bool, err error) {
 		return true, operation(ctx, tx)
 	})
@@ -66,12 +66,10 @@ var WithTransactionContext = func(ctx context.Context, db TxStarter, operation T
 	defer func() {
 		r := recover()
 
-		if r == nil && err == nil {
+		if r == nil && err == nil && commit {
 			// commit the transaction
-			if commit {
-				if err = tx.Commit(); err != nil {
-					err = errors.WithMessage(err, "commit")
-				}
+			if err = tx.Commit(); err != nil {
+				err = errors.WithMessage(err, "commit")
 			}
 
 		} else {
