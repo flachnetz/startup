@@ -28,3 +28,8 @@ require (
 	gopkg.in/go-playground/validator.v9 v9.27.0
 	gopkg.in/yaml.v2 v2.2.2 // indirect
 )
+
+replace (
+	github.com/flachnetz/startup/startup_base => ../startup_base
+	github.com/flachnetz/startup/startup_logrus => ../startup_logrus
+)
