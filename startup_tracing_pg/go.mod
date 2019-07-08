@@ -13,7 +13,7 @@ require (
 	github.com/lib/pq v1.1.1
 	github.com/mattn/go-colorable v0.1.2 // indirect
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
-	github.com/opentracing/opentracing-go v1.0.2
+	github.com/opentracing/opentracing-go v1.1.0
 	github.com/rubenv/sql-migrate v0.0.0-20190618074426-f4d34eae5a5c // indirect
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4 // indirect
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7 // indirect
@@ -23,4 +23,9 @@ require (
 	google.golang.org/grpc v1.22.0 // indirect
 )
 
-replace github.com/gchaincl/sqlhooks v1.1.0 => github.com/coordcity/sqlhooks v1.1.1-0.20190314160841-345b1ec84db5
+replace (
+	github.com/flachnetz/startup/startup_base => ../startup_base
+	github.com/flachnetz/startup/startup_postgres => ../startup_postgres
+	github.com/flachnetz/startup/startup_tracing => ../startup_tracing
+	github.com/gchaincl/sqlhooks v1.1.0 => github.com/coordcity/sqlhooks v1.1.1-0.20190314160841-345b1ec84db5
+)

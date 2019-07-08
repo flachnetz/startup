@@ -21,3 +21,9 @@ require (
 )
 
 replace github.com/openzipkin/zipkin-go-opentracing v0.3.5 => github.com/flachnetz/zipkin-go-opentracing v0.3.5
+
+replace (
+	github.com/flachnetz/startup/startup_base => ../startup_base
+	github.com/flachnetz/startup/startup_http => ../startup_http
+	github.com/flachnetz/startup/startup_logrus => ../startup_logrus
+)

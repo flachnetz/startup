@@ -15,3 +15,5 @@ require (
 	google.golang.org/appengine v1.5.0 // indirect
 	gopkg.in/gorp.v1 v1.7.2 // indirect
 )
+
+replace github.com/flachnetz/startup/startup_base => ../startup_base

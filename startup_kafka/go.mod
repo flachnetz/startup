@@ -9,3 +9,9 @@ require (
 	github.com/flachnetz/startup/startup_base v1.0.0
 	github.com/sirupsen/logrus v1.4.0
 )
+
+replace (
+	github.com/flachnetz/startup/lib/kafka => ../lib/kafka
+	github.com/flachnetz/startup/lib/schema => ../lib/schema
+	github.com/flachnetz/startup/startup_base => ../startup_base
+)
