@@ -3,8 +3,11 @@ package startup_tracing
 import (
 	"github.com/flachnetz/startup/startup_base"
 	"github.com/opentracing/opentracing-go"
-	zipkin "github.com/openzipkin/zipkin-go-opentracing"
+	zipkinot "github.com/openzipkin-contrib/zipkin-go-opentracing"
+	"github.com/openzipkin/zipkin-go"
+	zipkinhttp "github.com/openzipkin/zipkin-go/reporter/http"
 	"github.com/sirupsen/logrus"
+	"strings"
 
 	// dummy import, see
 	// https://github.com/golang/dep/blob/master/docs/FAQ.md#how-do-i-constrain-a-transitive-dependency-s-version
@@ -13,12 +16,6 @@ import (
 )
 
 var log = logrus.WithField("prefix", "zipkin")
-
-// logging for the collector
-var httpLogger = zipkin.LoggerFunc(func(kv ...interface{}) error {
-	log.Warn(kv...)
-	return nil
-})
 
 type TracingOptions struct {
 	Zipkin string `long:"zipkin" validate:"omitempty,url" description:"Zipkin server base url, an URL like http://host:9411/"`
@@ -43,20 +40,24 @@ func (opts *TracingOptions) Initialize() {
 	opts.once.Do(func() {
 		log.Infof("Sending zipkin traces to %s", opts.Zipkin)
 
-		// create collector
-		collector, err := zipkin.NewHTTPCollector(opts.Zipkin, zipkin.HTTPLogger(httpLogger))
-		startup_base.PanicOnError(err, "unable to create zipkin http collector")
+		if strings.Contains(opts.Zipkin, "/v1/spans") {
+			log.Warnf("Using zipkin v2 span reporting but a v1 span url was given.")
+		}
 
-		// create recorder
-		recorder := zipkin.NewRecorder(collector, false, "", opts.Inputs.ServiceName)
+		url := strings.ReplaceAll(opts.Zipkin, "/v1/spans", "/v2/spans")
+		reporter := zipkinhttp.NewReporter(url)
 
-		// create tracer
-		tracer, err := zipkin.NewTracer(
-			recorder,
-			zipkin.ClientServerSameSpan(true),
-			zipkin.TraceID128Bit(false))
+		endpoint, err := zipkin.NewEndpoint(opts.Inputs.ServiceName, "")
+		startup_base.PanicOnError(err, "Unable to create zipkin endpoint")
+
+		nativeTracer, err := zipkin.NewTracer(reporter,
+			zipkin.WithLocalEndpoint(endpoint),
+			zipkin.WithSharedSpans(false),
+			zipkin.WithTraceID128Bit(true))
 
 		startup_base.PanicOnError(err, "Unable to create zipkin tracer")
+
+		tracer := zipkinot.Wrap(nativeTracer)
 
 		// explicitly set our tracer to be the default tracer.
 		opentracing.InitGlobalTracer(tracer)
