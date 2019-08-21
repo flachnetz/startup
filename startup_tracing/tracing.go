@@ -9,9 +9,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"strings"
 
-	// dummy import, see
-	// https://github.com/golang/dep/blob/master/docs/FAQ.md#how-do-i-constrain-a-transitive-dependency-s-version
-	_ "github.com/apache/thrift/lib/go/thrift"
 	"sync"
 )
 
