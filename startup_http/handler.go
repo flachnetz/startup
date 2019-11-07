@@ -229,7 +229,7 @@ func ExtractAndCallWithBody(
 				return nil, errors.WithMessage(err, "parsing request body as json")
 			}
 
-			if reflect.ValueOf(body).Kind() == reflect.Struct {
+			if reflect.ValueOf(body).Elem().Kind() == reflect.Struct {
 				if err := parameterValidator.Struct(body); err != nil {
 					return nil, errors.WithMessage(err, "validating request body")
 				}
