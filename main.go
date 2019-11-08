@@ -22,7 +22,11 @@ func init() {
 }
 
 func MustParseCommandLine(opts interface{}) {
-	if err := ParseCommandLine(opts); err != nil {
+	MustParseCommandLineWithOptions(opts, flags.HelpFlag|flags.PassDoubleDash)
+}
+
+func MustParseCommandLineWithOptions(opts interface{}, options flags.Options) {
+	if err := ParseCommandLineWithOptions(opts, options); err != nil {
 		cause := errors.Cause(err)
 
 		if cause, ok := cause.(*flags.Error); ok && cause.Type == flags.ErrHelp {
@@ -35,13 +39,17 @@ func MustParseCommandLine(opts interface{}) {
 	}
 }
 
-// Parses command line.
 func ParseCommandLine(opts interface{}) error {
+	return ParseCommandLineWithOptions(opts, flags.HelpFlag|flags.PassDoubleDash)
+}
+
+// Parses command line.
+func ParseCommandLineWithOptions(opts interface{}, options flags.Options) error {
 	if reflect.ValueOf(opts).Kind() != reflect.Ptr {
 		return errors.New("options parameter must be pointer")
 	}
 
-	parser := flags.NewParser(opts, flags.HelpFlag|flags.PassDoubleDash)
+	parser := flags.NewParser(opts, options)
 	parser.NamespaceDelimiter = "-"
 
 	if _, err := parser.Parse(); err != nil {
