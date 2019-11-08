@@ -18,5 +18,4 @@ require (
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/julienschmidt/httprouter v1.2.0
 	github.com/mitchellh/go-testing-interface v1.0.0 // indirect
-	google.golang.org/genproto v0.0.0-20180831171423-11092d34479b // indirect
 )
