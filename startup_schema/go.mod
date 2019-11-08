@@ -8,7 +8,7 @@ require (
 	github.com/flachnetz/startup/lib/schema v1.1.1
 	github.com/flachnetz/startup/startup_base v1.0.0
 	github.com/flachnetz/startup/startup_consul v1.0.1
-	github.com/sirupsen/logrus v1.4.1
+	github.com/sirupsen/logrus v1.4.2
 )
 
 replace (
