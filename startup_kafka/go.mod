@@ -7,7 +7,7 @@ require (
 	github.com/flachnetz/startup/lib/kafka v1.0.0
 	github.com/flachnetz/startup/lib/schema v1.0.0
 	github.com/flachnetz/startup/startup_base v1.0.0
-	github.com/sirupsen/logrus v1.4.0
+	github.com/sirupsen/logrus v1.4.2
 )
 
 replace (
