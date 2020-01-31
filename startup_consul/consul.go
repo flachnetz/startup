@@ -8,7 +8,7 @@ import (
 )
 
 type ConsulOptions struct {
-	Consul string `long:"consul" default:"localhost:8500" validate:"hostport" description:"Consul address. Defaults to localhost:8500."`
+	Consul string `long:"consul" default:"consul.shared.svc.cluster.local:8500" validate:"hostport" description:"Consul address. Defaults to consul.shared.svc.cluster.local:8500."`
 	SSL    bool   `long:"consul-ssl" description:"Use https to connect to the consul api."`
 	DC     string `long:"consul-datacenter" description:"Override the default consul datacenter to query."`
 
