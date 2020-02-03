@@ -251,6 +251,7 @@ func withUpdateLogLevel() admin.RouteConfig {
 
 				log.WithField("prefix", "admin").Infof("Set log level to %s", level)
 				log.SetLevel(level)
+				return
 			}
 
 			http.Error(w, "Method must be GET or POST", http.StatusMethodNotAllowed)
