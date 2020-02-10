@@ -50,7 +50,8 @@ func (r *consulSchemaRegistry) Set(schemaString string) (string, error) {
 			return "", errors.WithMessage(err, "writing avro schema to consul")
 		}
 	}
-	return key, nil
+	// cut the prefix
+	return key[13:], nil
 }
 
 func (r *consulSchemaRegistry) Close() error {
