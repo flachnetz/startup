@@ -95,7 +95,6 @@ func (r *kafkaRegistry) Init(schemas []string) (map[string]string, error) {
 	panic("implement me")
 }
 
-
 func (r *kafkaRegistry) Get(key string) (string, error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()

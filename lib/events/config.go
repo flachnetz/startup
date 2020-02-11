@@ -3,16 +3,16 @@ package events
 import (
 	confluent "github.com/Landoop/schema-registry"
 	"github.com/Shopify/sarama"
-	"github.com/flachnetz/startup/v2/lib/schema"
 	consul "github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 	"io"
 	"os"
-	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/flachnetz/startup/v2/lib/schema"
 )
 
 type KafkaClientProvider interface {
@@ -162,9 +162,8 @@ func initializeEventSender(providers Providers, senderType string, arguments map
 
 		if arguments["schemainit"] == "true" {
 			var initEvents = []Event{}
-			for k := range topics.EventTypes {
-				ev := reflect.New(k)
-				initEvents = append(initEvents, ev.Elem().Interface().(Event))
+			for _, v := range topics.SchemaInitEvents {
+				initEvents = append(initEvents, v)
 			}
 			err := eventSender.Init(initEvents)
 			if err != nil {
