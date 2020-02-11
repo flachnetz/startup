@@ -24,6 +24,29 @@ type Providers struct {
 	Topics TopicsFunc
 }
 
+// Parses event sender config from string.
+// an example could be
+// --event-sender="confluent,address=http://confluent-registry.shared.svc.cluster.local,kafka=kafka.kafka.svc.cluster.local:9092,replication=1,blocking=true,schemainit=true"
+// which uses confluent registry with kafka in blocking mode and initialises schemas at the registry during startup
+//
+// Sender Options:
+//
+// stdout: sends events to stdout
+// noop: does not send anything at all
+// stdout: sends events to stderr
+// gzip,file=FILE: sends events to gziped filed
+// kafka=URL: sends events to kafka
+//
+// Schema registries:
+//
+// consul,address=URL: uses consul as schema registry
+// confluent,address=URL: uses confluent as schema registry
+//
+// Other options:
+//
+// replication=NUMBER: used to create the given kafka topics with the replication param
+// blocking=true: will wait until the event got sent
+// schemainit=true: inits all schemas from the configured topics list during startup
 func ParseEventSenders(providers Providers, config string) (EventSender, error) {
 	reSenderType := regexp.MustCompile(`^([a-z]+)`)
 	reArgument := regexp.MustCompile(`^,([a-z]+)=([^, ]+)`)
