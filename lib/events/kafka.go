@@ -43,7 +43,6 @@ type KafkaSender struct {
 	topicForEvent func(event Event) string
 }
 
-
 func NewKafkaSender(kafkaClient sarama.Client, senderConfig KafkaSenderConfig) (*KafkaSender, error) {
 
 	topics := getTopicsWithErrorTopic(senderConfig.TopicsConfig.Topics())
@@ -163,7 +162,7 @@ func topicForEventFunc(topicForType func(t reflect.Type) string) func(event Even
 type TopicsFunc func(replicationFactor int16) EventTopics
 
 type EventTopics struct {
-	EventTypes map[reflect.Type]kafka.Topic
+	EventTypes       map[reflect.Type]kafka.Topic
 	SchemaInitEvents []Event
 
 	// This is the fallback topic if a type can not be matched to one of the event types.

@@ -46,7 +46,6 @@ type Providers struct {
 //
 // replication=NUMBER: used to create the given kafka topics with the replication param
 // blocking=true: will wait until the event got sent
-// schemainit=true: inits all schemas from the configured topics list during startup
 func ParseEventSenders(providers Providers, config string) (EventSender, error) {
 	reSenderType := regexp.MustCompile(`^([a-z]+)`)
 	reArgument := regexp.MustCompile(`^,([a-z]+)=([^, ]+)`)
@@ -160,8 +159,8 @@ func initializeEventSender(providers Providers, senderType string, arguments map
 			return nil, errors.WithMessage(err, "kafka sender")
 		}
 
-		if arguments["schemainit"] == "true" {
-			var initEvents = []Event{}
+		if len(topics.SchemaInitEvents) > 0 {
+			var initEvents []Event
 			for _, v := range topics.SchemaInitEvents {
 				initEvents = append(initEvents, v)
 			}
