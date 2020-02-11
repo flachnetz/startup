@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"io"
 	"os"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -125,13 +126,30 @@ func initializeEventSender(providers Providers, senderType string, arguments map
 			return nil, errors.WithMessage(err, "create kafka client")
 		}
 
+		topics := providers.Topics(int16(replicationFactor))
 		eventSender, err := NewKafkaSender(kafkaClient, KafkaSenderConfig{
 			Encoder:       encoder,
 			AllowBlocking: arguments["blocking"] == "true",
-			TopicsConfig:  providers.Topics(int16(replicationFactor)),
+			TopicsConfig:  topics,
 		})
 
-		return eventSender, errors.WithMessage(err, "kafka sender")
+		if err != nil {
+			return nil, errors.WithMessage(err, "kafka sender")
+		}
+
+		if arguments["init-schemas"] == "true" {
+			var initEvents = []Event{}
+			for k := range topics.EventTypes {
+				ev := reflect.New(k)
+				initEvents = append(initEvents, ev.Elem().Interface().(Event))
+			}
+			err := eventSender.Init(initEvents)
+			if err != nil {
+				return nil, errors.WithMessage(err, "event schema init failed")
+			}
+		}
+
+		return eventSender, nil
 	}
 
 	return nil, errors.Errorf("unknown event sender type: %s", senderType)

@@ -23,3 +23,8 @@ require (
 	golang.org/x/sync v0.0.0-20190227155943-e225da77a7e6 // indirect
 	golang.org/x/sys v0.0.0-20190402054613-e4093980e83e // indirect
 )
+
+replace (
+	github.com/flachnetz/startup/lib/kafka => ../kafka
+	github.com/flachnetz/startup/lib/schema => ../schema
+)

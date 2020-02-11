@@ -43,6 +43,7 @@ type KafkaSender struct {
 	topicForEvent func(event Event) string
 }
 
+
 func NewKafkaSender(kafkaClient sarama.Client, senderConfig KafkaSenderConfig) (*KafkaSender, error) {
 
 	topics := getTopicsWithErrorTopic(senderConfig.TopicsConfig.Topics())
@@ -72,6 +73,17 @@ func NewKafkaSender(kafkaClient sarama.Client, senderConfig KafkaSenderConfig) (
 	go sender.consumeErrorChannel()
 
 	return sender, nil
+}
+
+func (kafka *KafkaSender) Init(events []Event) error {
+	kafka.log.Infof("registering schemas")
+	for _, ev := range events {
+		if _, err := kafka.encoder.Encode(ev); err != nil {
+			return errors.WithMessage(err, "init event schema")
+		}
+		kafka.log.Infof("registration succeeded for schema %s", ev.Schema())
+	}
+	return nil
 }
 
 func (kafka *KafkaSender) Send(event Event) {

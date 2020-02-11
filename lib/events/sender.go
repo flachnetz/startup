@@ -15,6 +15,11 @@ type LogrusEventSender struct {
 	logrus.FieldLogger
 }
 
+func (l LogrusEventSender) Init(events []Event) error {
+	// noop
+	return nil
+}
+
 func (l LogrusEventSender) Send(event Event) {
 	var buf strings.Builder
 
@@ -34,6 +39,10 @@ type WriterEventSender struct {
 	io.Writer
 }
 
+func (sender WriterEventSender) Init(event []Event) error {
+	return nil
+}
+
 func (sender WriterEventSender) Send(event Event) {
 	bytes, _ := json.Marshal(event)
 	_, _ = sender.Write(bytes)
@@ -49,6 +58,10 @@ func (sender WriterEventSender) Close() error {
 
 type NoopEventSender struct{}
 
+func (s NoopEventSender) Init(event []Event) error {
+	return nil
+}
+
 func (NoopEventSender) Send(event Event) {
 }
 
@@ -59,6 +72,10 @@ func (NoopEventSender) Close() error {
 type gzipEventSender struct {
 	closeCh chan error
 	events  chan Event
+}
+
+func (f *gzipEventSender) Init(event []Event) error {
+	return nil
 }
 
 func GZIPEventSender(filename string) (*gzipEventSender, error) {
@@ -104,6 +121,16 @@ func (f *gzipEventSender) Close() error {
 
 // A slice of event senders that is also an event sender.
 type EventSenders []EventSender
+
+func (senders EventSenders) Init(event []Event) error {
+	for _, sender := range senders {
+		if err := sender.Init(event); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
 
 func (senders EventSenders) Send(event Event) {
 	for _, sender := range senders {

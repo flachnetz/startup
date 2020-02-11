@@ -8,3 +8,8 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/sirupsen/logrus v1.4.0
 )
+
+replace (
+	github.com/flachnetz/startup/lib/kafka => ../kafka
+	github.com/flachnetz/startup/lib/schema => ../schema
+)
