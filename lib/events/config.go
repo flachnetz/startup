@@ -3,7 +3,7 @@ package events
 import (
 	confluent "github.com/Landoop/schema-registry"
 	"github.com/Shopify/sarama"
-	"github.com/flachnetz/startup/lib/schema"
+	"github.com/flachnetz/startup/v2/lib/schema"
 	consul "github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 	"io"

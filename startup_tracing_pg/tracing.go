@@ -3,9 +3,9 @@ package startup_tracing_pg
 import (
 	"context"
 	"database/sql"
-	"github.com/flachnetz/startup/startup_base"
-	. "github.com/flachnetz/startup/startup_postgres"
-	"github.com/flachnetz/startup/startup_tracing"
+	"github.com/flachnetz/startup/v2/startup_base"
+	. "github.com/flachnetz/startup/v2/startup_postgres"
+	"github.com/flachnetz/startup/v2/startup_tracing"
 	"github.com/gchaincl/sqlhooks"
 	"github.com/lib/pq"
 	"github.com/opentracing/opentracing-go"

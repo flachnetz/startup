@@ -2,8 +2,8 @@ package startup_tracing
 
 import (
 	"context"
-	"github.com/flachnetz/startup/startup_http"
-	. "github.com/flachnetz/startup/startup_logrus"
+	"github.com/flachnetz/startup/v2/startup_http"
+	. "github.com/flachnetz/startup/v2/startup_logrus"
 	"github.com/modern-go/gls"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"

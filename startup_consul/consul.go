@@ -1,8 +1,8 @@
 package startup_consul
 
 import (
-	"github.com/flachnetz/startup/lib/schema"
-	"github.com/flachnetz/startup/startup_base"
+	"github.com/flachnetz/startup/v2/lib/schema"
+	"github.com/flachnetz/startup/v2/startup_base"
 	consul "github.com/hashicorp/consul/api"
 	"sync"
 )

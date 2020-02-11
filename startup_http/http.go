@@ -3,8 +3,8 @@ package startup_http
 import (
 	"context"
 	"github.com/flachnetz/go-admin"
-	"github.com/flachnetz/startup/startup_base"
-	. "github.com/flachnetz/startup/startup_logrus"
+	"github.com/flachnetz/startup/v2/startup_base"
+	. "github.com/flachnetz/startup/v2/startup_logrus"
 	"github.com/goji/httpauth"
 	"github.com/gorilla/handlers"
 	"github.com/julienschmidt/httprouter"

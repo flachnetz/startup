@@ -2,7 +2,7 @@ package events
 
 import (
 	"bytes"
-	"github.com/flachnetz/startup/lib/schema"
+	"github.com/flachnetz/startup/v2/lib/schema"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
