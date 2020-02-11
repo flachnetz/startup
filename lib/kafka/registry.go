@@ -26,12 +26,12 @@ type kafkaRegistry struct {
 	schemaTopic string
 }
 
-func NewSchemaRegistry(kafkaClient sarama.Client, topic string, repicationFactor int16) (schema.Registry, error) {
+func NewSchemaRegistry(kafkaClient sarama.Client, topic string, replicationFactor int16) (schema.Registry, error) {
 	// ensure that the topic exists
 	err := EnsureTopics(kafkaClient, Topics{
 		Topic{
 			Name:              topic,
-			ReplicationFactor: repicationFactor,
+			ReplicationFactor: replicationFactor,
 			NumPartitions:     1,
 		},
 	})
@@ -61,7 +61,7 @@ func NewSchemaRegistry(kafkaClient sarama.Client, topic string, repicationFactor
 
 	err = registry.createPartitionConsumer(topic)
 	if err != nil {
-		registry.Close()
+		_ = registry.Close()
 		return nil, errors.WithMessage(err, "create partition consumer")
 	}
 
@@ -90,6 +90,11 @@ func (r *kafkaRegistry) Set(schemaString string) (string, error) {
 	r.schemaCache[key] = schemaString
 	return key, nil
 }
+
+func (r *kafkaRegistry) Init(schemas []string) (map[string]string, error) {
+	panic("implement me")
+}
+
 
 func (r *kafkaRegistry) Get(key string) (string, error) {
 	r.lock.Lock()

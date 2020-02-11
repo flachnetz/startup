@@ -17,6 +17,11 @@ type Event interface {
 }
 
 type EventSender interface {
+
+	// Init event schemas WITHOUT sending the events. This method should be used during startup
+	// to register schemas in the beginning, so that the service has all schemas cached.
+	Init(event []Event) error
+
 	// Send the given event. This method should be non blocking and
 	// must never fail. You might want to use a channel for buffering
 	// events internally. Errors will be logged to the terminal
