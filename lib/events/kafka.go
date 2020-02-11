@@ -3,7 +3,7 @@ package events
 import (
 	"encoding/json"
 	"github.com/Shopify/sarama"
-	"github.com/flachnetz/startup/lib/kafka"
+	"github.com/flachnetz/startup/v2/lib/kafka"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"reflect"

@@ -5,7 +5,7 @@ import (
 
 	"encoding/json"
 	"github.com/Shopify/sarama"
-	"github.com/flachnetz/startup/lib/schema"
+	"github.com/flachnetz/startup/v2/lib/schema"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )

@@ -2,7 +2,7 @@ package startup
 
 import (
 	"fmt"
-	"github.com/flachnetz/startup/startup_base"
+	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"

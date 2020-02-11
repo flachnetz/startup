@@ -2,7 +2,7 @@ package startup_tracing_pg
 
 import (
 	"context"
-	"github.com/flachnetz/startup/startup_tracing"
+	"github.com/flachnetz/startup/v2/startup_tracing"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"strings"

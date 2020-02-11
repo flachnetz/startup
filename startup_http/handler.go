@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	. "github.com/flachnetz/startup/startup_logrus"
+	. "github.com/flachnetz/startup/v2/startup_logrus"
 	"io/ioutil"
 	"net/http"
 	"reflect"
