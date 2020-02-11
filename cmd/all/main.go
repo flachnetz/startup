@@ -45,7 +45,7 @@ func main() {
 		Close()
 
 	defer opts.Events.
-		EventSender(&opts.Kafka, &opts.Schema).
+		EventSender().
 		Close()
 
 	opts.HTTP.Serve(startup_http.Config{
