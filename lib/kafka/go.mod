@@ -9,7 +9,4 @@ require (
 	github.com/sirupsen/logrus v1.4.0
 )
 
-replace (
-	github.com/flachnetz/startup/lib/kafka => ../kafka
-	github.com/flachnetz/startup/lib/schema => ../schema
-)
+replace github.com/flachnetz/startup/lib/schema => ../schema
