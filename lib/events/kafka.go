@@ -1,6 +1,7 @@
 package events
 
 import (
+	"encoding/json"
 	"github.com/Shopify/sarama"
 	"github.com/flachnetz/startup/lib/kafka"
 	"github.com/pkg/errors"
@@ -8,6 +9,8 @@ import (
 	"reflect"
 	"sync"
 )
+
+var errorTopic = "event_sender_errors"
 
 type Encoder interface {
 	// Encodes an event into some kind of binary representation.
@@ -29,11 +32,12 @@ type KafkaSenderConfig struct {
 }
 
 type KafkaSender struct {
-	log      logrus.FieldLogger
-	events   chan Event
-	eventsWg sync.WaitGroup
-	encoder  Encoder
-	producer sarama.AsyncProducer
+	log             logrus.FieldLogger
+	events          chan Event
+	eventsWg        sync.WaitGroup
+	encoder         Encoder
+	fallbackEncoder Encoder
+	producer        sarama.AsyncProducer
 
 	allowBlocking bool
 	topicForEvent func(event Event) string
@@ -53,12 +57,13 @@ func NewKafkaSender(kafkaClient sarama.Client, senderConfig KafkaSenderConfig) (
 	}
 
 	sender := &KafkaSender{
-		log:           logrus.WithField("prefix", "kafka"),
-		events:        make(chan Event, 1024),
-		encoder:       senderConfig.Encoder,
-		producer:      producer,
-		allowBlocking: senderConfig.AllowBlocking,
-		topicForEvent: topicForEventFunc(senderConfig.TopicsConfig.TopicForType),
+		log:             logrus.WithField("prefix", "kafka"),
+		events:          make(chan Event, 1024),
+		encoder:         senderConfig.Encoder,
+		fallbackEncoder: jsonEncoder{},
+		producer:        producer,
+		allowBlocking:   senderConfig.AllowBlocking,
+		topicForEvent:   topicForEventFunc(senderConfig.TopicsConfig.TopicForType),
 	}
 
 	sender.eventsWg.Add(2)
@@ -102,8 +107,8 @@ func (kafka *KafkaSender) handleEvents() {
 		// encode events to binary data
 		encoded, err := kafka.encoder.Encode(event)
 		if err != nil {
-			kafka.handleError(err)
-			return
+			kafka.handleError(err, event)
+			continue
 		}
 
 		// and enqueue it for sending
@@ -114,15 +119,24 @@ func (kafka *KafkaSender) handleEvents() {
 	}
 }
 
-func (kafka *KafkaSender) handleError(err error) {
-	kafka.log.Errorf("Failed to send event: %s", err)
+func (kafka *KafkaSender) handleError(err error, event Event) {
+	if event != nil {
+		payload, _ := json.Marshal(event)
+		kafka.log.Errorf("Failed to send event %s: %s -> routing to %s topic as json", string(payload), err, errorTopic)
+		kafka.producer.Input() <- &sarama.ProducerMessage{
+			Topic: errorTopic,
+			Value: sarama.ByteEncoder(payload),
+		}
+	} else {
+		kafka.log.Errorf("Failed to send event: %s", err)
+	}
 }
 
 func (kafka *KafkaSender) consumeErrorChannel() {
 	kafka.eventsWg.Done()
 
 	for err := range kafka.producer.Errors() {
-		kafka.handleError(err)
+		kafka.handleError(err, nil)
 	}
 }
 
