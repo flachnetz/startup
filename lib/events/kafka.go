@@ -45,8 +45,9 @@ type KafkaSender struct {
 
 func NewKafkaSender(kafkaClient sarama.Client, senderConfig KafkaSenderConfig) (*KafkaSender, error) {
 
+	topics := getTopicsWithErrorTopic(senderConfig.TopicsConfig.Topics())
 	// ensure that all topics that might be used later exist
-	if err := kafka.EnsureTopics(kafkaClient, senderConfig.TopicsConfig.Topics()); err != nil {
+	if err := kafka.EnsureTopics(kafkaClient, topics); err != nil {
 		return nil, errors.WithMessage(err, "ensure topics")
 	}
 
@@ -176,4 +177,19 @@ func (topics EventTopics) Topics() kafka.Topics {
 	}
 
 	return result
+}
+
+func getTopicsWithErrorTopic(topics kafka.Topics) kafka.Topics {
+	var replication int16 = 1
+	// get highest replication for error topic
+	for _, v := range topics {
+		if v.ReplicationFactor > replication {
+			replication = replication
+		}
+	}
+	return append(topics, kafka.Topic{
+		Name:              errorTopic,
+		NumPartitions:     9,
+		ReplicationFactor: replication,
+	})
 }
