@@ -137,7 +137,7 @@ func initializeEventSender(providers Providers, senderType string, arguments map
 			return nil, errors.WithMessage(err, "kafka sender")
 		}
 
-		if arguments["init-schemas"] == "true" {
+		if arguments["schemainit"] == "true" {
 			var initEvents = []Event{}
 			for k := range topics.EventTypes {
 				ev := reflect.New(k)
