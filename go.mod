@@ -1,4 +1,4 @@
-module github.com/flachnetz/startup
+module github.com/flachnetz/startup/v2
 
 exclude github.com/golang/lint v0.0.0-20190313153728-d0100b6bd8b3
 
