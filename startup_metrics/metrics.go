@@ -2,11 +2,11 @@ package startup_metrics
 
 import (
 	"github.com/DataDog/datadog-go/statsd"
+	"github.com/flachnetz/go-datadog"
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/pkg/errors"
 	"github.com/rcrowley/go-metrics"
 	"github.com/sirupsen/logrus"
-	"github.com/flachnetz/go-datadog"
 	"os"
 	"strings"
 	"sync"
