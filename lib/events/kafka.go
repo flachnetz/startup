@@ -29,6 +29,8 @@ type KafkaSenderConfig struct {
 
 	// The event encoder to use
 	Encoder Encoder
+
+	EventBufferSize int
 }
 
 type KafkaSender struct {
@@ -57,9 +59,14 @@ func NewKafkaSender(kafkaClient sarama.Client, senderConfig KafkaSenderConfig) (
 		return nil, errors.WithMessage(err, "create producer from client")
 	}
 
+	// just set to default
+	if senderConfig.EventBufferSize <= 0 {
+		senderConfig.EventBufferSize = 1024
+	}
+
 	sender := &KafkaSender{
 		log:             logrus.WithField("prefix", "kafka"),
-		events:          make(chan Event, 1024),
+		events:          make(chan Event, senderConfig.EventBufferSize),
 		encoder:         senderConfig.Encoder,
 		fallbackEncoder: jsonEncoder{},
 		producer:        producer,
