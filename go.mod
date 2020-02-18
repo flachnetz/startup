@@ -34,6 +34,7 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	github.com/syntaqx/go-metrics-datadog v0.0.0-20181220201509-312b31920cc5
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
+	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.29.1
 )
 
