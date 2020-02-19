@@ -5,12 +5,15 @@ import (
 	"github.com/flachnetz/startup/v2/startup_tracing"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
+	"regexp"
 	"strings"
 )
 
 type dbHook struct {
 	ServiceName string
 }
+
+var reSpace = regexp.MustCompile(`\s+`)
 
 func (h *dbHook) Before(ctx context.Context, query string, args ...interface{}) (context.Context, error) {
 	// lookup if we have a parent span
@@ -27,7 +30,7 @@ func (h *dbHook) Before(ctx context.Context, query string, args ...interface{}) 
 
 	// set extra tags for our datadog proxy
 	span.SetTag("dd.service", h.ServiceName)
-	span.SetTag("dd.resource", strings.TrimSpace(query))
+	span.SetTag("dd.resource", strings.TrimSpace(reSpace.ReplaceAllString(query, " ")))
 
 	return opentracing.ContextWithSpan(ctx, span), nil
 }
