@@ -61,8 +61,8 @@ func WithSpan(span opentracing.Span, fn func()) {
 //
 // Deprecated: propagate spans using context.
 //
-func TraceChild(op string, fn func(span opentracing.Span) error) (err error) {
-	return trace(op, false, fn)
+func TraceChild(op string, fn func(span opentracing.Span) error, spanOpts ...opentracing.StartSpanOption) (err error) {
+	return trace(op, false, fn, spanOpts...)
 }
 
 // Runs an operation and traces it with the given name. This will create a
@@ -70,11 +70,11 @@ func TraceChild(op string, fn func(span opentracing.Span) error) (err error) {
 //
 // Deprecated: propagate spans using context.
 //
-func TraceOrCreate(op string, fn func(span opentracing.Span) error) (err error) {
-	return trace(op, true, fn)
+func TraceOrCreate(op string, fn func(span opentracing.Span) error, spanOpts ...opentracing.StartSpanOption) (err error) {
+	return trace(op, true, fn, spanOpts...)
 }
 
-func trace(op string, always bool, fn func(span opentracing.Span) error) (err error) {
+func trace(op string, always bool, fn func(span opentracing.Span) error, spanOpts ...opentracing.StartSpanOption) (err error) {
 	span := noopSpan
 
 	if UseGLS {
@@ -83,12 +83,10 @@ func trace(op string, always bool, fn func(span opentracing.Span) error) (err er
 
 			if ok && previousSpan != nil {
 				// build a child span
-				span = previousSpan.Tracer().StartSpan(op,
-					ext.SpanKindRPCClient,
-					opentracing.ChildOf(previousSpan.Context()))
+				span = previousSpan.Tracer().StartSpan(op, append(spanOpts, ext.SpanKindRPCClient, opentracing.ChildOf(previousSpan.Context()))...)
 			} else if always {
 				// start a new one
-				span = opentracing.StartSpan(op, ext.SpanKindRPCClient)
+				span = opentracing.StartSpan(op, append(spanOpts, ext.SpanKindRPCClient)...)
 			}
 
 			g[activeSpanKey] = span
