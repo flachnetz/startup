@@ -2,9 +2,11 @@ package startup_tracing
 
 import (
 	"context"
+	"database/sql"
 	"github.com/modern-go/gls"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
+	"github.com/pkg/errors"
 )
 
 // Use the legacy GLS way to forward spans using goroutine-local storage.
@@ -94,7 +96,7 @@ func trace(op string, always bool, fn func(span opentracing.Span) error, spanOpt
 			defer func() {
 				g[activeSpanKey] = previousSpan
 
-				if err != nil {
+				if err != nil && isNotErrNoRows(err) {
 					span.SetTag("error", true)
 					span.SetTag("error_message", err.Error())
 				}
@@ -122,7 +124,7 @@ func TraceChildContext(ctx context.Context, op string, fn func(ctx context.Conte
 		opentracing.ChildOf(parentContext))
 
 	defer func() {
-		if err != nil {
+		if err != nil && isNotErrNoRows(err) {
 			span.SetTag("error", true)
 			span.SetTag("error_message", err.Error())
 		}
@@ -152,4 +154,8 @@ func CurrentSpanFromContextOrGLS(ctx context.Context) opentracing.Span {
 	}
 
 	return nil
+}
+
+func isNotErrNoRows(err error) bool {
+	return errors.Cause(err) != sql.ErrNoRows
 }
