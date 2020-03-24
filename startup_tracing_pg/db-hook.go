@@ -2,9 +2,11 @@ package startup_tracing_pg
 
 import (
 	"context"
+	"database/sql"
 	"github.com/flachnetz/startup/v2/startup_tracing"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
+	"github.com/pkg/errors"
 	"regexp"
 	"strings"
 )
@@ -46,7 +48,7 @@ func (h *dbHook) After(ctx context.Context, query string, args ...interface{}) (
 
 func (h *dbHook) OnError(ctx context.Context, err error, query string, args ...interface{}) error {
 	span := opentracing.SpanFromContext(ctx)
-	if span != nil {
+	if span != nil && errors.Cause(err) != sql.ErrNoRows {
 		span.SetTag("error", true)
 		span.SetTag("err", err.Error())
 		span.Finish()
