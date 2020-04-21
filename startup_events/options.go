@@ -13,6 +13,7 @@ var log = logrus.WithField("prefix", "events")
 
 type EventOptions struct {
 	EventSenderConfig string `long:"event-sender" default:"" description:"Event sender to use. Event sender type followed by arguments, e.g: confluent,address=http://confluent-registry.shared.svc.cluster.local,kafka=kafka.kafka.svc.cluster.local:9092,replication=1,blocking=true"`
+	DisableTls         bool     `long:"kafka-disable-tls" description:"Do not enable tls."`
 
 	Inputs struct {
 		// A function to create the event topics. This option must be specified.
@@ -28,6 +29,16 @@ type EventOptions struct {
 
 func (opts *EventOptions) EventSender() events.EventSender {
 	opts.eventSenderOnce.Do(func() {
+		config:=opts.Inputs.KafkaConfig
+		if config == nil {
+			log.Debugf("No kafka config supplied, using default config")
+			config = defaultConfig()
+		}
+
+		if opts.DisableTls {
+			config.Net.TLS.Enable = false
+		}
+		
 		providers := events.Providers{
 			Kafka:  kafkaClientProvider{opts.Inputs.KafkaConfig},
 			Topics: opts.Inputs.Topics,
@@ -68,7 +79,8 @@ func defaultConfig() *sarama.Config {
 	config.Producer.Retry.Backoff = 250 * time.Millisecond
 	config.ChannelBufferSize = 4
 
-	config.Version = sarama.V1_1_1_0
+	config.Version = sarama.V2_4_0_0
+	config.Net.TLS.Enable= true
 
 	return config
 }
