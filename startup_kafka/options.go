@@ -2,12 +2,13 @@ package startup_kafka
 
 import (
 	"github.com/Shopify/sarama"
-	"github.com/flachnetz/startup/v2/lib/kafka"
-	"github.com/flachnetz/startup/v2/lib/schema"
-	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/sirupsen/logrus"
 	"sync"
 	"time"
+
+	"github.com/flachnetz/startup/v2/lib/kafka"
+	"github.com/flachnetz/startup/v2/lib/schema"
+	"github.com/flachnetz/startup/v2/startup_base"
 )
 
 var log = logrus.WithField("prefix", "kafka")
@@ -15,6 +16,7 @@ var log = logrus.WithField("prefix", "kafka")
 type KafkaOptions struct {
 	Addresses          []string `long:"kafka-address" validate:"dive,hostport" description:"Address of kafka server to use. Can be specified multiple times to connect to multiple brokers."`
 	DefaultReplication int16    `long:"kafka-replication" default:"1" validate:"min=1" description:"Default replication factor for topic creation."`
+	DisableTls         bool     `long:"kafka-disable-tls" description:"Do not enable tls."`
 
 	Inputs struct {
 		// You can provide an extra kafka config to override the
@@ -39,6 +41,10 @@ func (opts *KafkaOptions) KafkaClient() sarama.Client {
 		if config == nil {
 			log.Debugf("No config supplied, using default config")
 			config = defaultConfig()
+		}
+
+		if opts.DisableTls {
+			config.Net.TLS.Enable = false
 		}
 
 		kafkaClient, err := sarama.NewClient(opts.Addresses, config)
@@ -66,7 +72,8 @@ func defaultConfig() *sarama.Config {
 	config.Consumer.Fetch.Min = 1024
 	config.Consumer.Return.Errors = true
 	config.ChannelBufferSize = 4
+	config.Net.TLS.Enable = true
 
-	config.Version = sarama.V1_1_0_0
+	config.Version = sarama.V2_4_0_0
 	return config
 }
