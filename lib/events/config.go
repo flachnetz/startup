@@ -1,15 +1,18 @@
 package events
 
 import (
+	"crypto/tls"
 	confluent "github.com/Landoop/schema-registry"
 	"github.com/Shopify/sarama"
 	consul "github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 	"io"
+	"net/http"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/flachnetz/startup/v2/lib/schema"
@@ -122,8 +125,15 @@ func initializeEventSender(providers Providers, senderType string, arguments map
 			if err := requireArguments(arguments, "kafka", "address"); err != nil {
 				return nil, errors.WithMessage(err, "confluent event sender")
 			}
-
-			confluentClient, err := confluent.NewClient(arguments["address"])
+			httpClient := &http.Client{
+				Timeout: 3 * time.Second,
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{
+						InsecureSkipVerify: true,
+					},
+				},
+			}
+			confluentClient, err := confluent.NewClient(arguments["address"], confluent.UsingClient(httpClient))
 			if err != nil {
 				return nil, errors.WithMessage(err, "confluent registry client")
 			}
@@ -166,7 +176,10 @@ func initializeEventSender(providers Providers, senderType string, arguments map
 			}
 			err := eventSender.Init(initEvents)
 			if err != nil {
-				return nil, errors.WithMessage(err, "event schema init failed")
+				log.Errorf("event schema init failed")
+				if topics.FailOnSchemaInit {
+					return nil, errors.WithMessage(err, "event schema init failed")
+				}
 			}
 		}
 

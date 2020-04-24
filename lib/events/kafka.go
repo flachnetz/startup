@@ -171,6 +171,7 @@ type TopicsFunc func(replicationFactor int16) EventTopics
 type EventTopics struct {
 	EventTypes       map[reflect.Type]kafka.Topic
 	SchemaInitEvents []Event
+	FailOnSchemaInit bool
 
 	// This is the fallback topic if a type can not be matched to one of the event types.
 	// It will be created automatically.
