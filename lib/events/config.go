@@ -159,15 +159,11 @@ func initializeEventSender(providers Providers, senderType string, arguments map
 		}
 
 		topics := providers.Topics(int16(replicationFactor))
+
 		bufferSize := 1024
-		if bs, err := strconv.Atoi(arguments["bufferSize"]); err != nil {
-			if arguments["bufferSize"] == "" {
-				bufferSize = 1024
-			} else {
-				return nil, errors.WithMessage(err, "cannot parse buffer size")
-			}
-		} else {
-			bufferSize = bs
+		if value := arguments["bufferSize"]; value != "" {
+			bufferSize, err = strconv.Atoi(value)
+			return nil, errors.WithMessage(err, "cannot parse buffer size")
 		}
 		log.Infof("setting buffer size to %d", bufferSize)
 
