@@ -51,7 +51,7 @@ type Providers struct {
 // blocking=true: will wait until the event got sent
 func ParseEventSenders(providers Providers, config string) (EventSender, error) {
 	reSenderType := regexp.MustCompile(`^([a-z]+)`)
-	reArgument := regexp.MustCompile(`^,([a-zA-Z]+)=([^, ]+)`)
+	reArgument := regexp.MustCompile(`^,([a-zA-Z]+)=([^,]+)`)
 
 	var eventSenders EventSenders
 
