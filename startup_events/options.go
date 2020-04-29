@@ -35,9 +35,7 @@ func (opts *EventOptions) EventSender() events.EventSender {
 			config = defaultConfig()
 		}
 
-		if opts.DisableTls {
-			config.Net.TLS.Enable = false
-		}
+		config.Net.TLS.Enable = !opts.DisableTls
 
 		providers := events.Providers{
 			Kafka:  kafkaClientProvider{config},
