@@ -43,9 +43,7 @@ func (opts *KafkaOptions) KafkaClient() sarama.Client {
 			config = defaultConfig()
 		}
 
-		if opts.DisableTls {
-			config.Net.TLS.Enable = false
-		}
+		config.Net.TLS.Enable = !opts.DisableTls
 
 		kafkaClient, err := sarama.NewClient(opts.Addresses, config)
 		startup_base.PanicOnError(err, "Cannot create kafka client")
