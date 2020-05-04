@@ -45,7 +45,7 @@ func main() {
 		Close()
 
 	defer opts.Events.
-		EventSender().
+		EventSender("test").
 		Close()
 
 	opts.HTTP.Serve(startup_http.Config{

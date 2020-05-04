@@ -5,8 +5,9 @@ import (
 	"time"
 )
 
-func DefaultConfig() *sarama.Config {
+func DefaultConfig(clientId string) *sarama.Config {
 	config := sarama.NewConfig()
+	config.ClientID = clientId
 
 	config.Version = sarama.V2_4_0_0
 

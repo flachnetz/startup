@@ -19,7 +19,7 @@ import (
 )
 
 type KafkaClientProvider interface {
-	KafkaClient(addresses []string) (sarama.Client, error)
+	KafkaClient(clientId string, addresses []string) (sarama.Client, error)
 }
 
 type Providers struct {
@@ -49,7 +49,7 @@ type Providers struct {
 //
 // replication=NUMBER: used to create the given kafka topics with the replication param
 // blocking=true: will wait until the event got sent
-func ParseEventSenders(providers Providers, config string) (EventSender, error) {
+func ParseEventSenders(clientId string, providers Providers, config string) (EventSender, error) {
 	reSenderType := regexp.MustCompile(`^([a-z]+)`)
 	reArgument := regexp.MustCompile(`^,([a-zA-Z]+)=([^,]+)`)
 
@@ -75,7 +75,7 @@ func ParseEventSenders(providers Providers, config string) (EventSender, error) 
 			config = config[len(match[0]):]
 		}
 
-		eventSender, err := initializeEventSender(providers, eventSenderType, argumentValues)
+		eventSender, err := initializeEventSender(clientId, providers, eventSenderType, argumentValues)
 		if err != nil {
 			return nil, errors.WithMessage(err, "initializinig event sender")
 		}
@@ -86,7 +86,7 @@ func ParseEventSenders(providers Providers, config string) (EventSender, error) 
 	return eventSenders, nil
 }
 
-func initializeEventSender(providers Providers, senderType string, arguments map[string]string) (EventSender, error) {
+func initializeEventSender(clientId string, providers Providers, senderType string, arguments map[string]string) (EventSender, error) {
 	switch senderType {
 	case "noop":
 		return NoopEventSender{}, nil
@@ -153,7 +153,7 @@ func initializeEventSender(providers Providers, senderType string, arguments map
 
 		// split by spaces or commas
 		kafkaAddresses := strings.FieldsFunc(arguments["kafka"], isCommaOrSpace)
-		kafkaClient, err := providers.Kafka.KafkaClient(kafkaAddresses)
+		kafkaClient, err := providers.Kafka.KafkaClient(clientId, kafkaAddresses)
 		if err != nil {
 			return nil, errors.WithMessage(err, "create kafka client")
 		}

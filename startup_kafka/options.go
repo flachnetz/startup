@@ -34,15 +34,16 @@ type KafkaOptions struct {
 	schemaRegistry     schema.Registry
 }
 
-func (opts *KafkaOptions) KafkaClient() sarama.Client {
+func (opts *KafkaOptions) KafkaClient(clientId string) sarama.Client {
 	opts.kafkaClientOnce.Do(func() {
 		config := opts.Inputs.KafkaConfig
 		if config == nil {
 			log.Debugf("No config supplied, using default config")
-			config = kafka.DefaultConfig()
+			config = kafka.DefaultConfig(clientId)
 		}
 
 		config.Net.TLS.Enable = !opts.DisableTls
+		config.ClientID = clientId
 
 		kafkaClient, err := sarama.NewClient(opts.Addresses, config)
 		startup_base.PanicOnError(err, "Cannot create kafka client")
