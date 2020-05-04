@@ -10,8 +10,8 @@ from typing import Tuple
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Releases a go module")
-    parser.add_argument("mod", help="Filename of the go mod file you would like to release")
-    parser.add_argument("version", help="Version to use", action="store_false")
+    parser.add_argument("-m","--mod", help="Filename of the go mod file you would like to release")
+    parser.add_argument("-v","--version", help="Version to use")
     return parser.parse_args()
 
 
