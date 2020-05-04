@@ -28,21 +28,23 @@ type EventOptions struct {
 	eventSender     events.EventSender
 }
 
-func (opts *EventOptions) EventSender() events.EventSender {
+func (opts *EventOptions) EventSender(clientId string) events.EventSender {
 	opts.eventSenderOnce.Do(func() {
 		config := opts.Inputs.KafkaConfig
 		if config == nil {
 			log.Debugf("No kafka config supplied, using default config")
-			config = kafka.DefaultConfig()
+			config = kafka.DefaultConfig(clientId)
 		}
 
 		config.Net.TLS.Enable = !opts.DisableTls
+		config.ClientID = clientId
+
 		providers := events.Providers{
 			Kafka:  kafkaClientProvider{config},
 			Topics: opts.Inputs.Topics,
 		}
 
-		eventSender, err := events.ParseEventSenders(providers, opts.EventSenderConfig)
+		eventSender, err := events.ParseEventSenders(clientId, providers, opts.EventSenderConfig)
 		startup_base.PanicOnError(err, "initialize event sender")
 
 		// register as global event sender
@@ -58,12 +60,13 @@ type kafkaClientProvider struct {
 	config *sarama.Config
 }
 
-func (p kafkaClientProvider) KafkaClient(addresses []string) (sarama.Client, error) {
+func (p kafkaClientProvider) KafkaClient(clientId string, addresses []string) (sarama.Client, error) {
 	config := p.config
 	if config == nil {
 		log.Debugf("No kafka config supplied, using default config")
-		config = kafka.DefaultConfig()
+		config = kafka.DefaultConfig(clientId)
 	}
+	config.ClientID = clientId
 
 	return sarama.NewClient(addresses, config)
 }

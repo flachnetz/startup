@@ -11,6 +11,7 @@ from typing import Tuple
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Releases a go module")
     parser.add_argument("mod", help="Filename of the go mod file you would like to release")
+    parser.add_argument("version", help="Version to use")
     return parser.parse_args()
 
 
@@ -59,7 +60,7 @@ def main():
     major, minor, patch = module_version
     release_version = (major, minor, patch + 1)
 
-    release_tag = tag_prefix + ".".join(str(v) for v in release_version)
+    release_tag = args.version || tag_prefix + ".".join(str(v) for v in release_version)
 
     print("Create release tag {}".format(release_tag))
     subprocess.check_call(["git", "tag", release_tag], cwd=str(root))
