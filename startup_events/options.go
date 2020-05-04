@@ -3,6 +3,7 @@ package startup_events
 import (
 	"github.com/Shopify/sarama"
 	"github.com/flachnetz/startup/v2/lib/events"
+	"github.com/flachnetz/startup/v2/lib/kafka"
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/sirupsen/logrus"
 	"sync"
@@ -61,23 +62,8 @@ func (p kafkaClientProvider) KafkaClient(addresses []string) (sarama.Client, err
 	config := p.config
 	if config == nil {
 		log.Debugf("No kafka config supplied, using default config")
-		config = defaultConfig()
+		config = kafka.DefaultConfig()
 	}
 
 	return sarama.NewClient(addresses, config)
-}
-
-func defaultConfig() *sarama.Config {
-	config := sarama.NewConfig()
-	config.Net.MaxOpenRequests = 16
-	config.Net.DialTimeout = 10 * time.Second
-	config.Producer.Timeout = 3 * time.Second
-	config.Producer.Retry.Max = 16
-	config.Producer.Retry.Backoff = 250 * time.Millisecond
-	config.ChannelBufferSize = 4
-
-	config.Version = sarama.V2_4_0_0
-	config.Net.TLS.Enable = true
-
-	return config
 }
