@@ -2,12 +2,12 @@ package startup_events
 
 import (
 	"github.com/Shopify/sarama"
+	"github.com/sirupsen/logrus"
+	"sync"
+
 	"github.com/flachnetz/startup/v2/lib/events"
 	"github.com/flachnetz/startup/v2/lib/kafka"
 	"github.com/flachnetz/startup/v2/startup_base"
-	"github.com/sirupsen/logrus"
-	"sync"
-	"time"
 )
 
 var log = logrus.WithField("prefix", "events")
@@ -33,7 +33,7 @@ func (opts *EventOptions) EventSender() events.EventSender {
 		config := opts.Inputs.KafkaConfig
 		if config == nil {
 			log.Debugf("No kafka config supplied, using default config")
-			config = defaultConfig()
+			config = kafka.DefaultConfig()
 		}
 
 		config.Net.TLS.Enable = !opts.DisableTls
