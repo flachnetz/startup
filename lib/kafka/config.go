@@ -1,9 +1,30 @@
 package kafka
 
 import (
+	"fmt"
 	"github.com/Shopify/sarama"
+	"github.com/sirupsen/logrus"
+	"strings"
 	"time"
 )
+
+type logrusAdapter struct {
+	l *logrus.Entry
+}
+
+func (l logrusAdapter) Print(v ...interface{}) {
+	l.Println(strings.TrimSpace(fmt.Sprint(v...)))
+}
+func (l logrusAdapter) Printf(format string, v ...interface{}) {
+	l.Println(strings.TrimSpace(fmt.Sprintf(format, v...)))
+}
+func (l logrusAdapter) Println(v ...interface{}) {
+	l.Println(strings.TrimSpace(fmt.Sprint(v...)))
+}
+
+func init() {
+	sarama.Logger = logrusAdapter{l: logrus.WithField("prefix", "sarama")}
+}
 
 func DefaultConfig(clientId string) *sarama.Config {
 	config := sarama.NewConfig()
