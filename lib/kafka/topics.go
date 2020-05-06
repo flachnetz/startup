@@ -3,6 +3,7 @@ package kafka
 import (
 	"github.com/Shopify/sarama"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -33,7 +34,7 @@ func EnsureTopics(client sarama.Client, topics Topics) error {
 		}
 
 		if resp != nil && len(resp.TopicErrors) > 0 {
-			return errors.Errorf("cannot create topics: %+v", resp.TopicErrors)
+			logrus.Warnf("there was at least one error during topic creation, ignoring for now: %+v", resp.TopicErrors)
 		}
 
 		return nil
