@@ -9,21 +9,21 @@ import (
 )
 
 type logrusAdapter struct {
-	l *logrus.Entry
+	delegate *logrus.Entry
 }
 
 func (l logrusAdapter) Print(v ...interface{}) {
-	l.Println(strings.TrimSpace(fmt.Sprint(v...)))
+	l.delegate.Println(strings.TrimSpace(fmt.Sprint(v...)))
 }
 func (l logrusAdapter) Printf(format string, v ...interface{}) {
-	l.Println(strings.TrimSpace(fmt.Sprintf(format, v...)))
+	l.delegate.Println(strings.TrimSpace(fmt.Sprintf(format, v...)))
 }
 func (l logrusAdapter) Println(v ...interface{}) {
-	l.Println(strings.TrimSpace(fmt.Sprint(v...)))
+	l.delegate.Println(strings.TrimSpace(fmt.Sprint(v...)))
 }
 
 func init() {
-	sarama.Logger = logrusAdapter{l: logrus.WithField("prefix", "sarama")}
+	sarama.Logger = logrusAdapter{delegate: logrus.WithField("prefix", "sarama")}
 }
 
 func DefaultConfig(clientId string) *sarama.Config {
