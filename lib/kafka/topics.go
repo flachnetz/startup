@@ -11,35 +11,44 @@ type Topics []Topic
 type TopicsFunc func(replicationFactor int16) Topics
 
 func EnsureTopics(client sarama.Client, topics Topics) error {
-	var err error
-	for _, broker := range client.Brokers() {
+	createTopics := func(broker *sarama.Broker) error {
 		// open connection asynchronously
-		if err = broker.Open(client.Config()); err != nil && err != sarama.ErrAlreadyConnected {
-			err = errors.WithMessage(err, "open broker connection")
-			continue
+		if err := broker.Open(client.Config()); err != nil && err != sarama.ErrAlreadyConnected {
+			return errors.WithMessage(err, "open broker connection")
 		}
 
 		// this one will wait for the actual connection.
-		if _, err = broker.Connected(); err != nil {
-			err = errors.WithMessage(err, "open broker connection")
-			continue
+		if _, err := broker.Connected(); err != nil {
+			return errors.WithMessage(err, "open broker connection")
 		}
 
-		_, err = broker.CreateTopics(&sarama.CreateTopicsRequest{
+		resp, err := broker.CreateTopics(&sarama.CreateTopicsRequest{
 			Version:      1,
 			TopicDetails: topics.details(),
 			Timeout:      1 * time.Second,
 		})
 
 		if err != nil {
-			err = errors.WithMessage(err, "create topics request")
-			continue
+			return errors.WithMessage(err, "create topics request")
+		}
+
+		if resp != nil && len(resp.TopicErrors) > 0 {
+			return errors.Errorf("cannot create topics: %+v", resp.TopicErrors)
 		}
 
 		return nil
 	}
 
-	return errors.WithMessage(err, "creating topics")
+	var err error
+	broker, err := client.Controller()
+	if err != nil {
+		broker, err = client.RefreshController()
+		if err == nil {
+			return errors.WithMessage(err, "cannot get broker controller, trying each broker now to create topics")
+		}
+	}
+
+	return createTopics(broker)
 }
 
 type Topic struct {
