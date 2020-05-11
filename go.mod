@@ -8,7 +8,7 @@ require (
 	github.com/Shopify/sarama v1.26.1
 	github.com/benbjohnson/clock v1.0.0
 	github.com/flachnetz/go-admin v1.5.3
-	github.com/flachnetz/go-datadog v1.2.0
+	github.com/flachnetz/go-datadog v1.3.0
 	github.com/gchaincl/sqlhooks v1.3.0
 	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/goji/httpauth v0.0.0-20160601135302-2da839ab0f4d
