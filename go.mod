@@ -15,12 +15,14 @@ require (
 	github.com/gorilla/handlers v1.4.2
 	github.com/hashicorp/consul/api v1.4.0
 	github.com/hashicorp/go-multierror v1.0.0
+	github.com/jackc/pgconn v1.5.0
+	github.com/jackc/pgtype v1.3.0
+	github.com/jackc/pgx/v4 v4.6.0
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/leodido/go-urn v1.2.0 // indirect
-	github.com/lib/pq v1.3.0
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/gls v0.0.0-20190610040709-84558782a674
@@ -29,7 +31,7 @@ require (
 	github.com/openzipkin-contrib/zipkin-go-opentracing v0.4.5
 	github.com/openzipkin/zipkin-go v0.2.2
 	github.com/pkg/errors v0.8.1
-	github.com/rcrowley/go-metrics v0.0.0-20190826022208-cac0b30c2563
+	github.com/rcrowley/go-metrics v0.0.0-20200313005456-10cdbea86bc0
 	github.com/rubenv/sql-migrate v0.0.0-20200210110325-c8d4be6f9bb7
 	github.com/sirupsen/logrus v1.4.2
 	github.com/syntaqx/go-metrics-datadog v0.0.0-20181220201509-312b31920cc5
@@ -38,4 +40,4 @@ require (
 	gopkg.in/go-playground/validator.v9 v9.29.1
 )
 
-go 1.13
+go 1.14

@@ -1,15 +1,16 @@
 package startup_postgres
 
 import (
-	"github.com/flachnetz/startup/v2/startup_base"
+	"github.com/jackc/pgconn"
 	"time"
+
+	"github.com/flachnetz/startup/v2/startup_base"
 
 	"database/sql"
 	"fmt"
 	"github.com/benbjohnson/clock"
+	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
-	_ "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 	"io"
 	"sync"
@@ -49,7 +50,7 @@ func (opts *PostgresOptions) Connection() *sqlx.DB {
 		// the same postgres driver but with registered hooks.
 		driverName := opts.Inputs.DriverName
 		if driverName == "" {
-			driverName = guessDriverName()
+			driverName = GuessDriverName()
 		}
 
 		log.Debugf("Opening database using driver %s", driverName)
@@ -77,7 +78,7 @@ func (opts *PostgresOptions) Connection() *sqlx.DB {
 	return opts.connection
 }
 
-func guessDriverName() string {
+func GuessDriverName() string {
 	var pgx, postgres bool
 	for _, driver := range sql.Drivers() {
 		pgx = pgx || driver == "pgx"
@@ -131,7 +132,7 @@ func (ch channelCloser) Close() error {
 }
 
 func ErrIsForeignKeyViolation(err error) bool {
-	if err, ok := err.(*pq.Error); ok {
+	if err, ok := err.(*pgconn.PgError); ok {
 		return err.Code == "23503"
 	}
 
@@ -139,7 +140,7 @@ func ErrIsForeignKeyViolation(err error) bool {
 }
 
 func ErrIsUniqueViolation(err error) bool {
-	if err, ok := err.(*pq.Error); ok {
+	if err, ok := err.(*pgconn.PgError); ok {
 		return err.Code == "23505"
 	}
 
