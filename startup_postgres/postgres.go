@@ -85,12 +85,12 @@ func GuessDriverName() string {
 		postgres = postgres || driver == "postgres"
 	}
 
-	if pgx {
-		return "pgx"
-	}
-
 	if postgres {
 		return "postgres"
+	}
+
+	if pgx {
+		return "pgx"
 	}
 
 	panic(startup_base.Errorf("No postgres database driver found"))
