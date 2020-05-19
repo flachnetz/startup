@@ -27,14 +27,8 @@ type PostgresTracingOptions struct {
 func (opts *PostgresTracingOptions) Initialize(tops *startup_tracing.TracingOptions) {
 	opts.once.Do(func() {
 		if tops.IsActive() {
-			driverName := "postgres"
-			if d := GuessDriverName(); d == driverName {
-				driverName = "pgx"
-			}
-
 			// Register a driver with hooks.
-			// We need to use the pgx name here so that sqlx will use the right binding syntax.
-			sql.Register(driverName, sqlhooks.Wrap(&stdlib.Driver{}, &dbHook{tops.Inputs.ServiceName + "-db"}))
+			sql.Register("postgres", sqlhooks.Wrap(&stdlib.Driver{}, &dbHook{tops.Inputs.ServiceName + "-db"}))
 
 			// replace the new transaction function with a new hook
 			opts.installTransactionTracingHook(tops.Inputs.ServiceName + "-db")
