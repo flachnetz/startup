@@ -28,7 +28,7 @@ func (s StringArray) Len() int {
 }
 
 func (s StringArray) AsSlice() []string {
-	result := make([]string, 0, len(s.Elements))
+	var result []string
 	for _, v := range s.Elements {
 		result = append(result, v.String)
 	}
@@ -50,7 +50,7 @@ func NewInt64Array(value []int64) Int64Array {
 }
 
 func (s Int64Array) AsSlice() []int64 {
-	result := make([]int64, 0, len(s.Elements))
+	var result []int64
 	for _, v := range s.Elements {
 		result = append(result, v.Int)
 	}
