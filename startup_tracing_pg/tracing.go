@@ -3,15 +3,15 @@ package startup_tracing_pg
 import (
 	"context"
 	"database/sql"
-	"github.com/flachnetz/startup/v2/startup_base"
-	. "github.com/flachnetz/startup/v2/startup_postgres"
-	"github.com/flachnetz/startup/v2/startup_tracing"
 	"github.com/gchaincl/sqlhooks"
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v4/stdlib"
 	"github.com/opentracing/opentracing-go"
 	"runtime"
 	"strings"
 	"sync"
+
+	. "github.com/flachnetz/startup/v2/startup_postgres"
+	"github.com/flachnetz/startup/v2/startup_tracing"
 )
 
 type PostgresTracingOptions struct {
@@ -27,16 +27,14 @@ type PostgresTracingOptions struct {
 func (opts *PostgresTracingOptions) Initialize(tops *startup_tracing.TracingOptions) {
 	opts.once.Do(func() {
 		if tops.IsActive() {
-			for _, driver := range sql.Drivers() {
-				if driver == "pgx" {
-					startup_base.Panicf("Cannot setup tracing: 'pgx' driver already registered.")
-					return
-				}
+			driverName := "postgres"
+			if d := GuessDriverName(); d == driverName {
+				driverName = "pgx"
 			}
 
 			// Register a driver with hooks.
 			// We need to use the pgx name here so that sqlx will use the right binding syntax.
-			sql.Register("pgx", sqlhooks.Wrap(&pq.Driver{}, &dbHook{tops.Inputs.ServiceName + "-db"}))
+			sql.Register(driverName, sqlhooks.Wrap(&stdlib.Driver{}, &dbHook{tops.Inputs.ServiceName + "-db"}))
 
 			// replace the new transaction function with a new hook
 			opts.installTransactionTracingHook(tops.Inputs.ServiceName + "-db")
