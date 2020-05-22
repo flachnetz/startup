@@ -39,6 +39,15 @@ type Int64Array struct {
 	pgtype.Int8Array
 }
 
+func (i *Int64Array) UnmarshalJSON(b []byte) error {
+	var slice []int64
+	if err := json.Unmarshal(b, &slice); err != nil {
+		return err
+	}
+	*i = NewInt64Array(slice)
+	return nil
+}
+
 func (i Int64Array) MarshalJSON() ([]byte, error) {
 	return json.Marshal(i.Elements)
 }
@@ -49,9 +58,9 @@ func NewInt64Array(value []int64) Int64Array {
 	return Int64Array{result}
 }
 
-func (s Int64Array) AsSlice() []int64 {
+func (i Int64Array) AsSlice() []int64 {
 	var result []int64
-	for _, v := range s.Elements {
+	for _, v := range i.Elements {
 		result = append(result, v.Int)
 	}
 	return result
