@@ -2,6 +2,7 @@ package startup_postgres
 
 import (
 	"github.com/jackc/pgconn"
+	"net/url"
 	"time"
 
 	"github.com/flachnetz/startup/v2/startup_base"
@@ -41,9 +42,13 @@ type PostgresOptions struct {
 
 func (opts *PostgresOptions) Connection() *sqlx.DB {
 	opts.connectionOnce.Do(func() {
-		log := logrus.WithField("prefix", "postgres")
+		logger := logrus.WithField("prefix", "postgres")
 
-		log.Infof("Connecting to postgres database at %s", opts.URL)
+		if pgUrl, err := url.Parse(opts.URL); err == nil {
+			pgUrl.User = nil
+			logger.Infof("Connecting to postgres database (username and password removed) at %s", pgUrl.String())
+
+		}
 
 		// check the driver name to use. We normally use the 'postgres' driver.
 		// BUT: If tracing is enabled, we'll switch over to the 'pgx' driver, which is
@@ -53,7 +58,7 @@ func (opts *PostgresOptions) Connection() *sqlx.DB {
 			driverName = GuessDriverName()
 		}
 
-		log.Debugf("Opening database using driver %s", driverName)
+		logger.Debugf("Opening database using driver %s", driverName)
 
 		db, err := sqlx.Connect(driverName, opts.URL)
 		startup_base.PanicOnError(err, "Cannot connect to postgres")
@@ -63,7 +68,7 @@ func (opts *PostgresOptions) Connection() *sqlx.DB {
 		db.SetConnMaxLifetime(opts.ConnectionLifetime)
 
 		if opts.Inputs.Initializer != nil {
-			log.Infof("Running database initializer")
+			logger.Infof("Running database initializer")
 
 			if err := opts.Inputs.Initializer(db); err != nil {
 				// close database on error
