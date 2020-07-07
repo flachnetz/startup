@@ -3,6 +3,7 @@ module github.com/flachnetz/startup/v2
 exclude github.com/golang/lint v0.0.0-20190313153728-d0100b6bd8b3
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.4.1
 	github.com/DataDog/datadog-go v2.2.0+incompatible
 	github.com/Landoop/schema-registry v0.0.0-20190327143759-50a5701c1891
 	github.com/Shopify/sarama v1.26.1
@@ -27,6 +28,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/gls v0.0.0-20190610040709-84558782a674
 	github.com/modern-go/reflect2 v1.0.1 // indirect
+	github.com/onsi/gomega v1.4.3
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/openzipkin-contrib/zipkin-go-opentracing v0.4.5
 	github.com/openzipkin/zipkin-go v0.2.2

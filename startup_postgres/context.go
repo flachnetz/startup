@@ -81,7 +81,7 @@ var WithTransactionContext = func(ctx context.Context, db TxStarter, operation T
 			if r != nil {
 				var ok bool
 				if err, ok = r.(error); !ok {
-					err = fmt.Errorf("%#v", err)
+					err = fmt.Errorf("panic(%#v)", r)
 				}
 			}
 
