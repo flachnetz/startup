@@ -50,7 +50,8 @@ type HTTPOptions struct {
 	BasicAuthUsername string `long:"http-admin-username" default:"admin" description:"Basic auth username for admin panel."`
 	BasicAuthPassword string `long:"http-admin-password" default:"bingo" description:"Basic auth password for admin panel."`
 
-	AccessLog string `long:"http-access-log" description:"Write http access log to a file. Defaults to stdout."`
+	AccessLog           string `long:"http-access-log" description:"Write http access log to a file. Defaults to stdout."`
+	AccessLogAdminRoute bool   `long:"http-access-log-admin-route" description:"If enabled, admin route requests will also be logged."`
 }
 
 func (opts HTTPOptions) Serve(config Config) {
@@ -113,6 +114,9 @@ func (opts HTTPOptions) Serve(config Config) {
 		handler = loggingHandler{
 			handler: handler,
 			log: func(ctx context.Context, line string) {
+				if !opts.AccessLogAdminRoute && strings.Contains(line, "GET /admin/") {
+					return
+				}
 				GetLogger(ctx, "httpd").Debug(line)
 			},
 		}
