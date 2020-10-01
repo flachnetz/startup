@@ -52,8 +52,13 @@ func ParseCommandLineWithOptions(opts interface{}, options flags.Options) error 
 	parser := flags.NewParser(opts, options)
 	parser.NamespaceDelimiter = "-"
 
-	if _, err := parser.Parse(); err != nil {
+	args, err := parser.Parse()
+	if err != nil {
 		return err
+	}
+
+	if len(args) > 0 && (options&flags.IgnoreUnknown) != flags.None {
+		log.Warnf("Found the following ignored arguments: %+v", args)
 	}
 
 	// validate all input values after argument parsing
