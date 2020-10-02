@@ -20,7 +20,7 @@ type KafkaOptions struct {
 	Inputs struct {
 		// You can provide an extra kafka config to override the
 		// default config.
-		KafkaConfig *sarama.Config
+		KafkaConfig func() *sarama.Config
 
 		// You could specify a topics function to automatically create topics
 		// with this kafka instance
@@ -36,7 +36,12 @@ type KafkaOptions struct {
 
 func (opts *KafkaOptions) KafkaClient(clientId string) sarama.Client {
 	opts.kafkaClientOnce.Do(func() {
-		config := opts.Inputs.KafkaConfig
+		kafkaConfigFunc := opts.Inputs.KafkaConfig
+		var config *sarama.Config
+		if kafkaConfigFunc != nil {
+			config = kafkaConfigFunc()
+		}
+		
 		if config == nil {
 			log.Debugf("No config supplied, using default config")
 			config = kafka.DefaultConfig(clientId)
