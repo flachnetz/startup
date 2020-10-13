@@ -3,11 +3,13 @@ package events
 import (
 	"encoding/json"
 	"github.com/Shopify/sarama"
-	"github.com/flachnetz/startup/v2/lib/kafka"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"io"
 	"reflect"
 	"sync"
+
+	"github.com/flachnetz/startup/v2/lib/kafka"
 )
 
 var errorTopic = "event_sender_errors"
@@ -18,6 +20,45 @@ type Encoder interface {
 
 	// Close the encoder.
 	Close() error
+}
+
+type RecordHeader struct {
+	Key   []byte
+	Value []byte
+}
+
+type KafkaMessageData struct {
+	Key     string
+	Headers []RecordHeader
+}
+
+type KafkaMessage struct {
+	Event Event
+	MD    KafkaMessageData
+}
+
+func (k *KafkaMessage) Schema() string {
+	return k.Event.Schema()
+}
+
+func (k *KafkaMessage) Serialize(writer io.Writer) error {
+	return k.Event.Serialize(writer)
+}
+
+func (k *KafkaMessage) MessageData() KafkaMessageData {
+	return k.MD
+}
+
+type KafkaEvent interface {
+	Event
+	MessageData() KafkaMessageData
+}
+
+func ToKafkaEvent(key string, ev Event) KafkaEvent {
+	return &KafkaMessage{
+		Event: ev,
+		MD:    KafkaMessageData{Key: key},
+	}
 }
 
 type KafkaSenderConfig struct {
@@ -129,11 +170,21 @@ func (kafka *KafkaSender) handleEvents() {
 			kafka.handleError(err, event)
 			continue
 		}
+		var headers []sarama.RecordHeader
+		var key string
+		if md, ok := event.(KafkaEvent); ok {
+			key = md.MessageData().Key
+			for _, h := range md.MessageData().Headers {
+				headers = append(headers, sarama.RecordHeader{Key: h.Key, Value: h.Value})
+			}
+		}
 
 		// and enqueue it for sending
 		kafka.producer.Input() <- &sarama.ProducerMessage{
-			Topic: kafka.topicForEvent(event),
-			Value: sarama.ByteEncoder(encoded),
+			Topic:   kafka.topicForEvent(event),
+			Key:     sarama.StringEncoder(key),
+			Value:   sarama.ByteEncoder(encoded),
+			Headers: headers,
 		}
 	}
 }
