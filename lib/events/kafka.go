@@ -32,11 +32,6 @@ type KafkaMessage struct {
 	Headers []RecordHeader
 }
 
-type KafkaEvent interface {
-	Event
-	Message() *KafkaMessage
-}
-
 func ToKafkaEvent(key string, ev Event) *KafkaMessage {
 	return &KafkaMessage{
 		Event: ev,
