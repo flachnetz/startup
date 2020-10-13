@@ -5,7 +5,6 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"io"
 	"reflect"
 	"sync"
 
@@ -28,21 +27,9 @@ type RecordHeader struct {
 }
 
 type KafkaMessage struct {
-	Event   Event
+	Event
 	Key     string
 	Headers []RecordHeader
-}
-
-func (k *KafkaMessage) Schema() string {
-	return k.Event.Schema()
-}
-
-func (k *KafkaMessage) Serialize(writer io.Writer) error {
-	return k.Event.Serialize(writer)
-}
-
-func (k *KafkaMessage) Message() *KafkaMessage {
-	return k
 }
 
 type KafkaEvent interface {
@@ -50,7 +37,7 @@ type KafkaEvent interface {
 	Message() *KafkaMessage
 }
 
-func ToKafkaEvent(key string, ev Event) KafkaEvent {
+func ToKafkaEvent(key string, ev Event) *KafkaMessage {
 	return &KafkaMessage{
 		Event: ev,
 		Key:   key,
@@ -167,10 +154,12 @@ func (kafka *KafkaSender) handleEvents() {
 			continue
 		}
 		var headers []sarama.RecordHeader
-		var key string
-		if md, ok := event.(KafkaEvent); ok {
-			key = md.MessageData().Key
-			for _, h := range md.MessageData().Headers {
+		var key sarama.Encoder
+		if msg, ok := event.(*KafkaMessage); ok {
+			if msg.Key != "" {
+				key = sarama.StringEncoder(msg.Key)
+			}
+			for _, h := range msg.Headers {
 				headers = append(headers, sarama.RecordHeader{Key: h.Key, Value: h.Value})
 			}
 		}
@@ -178,7 +167,7 @@ func (kafka *KafkaSender) handleEvents() {
 		// and enqueue it for sending
 		kafka.producer.Input() <- &sarama.ProducerMessage{
 			Topic:   kafka.topicForEvent(event),
-			Key:     sarama.StringEncoder(key),
+			Key:     key,
 			Value:   sarama.ByteEncoder(encoded),
 			Headers: headers,
 		}
