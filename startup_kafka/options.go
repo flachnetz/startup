@@ -41,7 +41,7 @@ func (opts *KafkaOptions) KafkaClient(clientId string) sarama.Client {
 		if kafkaConfigFunc != nil {
 			config = kafkaConfigFunc()
 		}
-		
+
 		if config == nil {
 			log.Debugf("No config supplied, using default config")
 			config = kafka.DefaultConfig(clientId)
