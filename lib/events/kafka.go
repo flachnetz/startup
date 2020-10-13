@@ -27,14 +27,10 @@ type RecordHeader struct {
 	Value []byte
 }
 
-type KafkaMessageData struct {
+type KafkaMessage struct {
+	Event   Event
 	Key     string
 	Headers []RecordHeader
-}
-
-type KafkaMessage struct {
-	Event Event
-	MD    KafkaMessageData
 }
 
 func (k *KafkaMessage) Schema() string {
@@ -45,19 +41,19 @@ func (k *KafkaMessage) Serialize(writer io.Writer) error {
 	return k.Event.Serialize(writer)
 }
 
-func (k *KafkaMessage) MessageData() KafkaMessageData {
-	return k.MD
+func (k *KafkaMessage) Message() *KafkaMessage {
+	return k
 }
 
 type KafkaEvent interface {
 	Event
-	MessageData() KafkaMessageData
+	Message() *KafkaMessage
 }
 
 func ToKafkaEvent(key string, ev Event) KafkaEvent {
 	return &KafkaMessage{
 		Event: ev,
-		MD:    KafkaMessageData{Key: key},
+		Key:   key,
 	}
 }
 
