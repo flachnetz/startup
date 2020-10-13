@@ -149,7 +149,7 @@ func (kafka *KafkaSender) handleEvents() {
 			continue
 		}
 
-		topicForEvent := kafka.topicForEvent(event)
+		topicForEvent := ""
 
 		var headers []sarama.RecordHeader
 		var key sarama.Encoder
@@ -160,7 +160,9 @@ func (kafka *KafkaSender) handleEvents() {
 			for _, h := range msg.Headers {
 				headers = append(headers, sarama.RecordHeader{Key: h.Key, Value: h.Value})
 			}
-			topicForEvent =  kafka.topicForEvent(msg.Event)
+			topicForEvent = kafka.topicForEvent(msg.Event)
+		} else {
+			topicForEvent = kafka.topicForEvent(event)
 		}
 
 		// and enqueue it for sending
