@@ -148,6 +148,9 @@ func (kafka *KafkaSender) handleEvents() {
 			kafka.handleError(err, event)
 			continue
 		}
+
+		topicForEvent := kafka.topicForEvent(event)
+
 		var headers []sarama.RecordHeader
 		var key sarama.Encoder
 		if msg, ok := event.(*KafkaMessage); ok {
@@ -157,11 +160,12 @@ func (kafka *KafkaSender) handleEvents() {
 			for _, h := range msg.Headers {
 				headers = append(headers, sarama.RecordHeader{Key: h.Key, Value: h.Value})
 			}
+			topicForEvent =  kafka.topicForEvent(msg.Event)
 		}
 
 		// and enqueue it for sending
 		kafka.producer.Input() <- &sarama.ProducerMessage{
-			Topic:   kafka.topicForEvent(event),
+			Topic:   topicForEvent,
 			Key:     key,
 			Value:   sarama.ByteEncoder(encoded),
 			Headers: headers,
