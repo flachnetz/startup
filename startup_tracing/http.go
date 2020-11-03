@@ -61,7 +61,7 @@ func Tracing(service string, op string) startup_http.HttpMiddleware {
 			ext.HTTPUrl.Set(serverSpan, cleanUrl(req.URL.String()))
 
 			// record and log the status code of the response
-			rl := responseLoggerOf(w)
+			rl, w := responseLoggerOf(w)
 			defer rl.addStatusToSpan(serverSpan)
 
 			// put the span into the context
@@ -72,14 +72,14 @@ func Tracing(service string, op string) startup_http.HttpMiddleware {
 				// a newly created GLS and tear it down after that
 				wrapped := gls.WithEmptyGls(func() {
 					WithSpan(serverSpan, func() {
-						handler.ServeHTTP(rl, req.WithContext(ctx))
+						handler.ServeHTTP(w, req.WithContext(ctx))
 					})
 				})
 
 				wrapped()
 
 			} else {
-				handler.ServeHTTP(rl, req.WithContext(ctx))
+				handler.ServeHTTP(w, req.WithContext(ctx))
 			}
 		})
 	}

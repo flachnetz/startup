@@ -6,11 +6,24 @@ import (
 	"net/http"
 )
 
-func responseLoggerOf(w http.ResponseWriter) *responseLogger {
-	if rl, ok := w.(*responseLogger); ok {
-		return rl
-	} else {
-		return &responseLogger{ResponseWriter: w, status: http.StatusOK}
+func responseLoggerOf(w http.ResponseWriter) (*responseLogger, http.ResponseWriter) {
+	hijacker, _ := w.(http.Hijacker)
+	flusher, _ := w.(http.Flusher)
+
+	rl := &responseLogger{ResponseWriter: w, status: http.StatusOK}
+
+	switch {
+	case hijacker != nil && flusher != nil:
+		return rl, &rlWithHijackerFlusher{rl, hijacker, flusher}
+
+	case hijacker != nil:
+		return rl, &rlWithHijacker{rl, hijacker}
+
+	case flusher != nil:
+		return rl, &rlWithFlusher{rl, flusher}
+
+	default:
+		return rl, rl
 	}
 }
 
@@ -26,13 +39,21 @@ func (l *responseLogger) WriteHeader(s int) {
 	l.status = s
 }
 
-func (l *responseLogger) Flush() {
-	f, ok := l.ResponseWriter.(http.Flusher)
-	if ok {
-		f.Flush()
-	}
-}
-
 func (l *responseLogger) addStatusToSpan(span opentracing.Span) {
 	ext.HTTPStatusCode.Set(span, uint16(l.status))
+}
+
+type rlWithHijacker struct {
+	http.ResponseWriter
+	http.Hijacker
+}
+
+type rlWithFlusher struct {
+	http.ResponseWriter
+	http.Flusher
+}
+type rlWithHijackerFlusher struct {
+	http.ResponseWriter
+	http.Hijacker
+	http.Flusher
 }
