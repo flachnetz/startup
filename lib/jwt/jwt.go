@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/metadata"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -17,7 +18,7 @@ type JwtStruct struct {
 	UserName       string   `json:"user_name"`
 	Uxid           string   `json:"uxid"`
 	SessionID      string   `json:"sessionId"`
-	CustomerNumber int      `json:"customerNumber"`
+	CustomerNumber string   `json:"customerNumber"`
 	Locale         string   `json:"locale"`
 	DeviceID       string   `json:"deviceId"`
 	Authorities    []string `json:"authorities"`
@@ -45,27 +46,11 @@ func NewJwtService(jwkResourceUrl string, clock clock.Clock) (*JwtService, error
 	}
 	return &JwtService{jwkKeySet: set, clock: clock}, nil
 }
-
-func (j *JwtService) GetJwtToken(ctx context.Context) (*JwtStruct, error) {
-
-	if j.jwkKeySet == nil {
-		return nil, errors.New("cannot verify jwt because jwk key set is missing")
-	}
-
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return nil, errors.New("cannot read header information")
-	}
-
+func (j *JwtService) GetJwtToken(authHeader string) (*JwtStruct, error) {
 	claims := &JwtStruct{}
 
-	authHeader, exists := md["authorization"]
-	if !exists || len(authHeader) != 1 { // return empty claim when not jwt token is given
-		return nil, nil
-	}
-
 	// parse and check signature
-	t, err := jwt.ParseBytes([]byte(authHeader[0][7:]), jwt.WithOpenIDClaims(), jwt.WithKeySet(j.jwkKeySet))
+	t, err := jwt.ParseBytes([]byte(authHeader[7:]), jwt.WithOpenIDClaims(), jwt.WithKeySet(j.jwkKeySet))
 	if err != nil {
 		return nil, err
 	}
@@ -76,18 +61,57 @@ func (j *JwtService) GetJwtToken(ctx context.Context) (*JwtStruct, error) {
 		return nil, err
 	}
 
-	// until now we only need these fields
-	if v, ok := t.Get("locale"); ok {
+	if v, ok := t.Get("UserName"); ok {
+		claims.UserName = v.(string)
+	}
+	if v, ok := t.Get("Uxid"); ok {
+		claims.Uxid = v.(string)
+	}
+	if v, ok := t.Get("SessionID"); ok {
+		claims.SessionID = v.(string)
+	}
+	if v, ok := t.Get("CustomerNumber"); ok {
+		claims.CustomerNumber = strconv.Itoa(int(v.(float64)))
+	}
+	if v, ok := t.Get("Locale"); ok {
 		claims.Locale = v.(string)
 	}
-	if v, ok := t.Get("site"); ok {
+	if v, ok := t.Get("DeviceID"); ok {
+		claims.DeviceID = v.(string)
+	}
+	if v, ok := t.Get("Authorities"); ok {
+		claims.Authorities = v.([]string)
+	}
+	if v, ok := t.Get("ClientID"); ok {
+		claims.ClientID = v.(string)
+	}
+	if v, ok := t.Get("Site"); ok {
 		claims.Site = strings.ToLower(v.(string))
 	}
-	if v, ok := t.Get("customerNumber"); ok {
-		claims.CustomerNumber = int(v.(float64))
+	if v, ok := t.Get("Scope"); ok {
+		claims.Scope = v.([]string)
 	}
 
 	return claims, err
+}
+
+func (j *JwtService) GetJwtTokenFromContext(ctx context.Context) (*JwtStruct, error) {
+
+	if j.jwkKeySet == nil {
+		return nil, errors.New("cannot verify jwt because jwk key set is missing")
+	}
+
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.New("cannot read header information")
+	}
+
+	authHeader, exists := md["authorization"]
+	if !exists || len(authHeader) != 1 { // return empty claim when not jwt token is given
+		return nil, nil
+	}
+
+	return j.GetJwtToken(authHeader[0])
 }
 
 func GetJwk(url string, httpClient http.Client) (*jwk.Set, error) {
