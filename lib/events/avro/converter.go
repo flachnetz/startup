@@ -16,13 +16,14 @@ type EventSource struct {
 }
 
 type Converter struct {
-	log           *logrus.Entry
-	registry      *SchemaRegistry
-	avroNamespace string
+	log      *logrus.Entry
+	registry *SchemaRegistry
+	options  ConverterOptions
 }
 
-func NewConverter(registry *SchemaRegistry, avroNamespace string) *Converter {
-	return &Converter{log: logrus.WithField("prefix", "avro-converter"), registry: registry, avroNamespace: avroNamespace}
+type ConverterOptions struct {
+	AvroNamespace string // prefix for namespace prefix which will be used to identify self defined records
+	ToLowerCase   bool   // map all field names to lower case
 }
 
 func (c *Converter) Parse(data []byte) (map[string]interface{}, *EventSource, error) {
@@ -89,6 +90,9 @@ func (c *Converter) convertAvroToGo(input interface{}) interface{} {
 		result := make(map[string]interface{}, len(input))
 
 		for key, value := range input {
+			if c.options.ToLowerCase {
+				key = strings.ToLower(key)
+			}
 			result[key] = c.convertAvroToGo(value)
 		}
 
@@ -123,15 +127,11 @@ func (c *Converter) simplifyAvroType(value map[string]interface{}) (interface{},
 				return actualValue, true
 			}
 
-			if strings.HasPrefix(key, c.avroNamespace) {
+			if strings.HasPrefix(key, c.options.AvroNamespace) {
 				return actualValue, true
 			}
 		}
 	}
 
 	return nil, false
-}
-
-func (c *Converter) isNamespacedAvroType(field string) bool {
-	return strings.HasPrefix(field, c.avroNamespace)
 }
