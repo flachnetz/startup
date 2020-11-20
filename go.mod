@@ -1,7 +1,5 @@
 module github.com/flachnetz/startup/v2
 
-exclude github.com/golang/lint v0.0.0-20190313153728-d0100b6bd8b3
-
 require (
 	github.com/DATA-DOG/go-sqlmock v1.4.1
 	github.com/DataDog/datadog-go v2.2.0+incompatible
@@ -24,6 +22,7 @@ require (
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/leodido/go-urn v1.2.0 // indirect
+	github.com/lestrrat-go/jwx v1.0.5
 	github.com/linkedin/goavro v2.1.0+incompatible
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
@@ -33,14 +32,16 @@ require (
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/openzipkin-contrib/zipkin-go-opentracing v0.4.5
 	github.com/openzipkin/zipkin-go v0.2.2
-	github.com/pkg/errors v0.8.1
+	github.com/pkg/errors v0.9.1
 	github.com/rcrowley/go-metrics v0.0.0-20200313005456-10cdbea86bc0
 	github.com/rubenv/sql-migrate v0.0.0-20200210110325-c8d4be6f9bb7
 	github.com/sirupsen/logrus v1.4.2
 	github.com/syntaqx/go-metrics-datadog v0.0.0-20181220201509-312b31920cc5
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
+	google.golang.org/grpc v1.22.1
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.29.1
+	gopkg.in/linkedin/goavro.v1 v1.0.5 // indirect
 )
 
-go 1.14
+go 1.15
