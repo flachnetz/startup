@@ -95,6 +95,20 @@ func (j *JwtService) GetJwtToken(authHeader string) (*JwtStruct, error) {
 	return claims, err
 }
 
+func (j *JwtService) GetJwtTokenFromRequest(req *http.Request) (*JwtStruct, error) {
+
+	if j.jwkKeySet == nil {
+		return nil, errors.New("cannot verify jwt because jwk key set is missing")
+	}
+
+	authHeader := req.Header.Get("authorization")
+	if authHeader == "" { // return empty claim when no jwt is given
+		return nil, nil
+	}
+
+	return j.GetJwtToken(authHeader)
+}
+
 func (j *JwtService) GetJwtTokenFromContext(ctx context.Context) (*JwtStruct, error) {
 
 	if j.jwkKeySet == nil {
