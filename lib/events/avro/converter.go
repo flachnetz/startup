@@ -26,6 +26,10 @@ type ConverterOptions struct {
 	ToLowerCase   bool   // map all field names to lower case
 }
 
+func NewConverter(registry *SchemaRegistry, options ConverterOptions) *Converter {
+	return &Converter{log: logrus.WithField("prefix", "avro-converter"), registry: registry, options: options}
+}
+
 func (c *Converter) Parse(data []byte) (map[string]interface{}, *EventSource, error) {
 
 	if bytes.HasPrefix(data, []byte("Obj\x01")) {
