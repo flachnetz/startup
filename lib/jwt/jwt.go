@@ -46,7 +46,7 @@ func NewJwtService(jwkResourceUrl string, clock clock.Clock) (*JwtService, error
 	return &JwtService{jwkKeySet: set, clock: clock}, nil
 }
 
-func (j *JwtService) getJwtToken(ctx context.Context) (*JwtStruct, error) {
+func (j *JwtService) GetJwtToken(ctx context.Context) (*JwtStruct, error) {
 
 	if j.jwkKeySet == nil {
 		return nil, errors.New("cannot verify jwt because jwk key set is missing")
