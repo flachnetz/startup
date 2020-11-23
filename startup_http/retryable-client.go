@@ -81,10 +81,10 @@ func DoRequest(httpClient *retryablehttp.Client, httpReq *retryablehttp.Request,
 	}
 
 	if resp.StatusCode/100 != 2 {
-		if len(body) > 0 && errorParser != nil {
-			return nil, errorParser(body)
+		if errorParser != nil {
+			return body, errorParser(body)
 		} else {
-			return nil, errors.Wrapf(err, "doRequest - request:%s status:%d body:%s", httpReq.URL.String(), resp.StatusCode, string(body))
+			return body, errors.Wrapf(err, "doRequest - request:%s status:%d body:%s", httpReq.URL.String(), resp.StatusCode, string(body))
 		}
 
 	}
