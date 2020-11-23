@@ -2,31 +2,17 @@ package startup_http
 
 import (
 	"bytes"
-	"crypto/tls"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
-	"time"
 
 	"github.com/flachnetz/startup/v2/startup_base"
-	"github.com/flachnetz/startup/v2/startup_tracing"
 )
 
 func RetryableHttpClient(logger *logrus.Entry, client *http.Client, debug bool) *retryablehttp.Client {
 	httpClient := retryablehttp.NewClient()
-
-	if client == nil {
-		client = startup_tracing.WithSpanPropagation(&http.Client{
-			Timeout: 5 * time.Second,
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
-				},
-			},
-		})
-	}
 
 	httpClient.HTTPClient = client
 
