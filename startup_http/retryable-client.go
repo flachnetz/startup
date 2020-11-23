@@ -76,11 +76,15 @@ func DoRequest(httpClient *retryablehttp.Client, httpReq *retryablehttp.Request,
 		return nil, errors.Wrapf(err, "doRequest: cannot read body from request %s", httpReq.URL.String())
 	}
 
+	if body == nil {
+		body = []byte("")
+	}
+
 	if resp.StatusCode/100 != 2 {
 		if len(body) > 0 && errorParser != nil {
 			return nil, errorParser(body)
 		} else {
-			return nil, errors.Wrapf(err, "doRequest: request: %s status %d", httpReq.URL.String(), resp.StatusCode)
+			return nil, errors.Wrapf(err, "doRequest - request:%s status:%d body:%s", httpReq.URL.String(), resp.StatusCode, string(body))
 		}
 
 	}
