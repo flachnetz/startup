@@ -14,17 +14,21 @@ import (
 	"github.com/flachnetz/startup/v2/startup_tracing"
 )
 
-func RetryableHttpClient(logger *logrus.Entry, debug bool) *retryablehttp.Client {
+func RetryableHttpClient(logger *logrus.Entry, client *http.Client, debug bool) *retryablehttp.Client {
 	httpClient := retryablehttp.NewClient()
 
-	httpClient.HTTPClient = startup_tracing.WithSpanPropagation(&http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
+	if client == nil {
+		client = startup_tracing.WithSpanPropagation(&http.Client{
+			Timeout: 5 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
 			},
-		},
-	})
+		})
+	}
+
+	httpClient.HTTPClient = client
 
 	if debug {
 		httpClient.RequestLogHook = func(l retryablehttp.Logger, request *http.Request, i int) {
