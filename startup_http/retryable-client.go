@@ -84,7 +84,7 @@ func DoRequest(httpClient *retryablehttp.Client, httpReq *retryablehttp.Request,
 		if errorParser != nil {
 			return body, resp, errorParser(body)
 		} else {
-			return body, resp, errors.Wrapf(err, "doRequest - request:%s status:%d body:%s", httpReq.URL.String(), resp.StatusCode, string(body))
+			return body, resp, errors.Errorf("doRequest - request:%s status:%d body:%s", httpReq.URL.String(), resp.StatusCode, string(body))
 		}
 
 	}
