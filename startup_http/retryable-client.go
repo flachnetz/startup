@@ -58,7 +58,7 @@ func RetryableHttpClient(logger *logrus.Entry, client *http.Client, debug bool) 
 	return httpClient
 }
 
-func DoRequest(httpClient *retryablehttp.Client, httpReq *retryablehttp.Request, auth string, errorParser func([]byte) error) ([]byte, error) {
+func DoRequest(httpClient *retryablehttp.Client, httpReq *retryablehttp.Request, auth string, errorParser func([]byte) error) ([]byte, *http.Response, error) {
 
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "application/json")
@@ -66,14 +66,14 @@ func DoRequest(httpClient *retryablehttp.Client, httpReq *retryablehttp.Request,
 
 	resp, err := httpClient.Do(httpReq)
 	if err != nil {
-		return nil, errors.Wrapf(err, "doRequest: cannot do request for %s", httpReq.URL.String())
+		return nil, resp, errors.Wrapf(err, "doRequest: cannot do request for %s", httpReq.URL.String())
 	}
 
 	defer startup_base.Close(resp.Body, "cannot close body")
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, errors.Wrapf(err, "doRequest: cannot read body from request %s", httpReq.URL.String())
+		return nil, resp, errors.Wrapf(err, "doRequest: cannot read body from request %s", httpReq.URL.String())
 	}
 
 	if body == nil {
@@ -82,12 +82,12 @@ func DoRequest(httpClient *retryablehttp.Client, httpReq *retryablehttp.Request,
 
 	if resp.StatusCode/100 != 2 {
 		if errorParser != nil {
-			return body, errorParser(body)
+			return body, resp, errorParser(body)
 		} else {
-			return body, errors.Wrapf(err, "doRequest - request:%s status:%d body:%s", httpReq.URL.String(), resp.StatusCode, string(body))
+			return body, resp, errors.Wrapf(err, "doRequest - request:%s status:%d body:%s", httpReq.URL.String(), resp.StatusCode, string(body))
 		}
 
 	}
 
-	return body, nil
+	return body, resp, nil
 }
