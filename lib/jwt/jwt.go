@@ -94,7 +94,7 @@ func (j *JwtService) GetJwtToken(authHeader string) (*JwtStruct, error) {
 		claims.Site = strings.ToLower(v.(string))
 	}
 	if v, ok := t.Get("scope"); ok {
-		claims.Scope = v.([]string)
+		claims.Scope = v.([]interface{})
 	}
 
 	return claims, err
