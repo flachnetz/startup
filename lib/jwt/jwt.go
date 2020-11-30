@@ -106,7 +106,7 @@ func (j *JwtService) GetJwtTokenFromRequest(req *http.Request) (*JwtStruct, erro
 		return nil, nil
 	}
 
-	return j.GetJwtToken(authHeader)
+	return j.GetJwtToken(authHeader[7:])
 }
 
 func (j *JwtService) GetJwtTokenFromContext(ctx context.Context) (*JwtStruct, error) {
