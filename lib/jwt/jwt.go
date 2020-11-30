@@ -66,34 +66,34 @@ func (j *JwtService) GetJwtToken(authHeader string) (*JwtStruct, error) {
 		return nil, err
 	}
 
-	if v, ok := t.Get("UserName"); ok {
+	if v, ok := t.Get("userName"); ok {
 		claims.UserName = v.(string)
 	}
-	if v, ok := t.Get("Uxid"); ok {
+	if v, ok := t.Get("uxid"); ok {
 		claims.Uxid = v.(string)
 	}
-	if v, ok := t.Get("SessionID"); ok {
+	if v, ok := t.Get("sessionID"); ok {
 		claims.SessionID = v.(string)
 	}
-	if v, ok := t.Get("CustomerNumber"); ok {
+	if v, ok := t.Get("customerNumber"); ok {
 		claims.CustomerNumber = strconv.Itoa(int(v.(float64)))
 	}
-	if v, ok := t.Get("Locale"); ok {
+	if v, ok := t.Get("locale"); ok {
 		claims.Locale = v.(string)
 	}
-	if v, ok := t.Get("DeviceID"); ok {
+	if v, ok := t.Get("deviceID"); ok {
 		claims.DeviceID = v.(string)
 	}
-	if v, ok := t.Get("Authorities"); ok {
+	if v, ok := t.Get("authorities"); ok {
 		claims.Authorities = v.([]string)
 	}
-	if v, ok := t.Get("ClientID"); ok {
+	if v, ok := t.Get("clientID"); ok {
 		claims.ClientID = v.(string)
 	}
-	if v, ok := t.Get("Site"); ok {
+	if v, ok := t.Get("site"); ok {
 		claims.Site = strings.ToLower(v.(string))
 	}
-	if v, ok := t.Get("Scope"); ok {
+	if v, ok := t.Get("scope"); ok {
 		claims.Scope = v.([]string)
 	}
 
