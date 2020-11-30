@@ -46,11 +46,16 @@ func NewJwtService(jwkResourceUrl string, clock clock.Clock) (*JwtService, error
 	}
 	return &JwtService{jwkKeySet: set, clock: clock}, nil
 }
+
 func (j *JwtService) GetJwtToken(authHeader string) (*JwtStruct, error) {
 	claims := &JwtStruct{}
 
+	if strings.Contains(authHeader, "Bearer") {
+		authHeader = authHeader[7:]
+	}
+
 	// parse and check signature
-	t, err := jwt.ParseBytes([]byte(authHeader[7:]), jwt.WithOpenIDClaims(), jwt.WithKeySet(j.jwkKeySet))
+	t, err := jwt.ParseBytes([]byte(authHeader), jwt.WithOpenIDClaims(), jwt.WithKeySet(j.jwkKeySet))
 	if err != nil {
 		return nil, err
 	}
