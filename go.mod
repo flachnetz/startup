@@ -28,9 +28,6 @@ require (
 	github.com/lestrrat-go/jwx v1.0.5
 	github.com/linkedin/goavro v2.1.0+incompatible
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
-	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
-	github.com/modern-go/gls v0.0.0-20190610040709-84558782a674
-	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/onsi/gomega v1.4.3
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/openzipkin-contrib/zipkin-go-opentracing v0.4.5

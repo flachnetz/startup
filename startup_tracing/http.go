@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/flachnetz/startup/v2/startup_http"
 	. "github.com/flachnetz/startup/v2/startup_logrus"
-	"github.com/modern-go/gls"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"net/http"
@@ -66,21 +65,7 @@ func Tracing(service string, op string) startup_http.HttpMiddleware {
 
 			// put the span into the context
 			ctx = opentracing.ContextWithSpan(ctx, serverSpan)
-
-			if UseGLS {
-				// if we are using GLS, we need to run the real handler function in
-				// a newly created GLS and tear it down after that
-				wrapped := gls.WithEmptyGls(func() {
-					WithSpan(serverSpan, func() {
-						handler.ServeHTTP(w, req.WithContext(ctx))
-					})
-				})
-
-				wrapped()
-
-			} else {
-				handler.ServeHTTP(w, req.WithContext(ctx))
-			}
+			handler.ServeHTTP(w, req.WithContext(ctx))
 		})
 	}
 }
