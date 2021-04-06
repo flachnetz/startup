@@ -19,6 +19,11 @@ import (
 
 	"github.com/flachnetz/startup/v2/lib/schema"
 )
+
+func TimeToEventTimestamp(ts time.Time) int64 {
+	return ts.UnixNano() / int64(time.Millisecond)
+}
+
 type KafkaSenderConfig struct {
 	// Set to true to block Send() if the buffers are full.
 	AllowBlocking bool
