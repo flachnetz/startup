@@ -1,13 +1,11 @@
 package jwt
 
 import (
-	"context"
 	"crypto/tls"
 	"github.com/benbjohnson/clock"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jwt"
 	"github.com/pkg/errors"
-	"google.golang.org/grpc/metadata"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,15 +13,15 @@ import (
 )
 
 type JwtStruct struct {
-	UserName       string   `json:"user_name"`
-	Uxid           string   `json:"uxid"`
-	SessionID      string   `json:"sessionId"`
-	CustomerNumber string   `json:"customerNumber"`
-	Locale         string   `json:"locale"`
-	DeviceID       string   `json:"deviceId"`
+	UserName       string        `json:"user_name"`
+	Uxid           string        `json:"uxid"`
+	SessionID      string        `json:"sessionId"`
+	CustomerNumber string        `json:"customerNumber"`
+	Locale         string        `json:"locale"`
+	DeviceID       string        `json:"deviceId"`
 	Authorities    []interface{} `json:"authorities"`
-	ClientID       string   `json:"client_id"`
-	Site           string   `json:"site"`
+	ClientID       string        `json:"client_id"`
+	Site           string        `json:"site"`
 	Scope          []interface{} `json:"scope"`
 }
 
@@ -33,7 +31,7 @@ type JwtService struct {
 }
 
 func NewJwtService(jwkResourceUrl string, clock clock.Clock) (*JwtService, error) {
-	set, err := GetJwk(jwkResourceUrl, http.Client{
+	set, err := GetJwk(jwkResourceUrl, &http.Client{
 		Timeout: 5 * time.Second,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
@@ -69,30 +67,39 @@ func (j *JwtService) GetJwtToken(authHeader string) (*JwtStruct, error) {
 	if v, ok := t.Get("userName"); ok {
 		claims.UserName = v.(string)
 	}
+
 	if v, ok := t.Get("uxid"); ok {
 		claims.Uxid = v.(string)
 	}
+
 	if v, ok := t.Get("sessionID"); ok {
 		claims.SessionID = v.(string)
 	}
+
 	if v, ok := t.Get("customerNumber"); ok {
 		claims.CustomerNumber = strconv.Itoa(int(v.(float64)))
 	}
+
 	if v, ok := t.Get("locale"); ok {
 		claims.Locale = v.(string)
 	}
+
 	if v, ok := t.Get("deviceID"); ok {
 		claims.DeviceID = v.(string)
 	}
+
 	if v, ok := t.Get("authorities"); ok {
 		claims.Authorities = v.([]interface{})
 	}
+
 	if v, ok := t.Get("clientID"); ok {
 		claims.ClientID = v.(string)
 	}
+
 	if v, ok := t.Get("site"); ok {
 		claims.Site = strings.ToLower(v.(string))
 	}
+
 	if v, ok := t.Get("scope"); ok {
 		claims.Scope = v.([]interface{})
 	}
@@ -101,7 +108,6 @@ func (j *JwtService) GetJwtToken(authHeader string) (*JwtStruct, error) {
 }
 
 func (j *JwtService) GetJwtTokenFromRequest(req *http.Request) (*JwtStruct, error) {
-
 	if j.jwkKeySet == nil {
 		return nil, errors.New("cannot verify jwt because jwk key set is missing")
 	}
@@ -114,28 +120,8 @@ func (j *JwtService) GetJwtTokenFromRequest(req *http.Request) (*JwtStruct, erro
 	return j.GetJwtToken(authHeader[7:])
 }
 
-func (j *JwtService) GetJwtTokenFromContext(ctx context.Context) (*JwtStruct, error) {
-
-	if j.jwkKeySet == nil {
-		return nil, errors.New("cannot verify jwt because jwk key set is missing")
-	}
-
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return nil, errors.New("cannot read header information")
-	}
-
-	authHeader, exists := md["authorization"]
-	if !exists || len(authHeader) != 1 { // return empty claim when not jwt token is given
-		return nil, nil
-	}
-
-	return j.GetJwtToken(authHeader[0])
-}
-
-func GetJwk(url string, httpClient http.Client) (*jwk.Set, error) {
-
-	set, err := jwk.Fetch(url, jwk.WithHTTPClient(&httpClient))
+func GetJwk(url string, httpClient *http.Client) (*jwk.Set, error) {
+	set, err := jwk.Fetch(url, jwk.WithHTTPClient(httpClient))
 	if err != nil {
 		return nil, err
 	}
