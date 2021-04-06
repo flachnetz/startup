@@ -1,13 +1,15 @@
 package startup_postgres
 
 import (
+	"context"
+	"database/sql"
+	"database/sql/driver"
 	"github.com/jackc/pgconn"
 	"net/url"
 	"time"
 
 	"github.com/flachnetz/startup/v2/startup_base"
 
-	"database/sql"
 	"fmt"
 	"github.com/benbjohnson/clock"
 	_ "github.com/jackc/pgx/v4/stdlib"
@@ -26,11 +28,6 @@ type PostgresOptions struct {
 	ConnectionLifetime time.Duration `long:"postgres-lifetime" default:"10m" description:"Maximum time a connection in the pool can be used."`
 
 	Inputs struct {
-		// the driver name to use. If this is empty,
-		// we select the default of 'postgres' or 'pgx',
-		// depending on availability
-		DriverName string
-
 		// An optional initializer. This might be used to do
 		// database migration or stuff.
 		Initializer Initializer
@@ -50,22 +47,10 @@ func (opts *PostgresOptions) Connection() *sqlx.DB {
 
 		}
 
-		// check the driver name to use. We normally use the 'postgres' driver.
-		// BUT: If tracing is enabled, we'll switch over to the 'pgx' driver, which is
-		// the same postgres driver but with registered hooks.
-		driverName := opts.Inputs.DriverName
-		if driverName == "" {
-			driverName = GuessDriverName()
-		}
+		connector, err := openConnector(opts.URL)
+		startup_base.PanicOnError(err, "Failed to create a database connector")
 
-		logger.Debugf("Opening database using driver %s", driverName)
-
-		db, err := sqlx.Connect(driverName, opts.URL)
-		startup_base.PanicOnError(err, "Cannot connect to postgres")
-
-		db.SetMaxOpenConns(opts.PoolSize)
-		db.SetMaxIdleConns(opts.PoolSize)
-		db.SetConnMaxLifetime(opts.ConnectionLifetime)
+		db := opts.mustConnect(connector)
 
 		if opts.Inputs.Initializer != nil {
 			logger.Infof("Running database initializer")
@@ -81,24 +66,6 @@ func (opts *PostgresOptions) Connection() *sqlx.DB {
 	})
 
 	return opts.connection
-}
-
-func GuessDriverName() string {
-	var pgx, postgres bool
-	for _, driver := range sql.Drivers() {
-		pgx = pgx || driver == "pgx"
-		postgres = postgres || driver == "postgres"
-	}
-
-	if postgres {
-		return "postgres"
-	}
-
-	if pgx {
-		return "pgx"
-	}
-
-	panic(startup_base.Errorf("No postgres database driver found"))
 }
 
 func (opts *PostgresOptions) StartVacuumTask(db *sqlx.DB, table string, interval time.Duration, clock clock.Clock) io.Closer {
@@ -127,6 +94,22 @@ func (opts *PostgresOptions) StartVacuumTask(db *sqlx.DB, table string, interval
 	}()
 
 	return channelCloser(closeCh)
+}
+
+func (opts *PostgresOptions) mustConnect(connector driver.Connector) *sqlx.DB {
+	ctx, cancelTimeout := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelTimeout()
+
+	db := sqlx.NewDb(sql.OpenDB(connector), "pgx")
+	db.SetMaxOpenConns(opts.PoolSize)
+	db.SetMaxIdleConns(opts.PoolSize)
+	db.SetConnMaxLifetime(opts.ConnectionLifetime)
+
+	if err := db.PingContext(ctx); err != nil {
+		startup_base.FatalOnError(err, "Cannot connect to database.")
+	}
+
+	return db
 }
 
 type channelCloser chan bool

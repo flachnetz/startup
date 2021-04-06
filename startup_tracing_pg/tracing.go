@@ -2,15 +2,14 @@ package startup_tracing_pg
 
 import (
 	"context"
-	"database/sql"
-	"github.com/gchaincl/sqlhooks"
-	"github.com/jackc/pgx/v4/stdlib"
+	"database/sql/driver"
+	"github.com/gchaincl/sqlhooks/v2"
 	"github.com/opentracing/opentracing-go"
 	"runtime"
 	"strings"
 	"sync"
 
-	. "github.com/flachnetz/startup/v2/startup_postgres"
+	pt "github.com/flachnetz/startup/v2/startup_postgres"
 	"github.com/flachnetz/startup/v2/startup_tracing"
 )
 
@@ -27,8 +26,9 @@ type PostgresTracingOptions struct {
 func (opts *PostgresTracingOptions) Initialize(tops *startup_tracing.TracingOptions) {
 	opts.once.Do(func() {
 		if tops.IsActive() {
-			// Register a driver with hooks.
-			sql.Register("postgres", sqlhooks.Wrap(&stdlib.Driver{}, &dbHook{tops.Inputs.ServiceName + "-db"}))
+			pt.Use(func(driver driver.Driver) driver.Driver {
+				return sqlhooks.Wrap(driver, &dbHook{tops.Inputs.ServiceName + "-db"})
+			})
 
 			// replace the new transaction function with a new hook
 			opts.installTransactionTracingHook(tops.Inputs.ServiceName + "-db")
@@ -37,7 +37,7 @@ func (opts *PostgresTracingOptions) Initialize(tops *startup_tracing.TracingOpti
 }
 
 func (opts *PostgresTracingOptions) installTransactionTracingHook(serviceName string) {
-	withTransactionContext := WithTransactionContext
+	withTransactionContext := pt.WithTransactionContext
 
 	skipFunction := opts.Inputs.SkipFrameworkMethod
 	if skipFunction == nil {
@@ -46,7 +46,7 @@ func (opts *PostgresTracingOptions) installTransactionTracingHook(serviceName st
 		}
 	}
 
-	WithTransactionContext = func(ctx context.Context, db TxStarter, operation TransactionCommitFn) (err error) {
+	pt.WithTransactionContext = func(ctx context.Context, db pt.TxStarter, operation pt.TransactionCommitFn) (err error) {
 		var tag string
 
 		// get the first method in the stack outside of the startup package
