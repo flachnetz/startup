@@ -12,7 +12,7 @@ type avroEncoder struct {
 	registry schema.Registry
 }
 
-func NewAvroEncoder(registry schema.Registry) Encoder {
+func NewConsulAvroEncoder(registry schema.Registry) Encoder {
 	return &avroEncoder{
 		log:      logrus.WithField("prefix", "avro"),
 		registry: registry,
