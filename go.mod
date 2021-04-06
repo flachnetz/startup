@@ -8,7 +8,7 @@ require (
 	github.com/confluentinc/confluent-kafka-go v1.6.1
 	github.com/flachnetz/go-admin v1.5.3
 	github.com/flachnetz/go-datadog v1.3.0
-	github.com/gchaincl/sqlhooks v1.3.0
+	github.com/gchaincl/sqlhooks/v2 v2.0.1
 	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/goji/httpauth v0.0.0-20160601135302-2da839ab0f4d
 	github.com/golang/snappy v0.0.1 // indirect

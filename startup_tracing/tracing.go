@@ -7,6 +7,7 @@ import (
 	"github.com/openzipkin/zipkin-go"
 	zipkinhttp "github.com/openzipkin/zipkin-go/reporter/http"
 	"github.com/sirupsen/logrus"
+	log2 "log"
 	"strings"
 
 	"sync"
@@ -41,8 +42,10 @@ func (opts *TracingOptions) Initialize() {
 			log.Warnf("Using zipkin v2 span reporting but a v1 span url was given.")
 		}
 
+		logAdapter := log2.New(log.WriterLevel(logrus.InfoLevel), "", 0)
+
 		url := strings.ReplaceAll(opts.Zipkin, "/v1/spans", "/v2/spans")
-		reporter := zipkinhttp.NewReporter(url)
+		reporter := zipkinhttp.NewReporter(url, zipkinhttp.Logger(logAdapter))
 
 		endpoint, err := zipkin.NewEndpoint(opts.Inputs.ServiceName, "")
 		startup_base.PanicOnError(err, "Unable to create zipkin endpoint")
