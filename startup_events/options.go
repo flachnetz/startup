@@ -1,16 +1,11 @@
 package startup_events
 
 import (
-	"github.com/Shopify/sarama"
-	"github.com/sirupsen/logrus"
 	"sync"
 
 	"github.com/flachnetz/startup/v2/lib/events"
-	"github.com/flachnetz/startup/v2/lib/kafka"
 	"github.com/flachnetz/startup/v2/startup_base"
 )
-
-var log = logrus.WithField("prefix", "events")
 
 type EventOptions struct {
 	EventSenderConfig string `long:"event-sender" default:"" description:"Event sender to use. Event sender type followed by arguments, e.g: confluent,address=http://confluent-registry.shared.svc.cluster.local,kafka=kafka.kafka.svc.cluster.local:9092,replication=1,blocking=true"`
@@ -19,9 +14,6 @@ type EventOptions struct {
 	Inputs struct {
 		// A function to create the event topics. This option must be specified.
 		Topics events.TopicsFunc `validate:"required"`
-
-		// optional kafka config to use with the kafka events producer
-		KafkaConfig *sarama.Config
 	}
 
 	eventSenderOnce sync.Once
@@ -30,21 +22,7 @@ type EventOptions struct {
 
 func (opts *EventOptions) EventSender(clientId string) events.EventSender {
 	opts.eventSenderOnce.Do(func() {
-		config := opts.Inputs.KafkaConfig
-		if config == nil {
-			log.Debugf("No kafka config supplied, using default config")
-			config = kafka.DefaultConfig(clientId)
-		}
-
-		config.Net.TLS.Enable = !opts.DisableTls
-		config.ClientID = clientId
-
-		providers := events.Providers{
-			Kafka:  kafkaClientProvider{config},
-			Topics: opts.Inputs.Topics,
-		}
-
-		eventSender, err := events.ParseEventSenders(clientId, providers, opts.EventSenderConfig)
+		eventSender, err := events.ParseEventSenders(clientId, opts.Inputs.Topics, opts.EventSenderConfig, opts.DisableTls)
 		startup_base.PanicOnError(err, "initialize event sender")
 
 		// register as global event sender
@@ -54,19 +32,4 @@ func (opts *EventOptions) EventSender(clientId string) events.EventSender {
 	})
 
 	return opts.eventSender
-}
-
-type kafkaClientProvider struct {
-	config *sarama.Config
-}
-
-func (p kafkaClientProvider) KafkaClient(clientId string, addresses []string) (sarama.Client, error) {
-	config := p.config
-	if config == nil {
-		log.Debugf("No kafka config supplied, using default config")
-		config = kafka.DefaultConfig(clientId)
-	}
-	config.ClientID = clientId
-
-	return sarama.NewClient(addresses, config)
 }
