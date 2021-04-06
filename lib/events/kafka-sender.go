@@ -12,7 +12,6 @@ import (
 	"github.com/flachnetz/startup/v2/startup_base"
 )
 
-
 type RecordHeader struct {
 	Key   []byte
 	Value []byte
@@ -30,7 +29,6 @@ func ToKafkaEvent(key string, ev Event) *KafkaMessage {
 		Key:   key,
 	}
 }
-
 
 type KafkaConfluentSender struct {
 	log             logrus.FieldLogger
@@ -73,6 +71,7 @@ func NewKafkaConfluentSender(producer *kafka2.Producer, senderConfig KafkaSender
 }
 
 func (s *KafkaConfluentSender) CreateTopics(topics kafka.Topics) error {
+	s.log.Infof("trying to create topics %+v", topics)
 	if len(topics) == 0 {
 		return nil
 	}
@@ -92,6 +91,8 @@ func (s *KafkaConfluentSender) CreateTopics(topics kafka.Topics) error {
 		}
 		if len(res) != 1 || res[0].Error.Code() != kafka2.ErrNoError && res[0].Error.Code() != kafka2.ErrTopicAlreadyExists {
 			return errors.Errorf("topic creation failed: %+v", res)
+		} else {
+			s.log.Infof("Topics created command returned with %+v", res)
 		}
 	}
 
