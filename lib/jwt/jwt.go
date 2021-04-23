@@ -112,8 +112,11 @@ func (j *JwtService) GetJwtTokenFromRequest(req *http.Request) (*JwtStruct, erro
 		return nil, errors.New("cannot verify jwt because jwk key set is missing")
 	}
 
-	authHeader := req.Header.Get("authorization")
-	if authHeader == "" { // return empty claim when no jwt is given
+	authHeader := req.Header.Get("Authorization")
+	if authHeader == "" {
+		authHeader = req.Header.Get("authorization")
+	}
+	if authHeader == "" {		
 		return nil, nil
 	}
 
