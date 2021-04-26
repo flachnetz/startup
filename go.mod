@@ -24,7 +24,7 @@ require (
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
-	github.com/labstack/echo/v4 v4.2.2 // indirect
+	github.com/labstack/gommon v0.3.0
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/lestrrat-go/jwx v1.0.5
 	github.com/linkedin/goavro v2.1.0+incompatible
@@ -39,6 +39,7 @@ require (
 	github.com/rubenv/sql-migrate v0.0.0-20200210110325-c8d4be6f9bb7
 	github.com/sirupsen/logrus v1.8.1
 	github.com/syntaqx/go-metrics-datadog v0.0.0-20181220201509-312b31920cc5
+	github.com/valyala/fasttemplate v1.2.1 // indirect
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2 // indirect
 	golang.org/x/sys v0.0.0-20210403161142-5e06dd20ab57 // indirect
