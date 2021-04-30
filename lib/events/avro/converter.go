@@ -131,8 +131,10 @@ func (c *Converter) simplifyAvroType(value map[string]interface{}) (interface{},
 				return actualValue, true
 			}
 
-			if strings.HasPrefix(key, c.options.AvroNamespace) {
-				return actualValue, true
+			if c.options.AvroNamespace != "" {
+				if strings.HasPrefix(key, c.options.AvroNamespace) {
+					return actualValue, true
+				}
 			}
 		}
 	}
