@@ -81,10 +81,17 @@ func (s *KafkaConfluentSender) CreateTopics(topics kafka.Topics) error {
 	defer adminClient.Close()
 
 	for _, topic := range topics {
+		config := map[string]string{}
+		for k, v := range topic.Config {
+			if v != nil {
+				config[k] = *v
+			}
+		}
 		res, err := adminClient.CreateTopics(context.Background(), []kafka2.TopicSpecification{{
 			Topic:             topic.Name,
 			NumPartitions:     int(topic.NumPartitions),
 			ReplicationFactor: int(topic.ReplicationFactor),
+			Config:            config,
 		}})
 		if err != nil {
 			return errors.Wrap(err, "topic creation")
