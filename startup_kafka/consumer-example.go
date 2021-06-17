@@ -3,6 +3,7 @@ package startup_kafka
 import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/atomic"
 	"strings"
 	"sync"
 	"time"
@@ -21,7 +22,7 @@ type Consumer struct {
 	kafkaDone     chan bool
 	wg            sync.WaitGroup
 
-	running bool
+	running atomic.Bool
 }
 
 type ConsumerOptions struct {
@@ -59,7 +60,7 @@ func NewConsumer(options ConsumerOptions) *Consumer {
 }
 
 func (c *Consumer) Close() error {
-	if c.running {
+	if c.running.Load() {
 		c.log.Infof("Closing")
 
 		c.kafkaDone <- true
@@ -69,7 +70,7 @@ func (c *Consumer) Close() error {
 }
 
 func (c *Consumer) Run() {
-	if c.running {
+	if c.running.Load() {
 		return
 	}
 
@@ -136,5 +137,5 @@ func (c *Consumer) Run() {
 		}
 	}()
 
-	c.running = true
+	c.running.Store(true)
 }
