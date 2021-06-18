@@ -47,8 +47,10 @@ type HTTPOptions struct {
 	TLSKeyFile  string `long:"http-tls-key" description:"Private key file to enable SSL support."`
 	TLSCertFile string `long:"http-tls-cert" description:"Certificate file to enable SSL support."`
 
-	BasicAuthUsername string `long:"http-admin-username" default:"admin" description:"Basic auth username for admin panel."`
-	BasicAuthPassword string `long:"http-admin-password" default:"bingo" description:"Basic auth password for admin panel."`
+	DisableAdminRedirect bool   `long:"http-disable-admin-redirect" default:"false" description:"Disable admin redirect on /"`
+	DisableAuth          bool   `long:"http-disable-admin-auth" default:"false" description:"Disable basic auth"`
+	BasicAuthUsername    string `long:"http-admin-username" default:"admin" description:"Basic auth username for admin panel."`
+	BasicAuthPassword    string `long:"http-admin-password" default:"bingo" description:"Basic auth password for admin panel."`
 
 	AccessLog           string `long:"http-access-log" description:"Write http access log to a file. Defaults to stdout."`
 	AccessLogAdminRoute bool   `long:"http-access-log-admin-route" description:"If enabled, admin route requests will also be logged."`
@@ -93,14 +95,16 @@ func (opts HTTPOptions) Serve(config Config) {
 		handler = config.Routing(router)
 	}
 
-	// try to register / -> /admin redirect.
-	tryRegisterAdminHandlerRedirect(router)
+	if !opts.DisableAdminRedirect {
+		// try to register / -> /admin redirect.
+		tryRegisterAdminHandlerRedirect(router)
+	}
 
 	// add extra handlers from config
 	routeConfigs = append(routeConfigs, config.AdminHandlers...)
 
 	// Admin handler with a lot of admin-stuff
-	adminHandler := requireAuth(opts.BasicAuthUsername, opts.BasicAuthPassword,
+	adminHandler := requireAuth(opts.DisableAuth, opts.BasicAuthUsername, opts.BasicAuthPassword,
 		admin.NewAdminHandler("/admin", appName, routeConfigs...))
 
 	// merge handlers
@@ -223,11 +227,11 @@ func mergeWithAdminHandler(admin, rest http.Handler) http.HandlerFunc {
 	}
 }
 
-func requireAuth(user, pass string, handler http.Handler) http.HandlerFunc {
+func requireAuth(disableAuth bool, user, pass string, handler http.Handler) http.HandlerFunc {
 	authed := httpauth.SimpleBasicAuth(user, pass)(handler)
 
 	return func(writer http.ResponseWriter, request *http.Request) {
-		if request.URL.Path == "/admin/ping" {
+		if disableAuth || request.URL.Path == "/admin/ping" {
 			handler.ServeHTTP(writer, request)
 		} else {
 			authed.ServeHTTP(writer, request)
