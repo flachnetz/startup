@@ -33,6 +33,7 @@ func ToKafkaEvent(key string, ev Event) *KafkaMessage {
 type KafkaConfluentSender struct {
 	log             logrus.FieldLogger
 	events          chan Event
+	eventBufferSize int
 	eventsWg        sync.WaitGroup
 	encoder         Encoder
 	fallbackEncoder Encoder
@@ -52,6 +53,7 @@ func NewKafkaConfluentSender(producer *kafka2.Producer, senderConfig KafkaSender
 	sender := &KafkaConfluentSender{
 		log:             logrus.WithField("prefix", "kafka"),
 		events:          make(chan Event, senderConfig.EventBufferSize),
+		eventBufferSize: senderConfig.EventBufferSize,
 		encoder:         senderConfig.Encoder,
 		fallbackEncoder: jsonEncoder{},
 		kafkaProducer:   producer,
@@ -128,7 +130,7 @@ func (s *KafkaConfluentSender) Send(event Event) {
 
 		default:
 			// the channel is full
-			s.log.Errorf("Could not enqueue event, channel is full: %v", s.events)
+			s.log.Errorf("Could not enqueue event, channel size of %d reached", s.eventBufferSize)
 		}
 	}
 }
