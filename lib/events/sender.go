@@ -37,7 +37,6 @@ type KafkaSenderConfig struct {
 	EventBufferSize int
 }
 
-
 var log = logrus.WithField("prefix", "events")
 
 type Event interface {
@@ -99,7 +98,6 @@ func (senders EventSenders) Close() error {
 
 	return result
 }
-
 
 // Parses event sender config from string.
 // an example could be
@@ -197,6 +195,7 @@ func initializeEventSender(clientId string, topicsFunc TopicsFunc, senderType st
 		producerConfigMap := kafka2.ConfigMap{
 			"client.id":         clientId,
 			"bootstrap.servers": strings.Join(kafkaAddresses, ","),
+			"go.batch.produce":  true,
 		}
 		if !disableTls {
 			producerConfigMap["security.protocol"] = "ssl"
