@@ -195,7 +195,7 @@ func initializeEventSender(clientId string, topicsFunc TopicsFunc, senderType st
 		producerConfigMap := kafka2.ConfigMap{
 			"client.id":         clientId,
 			"bootstrap.servers": strings.Join(kafkaAddresses, ","),
-			"go.batch.produce":  true,
+			"go.batch.producer":  true,
 		}
 		if !disableTls {
 			producerConfigMap["security.protocol"] = "ssl"
