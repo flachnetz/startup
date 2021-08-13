@@ -9,7 +9,10 @@ func (s NoopEventSender) Init(event []Event) error {
 func (NoopEventSender) Send(event Event) {
 }
 
-func (NoopEventSender) Close() error {
+func (NoopEventSender) SendBlocking(event Event) error {
 	return nil
 }
 
+func (NoopEventSender) Close() error {
+	return nil
+}
