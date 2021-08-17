@@ -2,8 +2,7 @@ package events
 
 import (
 	"context"
-	"fmt"
-	kafka2 "github.com/confluentinc/confluent-kafka-go/kafka"
+	rdkafka "github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"sync"
@@ -38,13 +37,13 @@ type KafkaConfluentSender struct {
 	eventsWg        sync.WaitGroup
 	encoder         Encoder
 	fallbackEncoder Encoder
-	kafkaProducer   *kafka2.Producer
+	kafkaProducer   *rdkafka.Producer
 
 	allowBlocking bool
 	topicForEvent func(event Event) string
 }
 
-func NewKafkaConfluentSender(producer *kafka2.Producer, senderConfig KafkaSenderConfig) (*KafkaConfluentSender, error) {
+func NewKafkaConfluentSender(producer *rdkafka.Producer, senderConfig KafkaSenderConfig) (*KafkaConfluentSender, error) {
 
 	// just set to default
 	if senderConfig.EventBufferSize <= 0 {
@@ -62,6 +61,7 @@ func NewKafkaConfluentSender(producer *kafka2.Producer, senderConfig KafkaSender
 		topicForEvent:   topicForEventFunc(senderConfig.TopicsConfig.TopicForType),
 	}
 	topics := getTopicsWithErrorTopic(senderConfig.TopicsConfig.Topics())
+
 	// ensure that all topics that might be used later exist
 	if err := sender.CreateTopics(topics); err != nil {
 		return nil, errors.WithMessage(err, "ensure topics")
@@ -79,7 +79,7 @@ func (s *KafkaConfluentSender) CreateTopics(topics kafka.Topics) error {
 		return nil
 	}
 
-	adminClient, err := kafka2.NewAdminClientFromProducer(s.kafkaProducer)
+	adminClient, err := rdkafka.NewAdminClientFromProducer(s.kafkaProducer)
 	startup_base.FatalOnError(err, "admin client")
 	defer adminClient.Close()
 
@@ -90,16 +90,17 @@ func (s *KafkaConfluentSender) CreateTopics(topics kafka.Topics) error {
 				config[k] = *v
 			}
 		}
-		res, err := adminClient.CreateTopics(context.Background(), []kafka2.TopicSpecification{{
+		res, err := adminClient.CreateTopics(context.Background(), []rdkafka.TopicSpecification{{
 			Topic:             topic.Name,
 			NumPartitions:     int(topic.NumPartitions),
 			ReplicationFactor: int(topic.ReplicationFactor),
 			Config:            config,
 		}})
 		if err != nil {
-			return errors.Wrap(err, "topic creation")
+			return errors.WithMessage(err, "topic creation")
 		}
-		if len(res) != 1 || res[0].Error.Code() != kafka2.ErrNoError && res[0].Error.Code() != kafka2.ErrTopicAlreadyExists {
+
+		if len(res) != 1 || res[0].Error.Code() != rdkafka.ErrNoError && res[0].Error.Code() != rdkafka.ErrTopicAlreadyExists {
 			return errors.Errorf("topic creation failed: %+v", res)
 		} else {
 			s.log.Infof("Topics created command returned with %+v", res)
@@ -141,56 +142,64 @@ func (s *KafkaConfluentSender) SendBlocking(event Event) error {
 	if err != nil {
 		return err
 	}
+
 	timer := time.NewTimer(5 * time.Second)
 	defer timer.Stop()
 
 	select {
 	case <-timer.C:
-		errorMsg := fmt.Sprintf("sending of message %+v timed out", event)
-		return errors.New(errorMsg)
+		return errors.Errorf("sending of message %+v timed out", event)
+
 	default:
-		syncChan := make(chan kafka2.Event, 1)
-		err := s.kafkaProducer.Produce(msg, syncChan)
-		if err != nil {
-			errorMsg := fmt.Sprintf("cannot send message %+v: %s", event, err.Error())
-			return errors.New(errorMsg)
+		syncChan := make(chan rdkafka.Event, 1)
+
+		if err := s.kafkaProducer.Produce(msg, syncChan); err != nil {
+			return errors.WithMessagef(err, "failed to send message %+v", event)
 		}
+
+		// wait for send to finish
 		<-syncChan
+
+		// there might have been an async error, so return async error here
 		return msg.TopicPartition.Error
 	}
 }
 
-func (s *KafkaConfluentSender) buildKafkaMsg(event Event) (*kafka2.Message, error) {
+func (s *KafkaConfluentSender) buildKafkaMsg(event Event) (*rdkafka.Message, error) {
 	encoded, err := s.encoder.Encode(event)
 	if err != nil {
-		errorMsg := fmt.Sprintf("encoding of message %+v failed: %s", event, err.Error())
-		return nil, errors.New(errorMsg)
+		return nil, errors.WithMessagef(err, "encoding of message %+v failed", event)
 	}
 
-	topicForEvent := ""
+	var topicForEvent string
 
-	var headers []kafka2.Header
+	var headers []rdkafka.Header
 	var key []byte
+
 	if msg, ok := event.(*KafkaMessage); ok {
 		if msg.Key != "" {
 			key = []byte(msg.Key)
 		}
+
 		for _, h := range msg.Headers {
-			headers = append(headers, kafka2.Header{Key: string(h.Key), Value: h.Value})
+			headers = append(headers, rdkafka.Header{Key: string(h.Key), Value: h.Value})
 		}
+
 		topicForEvent = s.topicForEvent(msg.Event)
 	} else {
 		topicForEvent = s.topicForEvent(event)
 	}
-	msg := &kafka2.Message{
-		TopicPartition: kafka2.TopicPartition{
+
+	msg := &rdkafka.Message{
+		TopicPartition: rdkafka.TopicPartition{
 			Topic:     &topicForEvent,
-			Partition: kafka2.PartitionAny,
+			Partition: rdkafka.PartitionAny,
 		},
-		Value:   encoded,
 		Key:     key,
+		Value:   encoded,
 		Headers: headers,
 	}
+
 	return msg, nil
 }
 
@@ -211,7 +220,7 @@ func (s *KafkaConfluentSender) handleEvents() {
 	for event := range s.events {
 		// encode events to binary data
 		if err := s.SendBlocking(event); err != nil {
-			s.log.Errorf("Failed to sent event %+w to kafka: %s", event, err)
+			s.log.Errorf("Failed to sent event %+v to kafka: %s", event, err)
 		}
 	}
 }

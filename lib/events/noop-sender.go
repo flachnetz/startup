@@ -2,14 +2,14 @@ package events
 
 type NoopEventSender struct{}
 
-func (s NoopEventSender) Init(event []Event) error {
+func (s NoopEventSender) Init([]Event) error {
 	return nil
 }
 
-func (NoopEventSender) Send(event Event) {
+func (NoopEventSender) Send(Event) {
 }
 
-func (NoopEventSender) SendBlocking(event Event) error {
+func (NoopEventSender) SendBlocking(Event) error {
 	return nil
 }
 

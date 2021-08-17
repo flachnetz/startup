@@ -87,33 +87,36 @@ func (senders EventSenders) Init(event []Event) error {
 func (senders EventSenders) Send(event Event) {
 	err := senders.SendBlocking(event)
 	if err != nil {
-		log.Errorf("Failed to sent event %+w to kafka: %s", event, err)
+		log.Errorf("Failed to sent event %+v to handlers: %s", event, err)
 	}
 }
 
 func (senders EventSenders) SendBlocking(event Event) error {
+	var errGroup error
+
 	for _, sender := range senders {
 		err := sender.SendBlocking(event)
 		if err != nil {
-			return err
+			errGroup = multierror.Append(errGroup, err)
 		}
 	}
-	return nil
+
+	return errGroup
 }
 
 func (senders EventSenders) Close() error {
-	var result error
+	var errGroup error
 
 	for _, sender := range senders {
 		if err := sender.Close(); err != nil {
-			result = multierror.Append(result, sender.Close())
+			errGroup = multierror.Append(errGroup, err)
 		}
 	}
 
-	return result
+	return errGroup
 }
 
-// Parses event sender config from string.
+// ParseEventSenders parses event sender config from string.
 // an example could be
 // --event-sender="confluent,address=http://confluent-registry.shared.svc.cluster.local,kafka=kafka.kafka.svc.cluster.local:9092,replication=1,blocking=true,schemainit=true"
 // which uses confluent registry with kafka in blocking mode and initialises schemas at the registry during startup
