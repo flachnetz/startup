@@ -8,8 +8,7 @@ require (
 	github.com/confluentinc/confluent-kafka-go v1.6.1
 	github.com/flachnetz/go-admin v1.5.3
 	github.com/flachnetz/go-datadog v1.3.0
-	github.com/gchaincl/sqlhooks/v2 v2.0.1
-	github.com/go-playground/universal-translator v0.17.0 // indirect
+	github.com/go-playground/universal-translator v0.18.0 // indirect
 	github.com/goji/httpauth v0.0.0-20160601135302-2da839ab0f4d
 	github.com/gorilla/handlers v1.4.2
 	github.com/hashicorp/consul/api v1.4.0
@@ -28,12 +27,14 @@ require (
 	github.com/lestrrat-go/jwx v1.0.5
 	github.com/linkedin/goavro/v2 v2.10.0
 	github.com/mattn/go-colorable v0.1.8 // indirect
+	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
 	github.com/onsi/gomega v1.4.3
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/openzipkin-contrib/zipkin-go-opentracing v0.4.5
 	github.com/openzipkin/zipkin-go v0.2.2
 	github.com/pkg/errors v0.9.1
+	github.com/qustavo/sqlhooks/v2 v2.1.0
 	github.com/rcrowley/go-metrics v0.0.0-20200313005456-10cdbea86bc0
 	github.com/rubenv/sql-migrate v0.0.0-20200210110325-c8d4be6f9bb7
 	github.com/sirupsen/logrus v1.8.1
@@ -41,9 +42,9 @@ require (
 	github.com/valyala/fasttemplate v1.2.1 // indirect
 	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	go.uber.org/atomic v1.4.0
-	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2 // indirect
-	golang.org/x/sys v0.0.0-20210403161142-5e06dd20ab57 // indirect
-	golang.org/x/term v0.0.0-20210317153231-de623e64d2a6 // indirect
+	golang.org/x/crypto v0.0.0-20210813211128-0a44fdfbc16e // indirect
+	golang.org/x/sys v0.0.0-20210817133320-13f9c583af74 // indirect
+	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.31.0
 )
