@@ -59,6 +59,9 @@ type EventSender interface {
 	// but otherwise ignored.
 	Send(event Event)
 
+	// SendBlocking the given event. This is an sync method, it will failed in case the msg was not delivered.
+	SendBlocking(event Event) error
+
 	// Close the event sender and flush all pending events.
 	// Waits for all events to be send out.
 	Close() error
@@ -82,9 +85,20 @@ func (senders EventSenders) Init(event []Event) error {
 }
 
 func (senders EventSenders) Send(event Event) {
-	for _, sender := range senders {
-		sender.Send(event)
+	err := senders.SendBlocking(event)
+	if err != nil {
+		log.Errorf("Failed to sent event %+w to kafka: %s", event, err)
 	}
+}
+
+func (senders EventSenders) SendBlocking(event Event) error {
+	for _, sender := range senders {
+		err := sender.SendBlocking(event)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (senders EventSenders) Close() error {

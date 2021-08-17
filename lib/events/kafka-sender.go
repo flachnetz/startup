@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"fmt"
 	kafka2 "github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -135,6 +136,64 @@ func (s *KafkaConfluentSender) Send(event Event) {
 	}
 }
 
+func (s *KafkaConfluentSender) SendBlocking(event Event) error {
+	msg, err := s.buildKafkaMsg(event)
+	if err != nil {
+		return err
+	}
+	timer := time.NewTimer(5 * time.Second)
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+		errorMsg := fmt.Sprintf("sending of message %+v timed out", event)
+		return errors.New(errorMsg)
+	default:
+		syncChan := make(chan kafka2.Event, 1)
+		err := s.kafkaProducer.Produce(msg, syncChan)
+		if err != nil {
+			errorMsg := fmt.Sprintf("cannot send message %+v: %s", event, err.Error())
+			return errors.New(errorMsg)
+		}
+		<-syncChan
+		return msg.TopicPartition.Error
+	}
+}
+
+func (s *KafkaConfluentSender) buildKafkaMsg(event Event) (*kafka2.Message, error) {
+	encoded, err := s.encoder.Encode(event)
+	if err != nil {
+		errorMsg := fmt.Sprintf("encoding of message %+v failed: %s", event, err.Error())
+		return nil, errors.New(errorMsg)
+	}
+
+	topicForEvent := ""
+
+	var headers []kafka2.Header
+	var key []byte
+	if msg, ok := event.(*KafkaMessage); ok {
+		if msg.Key != "" {
+			key = []byte(msg.Key)
+		}
+		for _, h := range msg.Headers {
+			headers = append(headers, kafka2.Header{Key: string(h.Key), Value: h.Value})
+		}
+		topicForEvent = s.topicForEvent(msg.Event)
+	} else {
+		topicForEvent = s.topicForEvent(event)
+	}
+	msg := &kafka2.Message{
+		TopicPartition: kafka2.TopicPartition{
+			Topic:     &topicForEvent,
+			Partition: kafka2.PartitionAny,
+		},
+		Value:   encoded,
+		Key:     key,
+		Headers: headers,
+	}
+	return msg, nil
+}
+
 func (s *KafkaConfluentSender) Close() error {
 	// Do not accept new events and wait for all events to be processed.
 	// This stops and waits for the handleEvents() goroutine.
@@ -151,46 +210,8 @@ func (s *KafkaConfluentSender) handleEvents() {
 
 	for event := range s.events {
 		// encode events to binary data
-		encoded, err := s.encoder.Encode(event)
-		if err != nil {
-			s.log.Errorf("encoding of message %+v failed: %s", event, err.Error())
-			continue
-		}
-
-		topicForEvent := ""
-
-		var headers []kafka2.Header
-		var key []byte
-		if msg, ok := event.(*KafkaMessage); ok {
-			if msg.Key != "" {
-				key = []byte(msg.Key)
-			}
-			for _, h := range msg.Headers {
-				headers = append(headers, kafka2.Header{Key: string(h.Key), Value: h.Value})
-			}
-			topicForEvent = s.topicForEvent(msg.Event)
-		} else {
-			topicForEvent = s.topicForEvent(event)
-		}
-		select {
-		case <-time.After(5 * time.Second):
-			s.log.Errorf("sending of message %+v timed out", event)
-			break
-		default:
-			syncChan := make(chan kafka2.Event, 1)
-			err := s.kafkaProducer.Produce(&kafka2.Message{
-				TopicPartition: kafka2.TopicPartition{
-					Topic:     &topicForEvent,
-					Partition: kafka2.PartitionAny,
-				},
-				Value:   encoded,
-				Key:     key,
-				Headers: headers,
-			}, syncChan)
-			if err != nil {
-				s.log.Errorf("cannot send message %+v: %s", event, err.Error())
-			}
-			<-syncChan
+		if err := s.SendBlocking(event); err != nil {
+			s.log.Errorf("Failed to sent event %+w to kafka: %s", event, err)
 		}
 	}
 }
