@@ -14,19 +14,16 @@ func (sender WriterEventSender) Init(event []Event) error {
 }
 
 func (sender WriterEventSender) Send(event Event) {
-	err := sender.SendBlocking(event)
-	if err != nil {
-		log.Errorf("Failed to sent event %+w to kafka: %s", event, err)
+	if err := sender.SendBlocking(event); err != nil {
+		log.Errorf("Failed to write event %v: %s", event, err)
 	}
 }
 
 func (sender WriterEventSender) SendBlocking(event Event) error {
 	bytes, _ := json.Marshal(event)
+
 	_, err := sender.Write(bytes)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (sender WriterEventSender) Close() error {

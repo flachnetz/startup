@@ -2,6 +2,7 @@ package events
 
 import (
 	"encoding/json"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"strings"
 )
@@ -16,9 +17,8 @@ func (l LogrusEventSender) Init(events []Event) error {
 }
 
 func (l LogrusEventSender) Send(event Event) {
-	err := l.SendBlocking(event)
-	if err != nil {
-		log.Errorf("Failed to sent event %+w to kafka: %s", event, err)
+	if err := l.SendBlocking(event); err != nil {
+		log.Errorf("Failed to log event %+v: %s", event, err)
 	}
 }
 
@@ -26,8 +26,7 @@ func (l LogrusEventSender) SendBlocking(event Event) error {
 	var buf strings.Builder
 
 	if err := json.NewEncoder(&buf).Encode(event); err != nil {
-		l.Errorf("Could not encode event: %+v", event)
-		return err
+		return errors.WithMessage(err, "encode event")
 	}
 
 	l.Info(buf.String())

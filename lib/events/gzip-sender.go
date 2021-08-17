@@ -49,10 +49,7 @@ func GZIPEventSender(filename string) (*gzipEventSender, error) {
 }
 
 func (f *gzipEventSender) Send(event Event) {
-	err := f.SendBlocking(event)
-	if err != nil {
-		log.Errorf("Failed to sent event %+w to kafka: %s", event, err)
-	}
+	_ = f.SendBlocking(event)
 }
 
 func (f *gzipEventSender) SendBlocking(event Event) error {
