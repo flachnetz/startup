@@ -3,7 +3,7 @@ package startup_tracing_pg
 import (
 	"context"
 	"database/sql/driver"
-	"github.com/gchaincl/sqlhooks/v2"
+	"github.com/qustavo/sqlhooks/v2"
 	"github.com/opentracing/opentracing-go"
 	"runtime"
 	"strings"
