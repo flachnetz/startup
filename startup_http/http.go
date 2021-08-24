@@ -47,8 +47,8 @@ type HTTPOptions struct {
 	TLSKeyFile  string `long:"http-tls-key" description:"Private key file to enable SSL support."`
 	TLSCertFile string `long:"http-tls-cert" description:"Certificate file to enable SSL support."`
 
-	DisableAdminRedirect bool   `long:"http-disable-admin-redirect" default:"false" description:"Disable admin redirect on /"`
-	DisableAuth          bool   `long:"http-disable-admin-auth" default:"false" description:"Disable basic auth"`
+	DisableAdminRedirect bool   `long:"http-disable-admin-redirect" description:"Disable admin redirect on /"`
+	DisableAuth          bool   `long:"http-disable-admin-auth" description:"Disable basic auth"`
 	BasicAuthUsername    string `long:"http-admin-username" default:"admin" description:"Basic auth username for admin panel."`
 	BasicAuthPassword    string `long:"http-admin-password" default:"bingo" description:"Basic auth password for admin panel."`
 
