@@ -23,6 +23,7 @@ type JwtStruct struct {
 	ClientID       string        `json:"client_id"`
 	Site           string        `json:"site"`
 	Scope          []interface{} `json:"scope"`
+	GrantType          []interface{} `json:"grant_type"`
 }
 
 type JwtService struct {
@@ -104,6 +105,10 @@ func (j *JwtService) GetJwtToken(authHeader string) (*JwtStruct, error) {
 		claims.Scope = v.([]interface{})
 	}
 
+	if v, ok := t.Get("grant_type"); ok {
+		claims.GrantType = v.([]interface{})
+	}
+
 	return claims, err
 }
 
@@ -116,7 +121,7 @@ func (j *JwtService) GetJwtTokenFromRequest(req *http.Request) (*JwtStruct, erro
 	if authHeader == "" {
 		authHeader = req.Header.Get("authorization")
 	}
-	if authHeader == "" {		
+	if authHeader == "" {
 		return nil, nil
 	}
 
