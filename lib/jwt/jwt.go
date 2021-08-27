@@ -23,7 +23,7 @@ type JwtStruct struct {
 	ClientID       string        `json:"client_id"`
 	Site           string        `json:"site"`
 	Scope          []interface{} `json:"scope"`
-	GrantType          []interface{} `json:"grant_type"`
+	GrantType      string        `json:"grant_type"`
 }
 
 type JwtService struct {
@@ -106,7 +106,7 @@ func (j *JwtService) GetJwtToken(authHeader string) (*JwtStruct, error) {
 	}
 
 	if v, ok := t.Get("grant_type"); ok {
-		claims.GrantType = v.([]interface{})
+		claims.GrantType = v.(string)
 	}
 
 	return claims, err
