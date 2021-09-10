@@ -31,11 +31,39 @@ func (h *dbHook) Before(ctx context.Context, query string, args ...interface{}) 
 		opentracing.ChildOf(parent.Context()),
 		ext.SpanKindRPCClient)
 
+	queryClean := strings.TrimSpace(reSpace.ReplaceAllString(query, " "))
+	queryType := queryTypeOf(queryClean)
+
 	// set extra tags for our datadog proxy
 	span.SetTag("dd.service", h.ServiceName)
-	span.SetTag("dd.resource", strings.TrimSpace(reSpace.ReplaceAllString(query, " ")))
+	span.SetTag("dd.resource", queryType)
+	span.SetTag("sql.query", queryClean)
 
 	return opentracing.ContextWithSpan(ctx, span), nil
+}
+
+func queryTypeOf(query string) string {
+	if len(query) > 8 {
+		prefix := query[:7]
+
+		if strings.EqualFold("select ", prefix) {
+			return "SELECT"
+		}
+
+		if strings.EqualFold("insert ", prefix) {
+			return "INSERT"
+		}
+
+		if strings.EqualFold("delete ", prefix) {
+			return "DELETE"
+		}
+
+		if strings.EqualFold("update ", prefix) {
+			return "UPDATE"
+		}
+	}
+
+	return "SQL"
 }
 
 func (h *dbHook) After(ctx context.Context, query string, args ...interface{}) (context.Context, error) {
