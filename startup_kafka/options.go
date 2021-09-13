@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Simple flags for consumer
+// KafkaOptions provides simple flags for to create a kafka consumer
 type KafkaOptions struct {
 	KafkaAddresses     []string `long:"kafka-address" validate:"dive,hostport" description:"Address of kafka server to use. Can be specified multiple times to connect to multiple brokers."`
 	KafkaConsumerGroup string   `long:"kafka-consumer-group" default:"RANDOM" description:"Consumer group of kafka messages"`
