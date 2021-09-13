@@ -10,9 +10,10 @@ import (
 
 // KafkaOptions provides simple flags for to create a kafka consumer
 type KafkaOptions struct {
-	KafkaAddresses     []string `long:"kafka-address" validate:"dive,hostport" description:"Address of kafka server to use. Can be specified multiple times to connect to multiple brokers."`
-	KafkaConsumerGroup string   `long:"kafka-consumer-group" default:"RANDOM" description:"Consumer group of kafka messages"`
-	KafkaOffsetReset   string   `long:"kafka-offset-reset" default:"smallest" description:"Offset reset for kafka topic" choice:"smallest" choice:"largest"`
+	KafkaAddresses        []string `long:"kafka-address" validate:"dive,hostport" description:"Address of kafka server to use. Can be specified multiple times to connect to multiple brokers."`
+	KafkaConsumerGroup    string   `long:"kafka-consumer-group" default:"RANDOM" description:"Consumer group of kafka messages"`
+	KafkaOffsetReset      string   `long:"kafka-offset-reset" default:"smallest" description:"Offset reset for kafka topic" choice:"smallest" choice:"largest"`
+	KafkaSecurityProtocol string   `long:"kafka-security-protocol" default:"ssl" description:"Security protocol" choice:"ssl" choice:"plaintext"`
 }
 
 func (opts KafkaOptions) NewConsumer(config kafka.ConfigMap) *kafka.Consumer {
@@ -24,9 +25,7 @@ func (opts KafkaOptions) NewConsumer(config kafka.ConfigMap) *kafka.Consumer {
 		"bootstrap.servers": strings.Join(opts.KafkaAddresses, ","),
 		"group.id":          opts.KafkaConsumerGroup,
 		"auto.offset.reset": opts.KafkaOffsetReset,
-
-		// use ssl by default
-		"security.protocol": "ssl",
+		"security.protocol": opts.KafkaSecurityProtocol,
 
 		// auto commit true is the default.
 		"enable.auto.commit": "false",
