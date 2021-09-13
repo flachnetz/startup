@@ -12,7 +12,7 @@ type Batcher struct {
 	count int
 }
 
-// NewBatcher returns a simple Batcher that can be used to buffer & batch
+// New returns a simple Batcher that can be used to buffer & batch
 // values as simple as this:
 //
 //  b := batcher.New(1024, 5*time.Second)
