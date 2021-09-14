@@ -49,9 +49,9 @@ type ConfluentClientOptions struct {
 	client     *confluent.Client
 }
 
-func (opts *ConfluentClientOptions) ConfluentClient() *confluent.Client {
+func (opts *ConfluentClientOptions) ConfluentClient(options ...confluent.Option) *confluent.Client {
 	opts.clientOnce.Do(func() {
-		client, err := confluent.NewClient(opts.ConfluentUrl.String())
+		client, err := confluent.NewClient(opts.ConfluentUrl.String(), options...)
 		startup_base.PanicOnError(err, "Cannot initialize confluent client.")
 
 		opts.client = client
