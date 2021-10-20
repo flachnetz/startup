@@ -122,7 +122,7 @@ func (j *JwtService) GetJwtTokenFromRequest(req *http.Request) (*JwtStruct, erro
 		authHeader = req.Header.Get("authorization")
 	}
 	if authHeader == "" {
-		return nil, nil
+		return nil, errors.New("authorization header is empty or not set")
 	}
 
 	return j.GetJwtToken(authHeader[7:])
