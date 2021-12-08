@@ -41,6 +41,9 @@ func (l *responseLogger) WriteHeader(s int) {
 
 func (l *responseLogger) addStatusToSpan(span opentracing.Span) {
 	ext.HTTPStatusCode.Set(span, uint16(l.status))
+	if l.status == http.StatusNotFound {
+		ext.Error.Set(span, false)
+	}
 }
 
 type rlWithHijacker struct {
