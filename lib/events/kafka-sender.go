@@ -137,6 +137,19 @@ func (s *KafkaConfluentSender) Send(event Event) {
 	}
 }
 
+func (s *KafkaConfluentSender) sendAsync(event Event) error {
+	msg, err := s.buildKafkaMsg(event)
+	if err != nil {
+		return err
+	}
+
+	if err := s.kafkaProducer.Produce(msg, nil); err != nil {
+		return errors.WithMessagef(err, "failed to send message %+v", event)
+	}
+
+	return nil
+}
+
 func (s *KafkaConfluentSender) SendBlocking(event Event) error {
 	msg, err := s.buildKafkaMsg(event)
 	if err != nil {
@@ -219,7 +232,7 @@ func (s *KafkaConfluentSender) handleEvents() {
 
 	for event := range s.events {
 		// encode events to binary data
-		if err := s.SendBlocking(event); err != nil {
+		if err := s.sendAsync(event); err != nil {
 			s.log.Errorf("Failed to sent event %+v to kafka: %s", event, err)
 		}
 	}

@@ -85,9 +85,8 @@ func (senders EventSenders) Init(event []Event) error {
 }
 
 func (senders EventSenders) Send(event Event) {
-	err := senders.SendBlocking(event)
-	if err != nil {
-		log.Errorf("Failed to sent event %+v to handlers: %s", event, err)
+	for _, sender := range senders {
+		sender.Send(event)
 	}
 }
 
