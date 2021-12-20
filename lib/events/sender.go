@@ -1,9 +1,11 @@
 package events
 
 import (
+	"context"
 	"crypto/tls"
 	confluent "github.com/Landoop/schema-registry"
 	kafka2 "github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/flachnetz/startup/v2/startup_logrus"
 	consul "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
@@ -219,6 +221,21 @@ func initializeEventSender(clientId string, topicsFunc TopicsFunc, senderType st
 		if err != nil {
 			return nil, errors.WithMessage(err, "kafka producer")
 		}
+
+		go func() {
+			logger := startup_logrus.GetLogger(context.Background(), "kafka-delivery-channel")
+			for e := range producer.Events() {
+				switch ev := e.(type) {
+				case *kafka2.Message:
+					if ev.TopicPartition.Error != nil {
+						logger.Errorf("Failed to deliver message: %v\n", ev.TopicPartition)
+					} else {
+						logger.Debugf("Successfully produced record to topic %s partition [%d] @ offset %v\n",
+							*ev.TopicPartition.Topic, ev.TopicPartition.Partition, ev.TopicPartition.Offset)
+					}
+				}
+			}
+		}()
 
 		topics := topicsFunc(int16(replicationFactor))
 
