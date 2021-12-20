@@ -268,7 +268,7 @@ func initializeEventSender(clientId string, topicsFunc TopicsFunc, senderType st
 			}
 			err := eventSender.Init(initEvents)
 			if err != nil {
-				log.Errorf("event schema init failed")
+				log.Errorf("event schema init failed: %s", err.Error())
 				if topics.FailOnSchemaInit {
 					return nil, errors.WithMessage(err, "event schema init failed")
 				}
