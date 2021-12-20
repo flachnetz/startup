@@ -228,9 +228,9 @@ func initializeEventSender(clientId string, topicsFunc TopicsFunc, senderType st
 				switch ev := e.(type) {
 				case *kafka2.Message:
 					if ev.TopicPartition.Error != nil {
-						logger.Errorf("Failed to deliver message: %v\n", ev.TopicPartition)
+						logger.Errorf("Failed to deliver message: %v", ev.TopicPartition)
 					} else {
-						logger.Debugf("Successfully produced record to topic %s partition [%d] @ offset %v\n",
+						logger.Debugf("Successfully produced record to topic %s partition [%d] @ offset %v",
 							*ev.TopicPartition.Topic, ev.TopicPartition.Partition, ev.TopicPartition.Offset)
 					}
 				}
