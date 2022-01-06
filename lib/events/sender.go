@@ -139,7 +139,7 @@ func (senders EventSenders) Close() error {
 //
 // replication=NUMBER: used to create the given kafka topics with the replication param
 // blocking=true: will wait until the event got sent
-func ParseEventSenders(clientId string, topicsFunc TopicsFunc, config string, disableTls bool) (EventSender, error) {
+func ParseEventSenders(clientId string, topicsFunc TopicsFunc, config string, disableTls bool, configMap map[string]interface{}) (EventSender, error) {
 	reSenderType := regexp.MustCompile(`^([a-z]+)`)
 	reArgument := regexp.MustCompile(`^,([a-zA-Z]+)=([^,]+)`)
 
@@ -165,7 +165,7 @@ func ParseEventSenders(clientId string, topicsFunc TopicsFunc, config string, di
 			config = config[len(match[0]):]
 		}
 
-		eventSender, err := initializeEventSender(clientId, topicsFunc, eventSenderType, argumentValues, disableTls)
+		eventSender, err := initializeEventSender(clientId, topicsFunc, eventSenderType, argumentValues, disableTls, configMap)
 		if err != nil {
 			return nil, errors.WithMessage(err, "initializinig event sender")
 		}
@@ -176,7 +176,7 @@ func ParseEventSenders(clientId string, topicsFunc TopicsFunc, config string, di
 	return eventSenders, nil
 }
 
-func initializeEventSender(clientId string, topicsFunc TopicsFunc, senderType string, arguments map[string]string, disableTls bool) (EventSender, error) {
+func initializeEventSender(clientId string, topicsFunc TopicsFunc, senderType string, arguments map[string]string, disableTls bool, configMap map[string]interface{}) (EventSender, error) {
 	switch senderType {
 	case "noop":
 		return NoopEventSender{}, nil
@@ -213,10 +213,15 @@ func initializeEventSender(clientId string, topicsFunc TopicsFunc, senderType st
 		producerConfigMap := kafka2.ConfigMap{
 			"client.id":         clientId,
 			"bootstrap.servers": strings.Join(kafkaAddresses, ","),
+			"partitioner":       "murmur2_random",
 		}
 		if !disableTls {
 			producerConfigMap["security.protocol"] = "ssl"
 		}
+		for k, v := range configMap {
+			producerConfigMap[k] = v
+		}
+
 		producer, err := kafka2.NewProducer(&producerConfigMap)
 		if err != nil {
 			return nil, errors.WithMessage(err, "kafka producer")
