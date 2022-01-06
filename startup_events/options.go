@@ -8,8 +8,9 @@ import (
 )
 
 type EventOptions struct {
-	EventSenderConfig string `long:"event-sender" default:"" description:"Event sender to use. Event sender type followed by arguments, e.g: confluent,address=http://confluent-registry.shared.svc.cluster.local,kafka=kafka.kafka.svc.cluster.local:9092,replication=1,blocking=true"`
-	DisableTls        bool   `long:"event-sender-disable-tls" description:"Do not enable tls."`
+	EventSenderConfig string                 `long:"event-sender" default:"" description:"Event sender to use. Event sender type followed by arguments, e.g: confluent,address=http://confluent-registry.shared.svc.cluster.local,kafka=kafka.kafka.svc.cluster.local:9092,replication=1,blocking=true"`
+	DisableTls        bool                   `long:"event-sender-disable-tls" description:"Do not enable tls."`
+	ConfigMap         map[string]interface{} `long:"event-config" default:"" description:"ConfigMap is a map containing standard librdkafka configuration properties as documented in: https://github.com/edenhill/librdkafka/tree/master/CONFIGURATION.md"`
 
 	Inputs struct {
 		// A function to create the event topics. This option must be specified.
@@ -22,7 +23,7 @@ type EventOptions struct {
 
 func (opts *EventOptions) EventSender(clientId string) events.EventSender {
 	opts.eventSenderOnce.Do(func() {
-		eventSender, err := events.ParseEventSenders(clientId, opts.Inputs.Topics, opts.EventSenderConfig, opts.DisableTls)
+		eventSender, err := events.ParseEventSenders(clientId, opts.Inputs.Topics, opts.EventSenderConfig, opts.DisableTls, opts.ConfigMap)
 		startup_base.PanicOnError(err, "initialize event sender")
 
 		// register as global event sender

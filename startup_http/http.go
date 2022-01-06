@@ -183,7 +183,7 @@ func (opts HTTPOptions) Serve(config Config) {
 func RegisterSignalHandlerForServer(server *http.Server) <-chan struct{} {
 	waitCh := make(chan struct{})
 
-	signalCh := make(chan os.Signal)
+	signalCh := make(chan os.Signal, 1)
 
 	go func() {
 		signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM)
