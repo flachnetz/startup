@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"context"
 	"crypto/tls"
 	"github.com/benbjohnson/clock"
 	"github.com/lestrrat-go/jwx/jwk"
@@ -28,11 +29,11 @@ type JwtStruct struct {
 
 type JwtService struct {
 	clock     clock.Clock
-	jwkKeySet *jwk.Set
+	jwkKeySet jwk.Set
 }
 
 func NewJwtService(jwkResourceUrl string, clock clock.Clock) (*JwtService, error) {
-	set, err := GetJwk(jwkResourceUrl, &http.Client{
+	set, err := GetJwk(context.Background(), jwkResourceUrl, &http.Client{
 		Timeout: 5 * time.Second,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
@@ -54,13 +55,7 @@ func (j *JwtService) GetJwtToken(authHeader string) (*JwtStruct, error) {
 	}
 
 	// parse and check signature
-	t, err := jwt.ParseBytes([]byte(authHeader), jwt.WithOpenIDClaims(), jwt.WithKeySet(j.jwkKeySet))
-	if err != nil {
-		return nil, err
-	}
-
-	// now verify content
-	err = jwt.Verify(t, jwt.WithClock(j.clock))
+	t, err := jwt.ParseString(authHeader, jwt.WithKeySet(j.jwkKeySet), jwt.WithClock(j.clock), jwt.WithValidate(true))
 	if err != nil {
 		return nil, err
 	}
@@ -128,19 +123,14 @@ func (j *JwtService) GetJwtTokenFromRequest(req *http.Request) (*JwtStruct, erro
 	return j.GetJwtToken(authHeader[7:])
 }
 
-func GetJwk(url string, httpClient *http.Client) (*jwk.Set, error) {
-	set, err := jwk.Fetch(url, jwk.WithHTTPClient(httpClient))
+func GetJwk(ctx context.Context, url string, httpClient *http.Client) (jwk.Set, error) {
+	set, err := jwk.Fetch(ctx, url, jwk.WithHTTPClient(httpClient))
 	if err != nil {
 		return nil, err
 	}
 
-	if len(set.Keys) == 0 {
+	if set.Len() == 0 {
 		return nil, errors.New("no jwk keys found")
-	}
-
-	var key interface{}
-	if err := set.Keys[0].Raw(&key); err != nil {
-		return nil, err
 	}
 
 	return set, nil
