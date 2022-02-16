@@ -79,16 +79,16 @@ func (c *Converter) decode(hash string, data []byte) (map[string]interface{}, *E
 	}
 
 	// convert form "avro native" to a clean go value.
-	parsed := c.convertAvroToGo(original)
+	parsed := c.ConvertAvroToGo(original)
 
 	return parsed.(map[string]interface{}), &EventSource{original, codec.Schema()}, nil
 }
 
-func (c *Converter) convertAvroToGo(input interface{}) interface{} {
+func (c *Converter) ConvertAvroToGo(input interface{}) interface{} {
 	switch input := input.(type) {
 	case map[string]interface{}:
 		if result, ok := c.simplifyAvroType(input); ok {
-			return c.convertAvroToGo(result)
+			return c.ConvertAvroToGo(result)
 		}
 
 		result := make(map[string]interface{}, len(input))
@@ -97,7 +97,7 @@ func (c *Converter) convertAvroToGo(input interface{}) interface{} {
 			if c.options.ToLowerCase {
 				key = strings.ToLower(key)
 			}
-			result[key] = c.convertAvroToGo(value)
+			result[key] = c.ConvertAvroToGo(value)
 		}
 
 		return result
@@ -105,7 +105,7 @@ func (c *Converter) convertAvroToGo(input interface{}) interface{} {
 	case []interface{}:
 		result := make([]interface{}, 0, len(input))
 		for _, value := range input {
-			result = append(result, c.convertAvroToGo(value))
+			result = append(result, c.ConvertAvroToGo(value))
 		}
 
 		return result
