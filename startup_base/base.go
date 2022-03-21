@@ -5,8 +5,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"os"
 	"path"
-
-	"github.com/x-cray/logrus-prefixed-formatter"
 )
 
 var BuildPackage string
@@ -36,11 +34,10 @@ func (opts *BaseOptions) Initialize() {
 		logrus.SetFormatter(&logrus.JSONFormatter{})
 
 	} else {
-		logrus.SetFormatter(&prefixed.TextFormatter{
-			FullTimestamp:   true,
-			DisableSorting:  false,
-			ForceFormatting: true,
-			ForceColors:     opts.ForceColor,
+		logrus.SetFormatter(&logrus.TextFormatter{
+			FullTimestamp:  true,
+			DisableSorting: false,
+			ForceColors:    opts.ForceColor,
 		})
 	}
 
