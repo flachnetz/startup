@@ -35,9 +35,11 @@ func (opts *BaseOptions) Initialize() {
 
 	} else {
 		logrus.SetFormatter(&logrus.TextFormatter{
-			FullTimestamp:  true,
-			DisableSorting: false,
-			ForceColors:    opts.ForceColor,
+			FullTimestamp:          true,
+			DisableSorting:         false,
+			DisableLevelTruncation: true,
+			PadLevelText:           true,
+			ForceColors:            opts.ForceColor,
 		})
 	}
 
