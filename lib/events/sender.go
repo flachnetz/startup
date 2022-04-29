@@ -3,11 +3,11 @@ package events
 import (
 	"context"
 	"crypto/tls"
+	"database/sql"
+	goerr "errors"
 	confluent "github.com/Landoop/schema-registry"
 	kafka2 "github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/flachnetz/startup/v2/startup_logrus"
-	consul "github.com/hashicorp/consul/api"
-	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"io"
@@ -18,9 +18,10 @@ import (
 	"strings"
 	"time"
 	"unicode"
-
-	"github.com/flachnetz/startup/v2/lib/schema"
 )
+
+var ErrNoAsyncSupport = goerr.New("event sender does not support async event sending")
+var ErrNoTxSupport = goerr.New("event sender does not support transactional event sending")
 
 func TimeToEventTimestamp(ts time.Time) int64 {
 	return ts.UnixNano() / int64(time.Millisecond)
@@ -42,80 +43,40 @@ type KafkaSenderConfig struct {
 var log = logrus.WithField("prefix", "events")
 
 type Event interface {
-	// Returns the avro schema of this event
+	// Schema returns the avro schema of this event
 	Schema() string
 
-	// Writes the event (in avro format) to the given writer.
+	// Serialize writes the event (in avro format) to the given writer.
 	Serialize(io.Writer) error
 }
 
 type EventSender interface {
+	// Close the event sender and flush all pending events.
+	// Waits for all events to be send out.
+	Close() error
+}
 
-	// Init event schemas WITHOUT sending the events. This method should be used during startup
-	// to register schemas in the beginning, so that the service has all schemas cached.
-	Init(event []Event) error
+type AsyncEventSender interface {
+	EventSender
 
 	// Send the given event. This method should be non blocking and
 	// must never fail. You might want to use a channel for buffering
 	// events internally. Errors will be logged to the terminal
 	// but otherwise ignored.
 	Send(event Event)
-
-	// SendBlocking the given event. This is an sync method, it will failed in case the msg was not delivered.
-	SendBlocking(event Event) error
-
-	// Close the event sender and flush all pending events.
-	// Waits for all events to be send out.
-	Close() error
 }
 
-// Global instance to send events. Defaults to a simple sender that prints
-// events using a logger instance.
+type TransactionalEventSender interface {
+	EventSender
+
+	// SendInTx Send Sends the message in the transaction.
+	// Returns an error, if sending fails.
+	SendInTx(ctx context.Context, tx *sql.Tx, event Event) error
+}
+
+// Events is the global instance to send events.
+// Defaults to a simple sender that prints events using a logger instance.
 var Events EventSender = LogrusEventSender{logrus.WithField("prefix", "events")}
-
-// A slice of event senders that is also an event sender.
-type EventSenders []EventSender
-
-func (senders EventSenders) Init(event []Event) error {
-	for _, sender := range senders {
-		if err := sender.Init(event); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (senders EventSenders) Send(event Event) {
-	for _, sender := range senders {
-		sender.Send(event)
-	}
-}
-
-func (senders EventSenders) SendBlocking(event Event) error {
-	var errGroup error
-
-	for _, sender := range senders {
-		err := sender.SendBlocking(event)
-		if err != nil {
-			errGroup = multierror.Append(errGroup, err)
-		}
-	}
-
-	return errGroup
-}
-
-func (senders EventSenders) Close() error {
-	var errGroup error
-
-	for _, sender := range senders {
-		if err := sender.Close(); err != nil {
-			errGroup = multierror.Append(errGroup, err)
-		}
-	}
-
-	return errGroup
-}
 
 // ParseEventSenders parses event sender config from string.
 // an example could be
@@ -132,7 +93,6 @@ func (senders EventSenders) Close() error {
 //
 // Schema registries:
 //
-// consul,address=URL: uses consul as schema registry
 // confluent,address=URL: uses confluent as schema registry
 //
 // Other options:
@@ -143,37 +103,35 @@ func ParseEventSenders(clientId string, topicsFunc TopicsFunc, config string, di
 	reSenderType := regexp.MustCompile(`^([a-z]+)`)
 	reArgument := regexp.MustCompile(`^,([a-zA-Z]+)=([^,]+)`)
 
-	var eventSenders EventSenders
-
-	for config != "" {
-		match := reSenderType.FindStringSubmatch(config)
-		if match == nil {
-			return nil, errors.Errorf("expected event sender type at '%s'", shorten(config))
-		}
-
-		eventSenderType := match[1]
-		config = config[len(match[0]):]
-
-		argumentValues := map[string]string{}
-		for len(config) > 0 && config[0] != ' ' {
-			match := reArgument.FindStringSubmatch(config)
-			if match == nil {
-				return nil, errors.Errorf("expected argument at '%s'", shorten(config))
-			}
-
-			argumentValues[match[1]] = match[2]
-			config = config[len(match[0]):]
-		}
-
-		eventSender, err := initializeEventSender(clientId, topicsFunc, eventSenderType, argumentValues, disableTls, configMap)
-		if err != nil {
-			return nil, errors.WithMessage(err, "initializinig event sender")
-		}
-
-		eventSenders = append(eventSenders, eventSender)
+	if config == "" {
+		return NoopEventSender{}, nil
 	}
 
-	return eventSenders, nil
+	match := reSenderType.FindStringSubmatch(config)
+	if match == nil {
+		return nil, errors.Errorf("expected event sender type at '%s'", shorten(config))
+	}
+
+	eventSenderType := match[1]
+	config = config[len(match[0]):]
+
+	argumentValues := map[string]string{}
+	for len(config) > 0 && config[0] != ' ' {
+		match := reArgument.FindStringSubmatch(config)
+		if match == nil {
+			return nil, errors.Errorf("expected argument at '%s'", shorten(config))
+		}
+
+		argumentValues[match[1]] = match[2]
+		config = config[len(match[0]):]
+	}
+
+	eventSender, err := initializeEventSender(clientId, topicsFunc, eventSenderType, argumentValues, disableTls, configMap)
+	if err != nil {
+		return nil, errors.WithMessage(err, "initializing event sender")
+	}
+
+	return eventSender, nil
 }
 
 func initializeEventSender(clientId string, topicsFunc TopicsFunc, senderType string, arguments map[string]string, disableTls bool, configMap map[string]interface{}) (EventSender, error) {
@@ -194,8 +152,12 @@ func initializeEventSender(clientId string, topicsFunc TopicsFunc, senderType st
 
 		return GZIPEventSender(arguments["file"])
 
-	case "consul", "confluent":
-		encoder, err := getEncoder(senderType, arguments)
+	case "database":
+		lookupTopic := topicForEventFunc(topicsFunc(1).TopicForType)
+		return &PostgresEventSender{lookupTopic}, nil
+
+	case "confluent":
+		encoder, err := getEncoder(arguments)
 		if err != nil {
 			return nil, errors.WithMessage(err, "create encoder")
 		}
@@ -253,7 +215,6 @@ func initializeEventSender(clientId string, topicsFunc TopicsFunc, senderType st
 		}
 		log.Infof("setting buffer size to %d", bufferSize)
 
-		var eventSender EventSender
 		senderConfig := KafkaSenderConfig{
 			Encoder:         encoder,
 			AllowBlocking:   arguments["blocking"] == "true",
@@ -261,29 +222,39 @@ func initializeEventSender(clientId string, topicsFunc TopicsFunc, senderType st
 			TopicsConfig:    topics,
 		}
 
-		eventSender, err = NewKafkaConfluentSender(producer, senderConfig)
+		eventSender, err := NewKafkaConfluentSender(producer, senderConfig)
 		if err != nil {
 			return nil, errors.WithMessage(err, "kafka sender")
 		}
 
-		if len(topics.SchemaInitEvents) > 0 {
-			var initEvents []Event
-			for _, v := range topics.SchemaInitEvents {
-				initEvents = append(initEvents, v)
-			}
-			err := eventSender.Init(initEvents)
-			if err != nil {
-				log.Errorf("event schema init failed: %s", err.Error())
-				if topics.FailOnSchemaInit {
-					return nil, errors.WithMessage(err, "event schema init failed")
-				}
-			}
+		if err := initializeKafkaSender(eventSender, topics); err != nil {
+			return nil, err
 		}
 
 		return eventSender, nil
 	}
 
 	return nil, errors.Errorf("unknown event sender type: %s", senderType)
+}
+
+func initializeKafkaSender(eventSender *KafkaConfluentSender, topics EventTopics) error {
+	if len(topics.SchemaInitEvents) == 0 {
+		return nil
+	}
+
+	var initEvents []Event
+	for _, v := range topics.SchemaInitEvents {
+		initEvents = append(initEvents, v)
+	}
+
+	if err := eventSender.Init(initEvents); err != nil {
+		log.Errorf("event schema init failed: %s", err.Error())
+		if topics.FailOnSchemaInit {
+			return errors.WithMessage(err, "event schema init failed")
+		}
+	}
+
+	return nil
 }
 
 func requireArguments(arguments map[string]string, names ...string) error {
@@ -316,47 +287,22 @@ func isCommaOrSpace(ch rune) bool {
 	return ch == ',' || unicode.IsSpace(ch)
 }
 
-func newConsulClient(address string) (*consul.Client, error) {
-	config := consul.DefaultConfig()
-	config.Address = address
-
-	return consul.NewClient(config)
-}
-
-func getEncoder(schemaRegistryType string, arguments map[string]string) (Encoder, error) {
-	switch schemaRegistryType {
-	case "consul":
-		if err := requireArguments(arguments, "kafka", "address"); err != nil {
-			return nil, errors.WithMessage(err, "consul event sender")
-		}
-
-		consulClient, err := newConsulClient(arguments["address"])
-		if err != nil {
-			return nil, errors.Errorf("consul client")
-		}
-
-		return NewConsulAvroEncoder(schema.NewCachedRegistry(
-			schema.NewConsulSchemaRegistry(consulClient))), nil
-
-	case "confluent":
-		if err := requireArguments(arguments, "kafka", "address"); err != nil {
-			return nil, errors.WithMessage(err, "confluent event sender")
-		}
-		httpClient := &http.Client{
-			Timeout: 3 * time.Second,
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
-				},
-			},
-		}
-		confluentClient, err := confluent.NewClient(arguments["address"], confluent.UsingClient(httpClient))
-		if err != nil {
-			return nil, errors.WithMessage(err, "confluent registry client")
-		}
-
-		return NewAvroConfluentEncoder(confluentClient), nil
-	default:
-		return nil, errors.New("no encoder found for schema registry type " + schemaRegistryType)
+func getEncoder(arguments map[string]string) (Encoder, error) {
+	if err := requireArguments(arguments, "kafka", "address"); err != nil {
+		return nil, errors.WithMessage(err, "confluent event sender")
 	}
+	httpClient := &http.Client{
+		Timeout: 3 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}
+	confluentClient, err := confluent.NewClient(arguments["address"], confluent.UsingClient(httpClient))
+	if err != nil {
+		return nil, errors.WithMessage(err, "confluent registry client")
+	}
+
+	return NewAvroConfluentEncoder(confluentClient), nil
 }

@@ -9,21 +9,9 @@ type WriterEventSender struct {
 	io.Writer
 }
 
-func (sender WriterEventSender) Init(event []Event) error {
-	return nil
-}
-
 func (sender WriterEventSender) Send(event Event) {
-	if err := sender.SendBlocking(event); err != nil {
-		log.Errorf("Failed to write event %v: %s", event, err)
-	}
-}
-
-func (sender WriterEventSender) SendBlocking(event Event) error {
 	bytes, _ := json.Marshal(event)
-
-	_, err := sender.Write(bytes)
-	return err
+	_, _ = sender.Write(bytes)
 }
 
 func (sender WriterEventSender) Close() error {

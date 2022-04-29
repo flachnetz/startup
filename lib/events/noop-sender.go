@@ -1,15 +1,16 @@
 package events
 
-type NoopEventSender struct{}
+import (
+	"context"
+	"database/sql"
+)
 
-func (s NoopEventSender) Init([]Event) error {
-	return nil
-}
+type NoopEventSender struct{}
 
 func (NoopEventSender) Send(Event) {
 }
 
-func (NoopEventSender) SendBlocking(Event) error {
+func (s NoopEventSender) SendInTx(ctx context.Context, tx *sql.Tx, event Event) error {
 	return nil
 }
 

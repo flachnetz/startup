@@ -38,7 +38,7 @@ func (topics EventTopics) TopicForType(t reflect.Type) string {
 	return topics.Fallback
 }
 
-func (topics EventTopics) Topics() kafka.Topics {
+func (topics *EventTopics) Topics() kafka.Topics {
 	var result kafka.Topics
 
 	for _, topic := range topics.EventTypes {

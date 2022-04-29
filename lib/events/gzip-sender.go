@@ -12,10 +12,6 @@ type gzipEventSender struct {
 	events  chan Event
 }
 
-func (f *gzipEventSender) Init(event []Event) error {
-	return nil
-}
-
 func GZIPEventSender(filename string) (*gzipEventSender, error) {
 	fp, err := os.Create(filename)
 	if err != nil {
@@ -49,12 +45,7 @@ func GZIPEventSender(filename string) (*gzipEventSender, error) {
 }
 
 func (f *gzipEventSender) Send(event Event) {
-	_ = f.SendBlocking(event)
-}
-
-func (f *gzipEventSender) SendBlocking(event Event) error {
 	f.events <- event
-	return nil
 }
 
 func (f *gzipEventSender) Close() error {
