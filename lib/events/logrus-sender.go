@@ -1,6 +1,8 @@
 package events
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -11,25 +13,25 @@ type LogrusEventSender struct {
 	logrus.FieldLogger
 }
 
-func (l LogrusEventSender) Init(events []Event) error {
-	// noop
-	return nil
-}
-
 func (l LogrusEventSender) Send(event Event) {
-	if err := l.SendBlocking(event); err != nil {
-		log.Errorf("Failed to log event %+v: %s", event, err)
+	var buf strings.Builder
+
+	if err := json.NewEncoder(&buf).Encode(event); err != nil {
+		l.Warnf("Failed to encode event: %s", err)
+		return
 	}
+
+	l.Info("Non transactional event:", buf.String())
 }
 
-func (l LogrusEventSender) SendBlocking(event Event) error {
+func (l LogrusEventSender) SendInTx(ctx context.Context, tx *sql.Tx, event Event) error {
 	var buf strings.Builder
 
 	if err := json.NewEncoder(&buf).Encode(event); err != nil {
 		return errors.WithMessage(err, "encode event")
 	}
 
-	l.Info(buf.String())
+	l.Info("Transactional event:", buf.String())
 	return nil
 }
 

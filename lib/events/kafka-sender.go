@@ -3,13 +3,11 @@ package events
 import (
 	"context"
 	rdkafka "github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/flachnetz/startup/v2/lib/kafka"
+	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"sync"
-	"time"
-
-	"github.com/flachnetz/startup/v2/lib/kafka"
-	"github.com/flachnetz/startup/v2/startup_base"
 )
 
 type RecordHeader struct {
@@ -36,7 +34,6 @@ type KafkaConfluentSender struct {
 	eventBufferSize int
 	eventsWg        sync.WaitGroup
 	encoder         Encoder
-	fallbackEncoder Encoder
 	kafkaProducer   *rdkafka.Producer
 
 	allowBlocking bool
@@ -55,7 +52,6 @@ func NewKafkaConfluentSender(producer *rdkafka.Producer, senderConfig KafkaSende
 		events:          make(chan Event, senderConfig.EventBufferSize),
 		eventBufferSize: senderConfig.EventBufferSize,
 		encoder:         senderConfig.Encoder,
-		fallbackEncoder: jsonEncoder{},
 		kafkaProducer:   producer,
 		allowBlocking:   senderConfig.AllowBlocking,
 		topicForEvent:   topicForEventFunc(senderConfig.TopicsConfig.TopicForType),
@@ -148,34 +144,6 @@ func (s *KafkaConfluentSender) sendAsync(event Event) error {
 	}
 
 	return nil
-}
-
-func (s *KafkaConfluentSender) SendBlocking(event Event) error {
-	msg, err := s.buildKafkaMsg(event)
-	if err != nil {
-		return err
-	}
-
-	timer := time.NewTimer(5 * time.Second)
-	defer timer.Stop()
-
-	select {
-	case <-timer.C:
-		return errors.Errorf("sending of message %+v timed out", event)
-
-	default:
-		syncChan := make(chan rdkafka.Event, 1)
-
-		if err := s.kafkaProducer.Produce(msg, syncChan); err != nil {
-			return errors.WithMessagef(err, "failed to send message %+v", event)
-		}
-
-		// wait for send to finish
-		<-syncChan
-
-		// there might have been an async error, so return async error here
-		return msg.TopicPartition.Error
-	}
 }
 
 func (s *KafkaConfluentSender) buildKafkaMsg(event Event) (*rdkafka.Message, error) {
