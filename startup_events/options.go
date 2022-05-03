@@ -145,6 +145,8 @@ func kafkaSender(opts *EventOptions, clientId string) (*kafka.Producer, error) {
 
 	if opts.Async.Kafka.DisableTLS {
 		kafkaConfig["security.protocol"] = "plaintext"
+	} else {
+		kafkaConfig["security.protocol"] = "ssl"
 	}
 
 	kafkaClient, err := kafka.NewProducer(&kafkaConfig)
