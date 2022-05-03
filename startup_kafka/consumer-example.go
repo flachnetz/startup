@@ -55,7 +55,6 @@ func NewConsumer(options ConsumerOptions) *Consumer {
 	startup_base.FatalOnError(err, "create kafka consumer failed")
 	c.consumer = consumer
 
-
 	return c
 }
 
