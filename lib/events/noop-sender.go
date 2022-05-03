@@ -7,13 +7,13 @@ import (
 
 type NoopEventSender struct{}
 
-func (NoopEventSender) Send(Event) {
+func (n NoopEventSender) SendAsync(event Event) {
 }
 
-func (s NoopEventSender) SendInTx(ctx context.Context, tx *sql.Tx, event Event) error {
+func (n NoopEventSender) SendInTx(ctx context.Context, tx *sql.Tx, event Event) error {
 	return nil
 }
 
-func (NoopEventSender) Close() error {
+func (n NoopEventSender) Close() error {
 	return nil
 }
