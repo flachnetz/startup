@@ -1,18 +1,19 @@
 package events
 
+import (
+	"context"
+	"github.com/jmoiron/sqlx"
+)
+
 type NoopEventSender struct{}
 
-func (s NoopEventSender) Init([]Event) error {
+func (n NoopEventSender) SendAsync(event Event) {
+}
+
+func (n NoopEventSender) SendInTx(ctx context.Context, tx sqlx.ExecerContext, event Event) error {
 	return nil
 }
 
-func (NoopEventSender) Send(Event) {
-}
-
-func (NoopEventSender) SendBlocking(Event) error {
-	return nil
-}
-
-func (NoopEventSender) Close() error {
+func (n NoopEventSender) Close() error {
 	return nil
 }
