@@ -3,20 +3,38 @@ package events
 import (
 	"context"
 	"database/sql"
+	"github.com/jackc/pgtype"
 	"github.com/pkg/errors"
 )
 
 func WriteToOutbox(ctx context.Context, tx *sql.Tx, metadata EventMetadata, payload []byte) error {
-	// TODO adjust to goharvester table format
-
 	topic := metadata.Topic
 	key := metadata.Key
 	headers := metadata.Headers.ToJSON()
 
+	header_keys := make([]string, 0, len(headers))
+	header_values := make([]string, 0, len(headers))
+
+	for _, header := range metadata.Headers {
+		header_keys = append(header_keys, header.Key)
+		header_values = append(header_keys, header.Value)
+	}
+
 	// insert event into database
-	stmt := "INSERT INTO kafka_outbox (topic, key, headers, payload) VALUES ($1, $2, $3, $4)"
-	_, err := tx.ExecContext(ctx, stmt, topic, key, headers, payload)
+	stmt := "INSERT INTO kafka_outbox (kafka_topic, kafka_key, kafka_value, kafka_header_keys, kafka_header_values) VALUES ($1, $2, $3, $4, $5)"
+	_, err := tx.ExecContext(ctx, stmt, topic, toText(key), toTextArray(header_keys), toTextArray(header_values), payload)
 	return errors.WithMessage(err, "write event into database")
+}
+
+func toText(value *string) pgtype.Text {
+	var arr pgtype.Text
+	_ = arr.Set(value)
+	return arr
+}
+func toTextArray(values []string) pgtype.TextArray {
+	var arr pgtype.TextArray
+	_ = arr.Set(values)
+	return arr
 }
 
 func CreateOutbox(ctx context.Context, db *sql.DB) error {
@@ -27,19 +45,15 @@ func CreateOutbox(ctx context.Context, db *sql.DB) error {
 
 	createTable := `
 		CREATE TABLE IF NOT EXISTS kafka_outbox (
-		  id      BIGSERIAL NOT NULL PRIMARY KEY,
-		
-		  -- the topic to write the message to.
-		  topic   TEXT      NOT NULL,
-		
-		  -- an optional key that will be used as the kafka message key
-		  KEY     TEXT      NULL,
-		
-		  -- a json encoded list of {key, value} pairs
-		  headers JSON      NULL,
-		
-		  -- the payload of this kafka message
-		  payload BYTEA     NOT NULL
+		  	id     				BIGSERIAL NOT NULL PRIMARY KEY,
+			create_time         TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP ,
+			leader_id           UUID NULL DEFAULT NULL,
+			
+			kafka_topic         TEXT NOT NULL,
+			kafka_key           TEXT NULL,
+			kafka_value         BYTEA NOT NULL,
+			kafka_header_keys   TEXT[] NOT NULL,
+			kafka_header_values TEXT[] NOT NULL,
 		)
 	`
 
