@@ -3,11 +3,11 @@ package events
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/binary"
 	"encoding/json"
 	confluent "github.com/Landoop/schema-registry"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"io"
 	"reflect"
@@ -80,7 +80,7 @@ func (ev *eventSender) SendAsync(event Event) {
 	}
 }
 
-func (ev *eventSender) SendInTx(ctx context.Context, tx *sql.Tx, event Event) error {
+func (ev *eventSender) SendInTx(ctx context.Context, tx sqlx.ExecerContext, event Event) error {
 	meta, avro, err := ev.encodeAvro(event)
 	if err != nil {
 		return errors.WithMessage(err, "encode event")
