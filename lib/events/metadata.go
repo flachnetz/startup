@@ -1,7 +1,6 @@
 package events
 
 import (
-	"encoding/json"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/pkg/errors"
 	"reflect"
@@ -25,16 +24,10 @@ func (topics *NormalizedEventTypes) MetadataOf(event Event) (*EventMetadata, err
 
 	if msg, ok := event.(*KafkaEvent); ok {
 		key = &msg.Key
-
-		for _, h := range msg.Headers {
-			headers = append(headers, EventHeader{
-				Key:   string(h.Key),
-				Value: string(h.Value),
-			})
-		}
+		headers = msg.Headers
 
 		// unwrap the actual event
-		event = msg
+		event = msg.Event
 	}
 
 	// now we can get the actual event type
@@ -70,13 +63,4 @@ func (headers EventHeaders) ToKafka() []kafka.Header {
 	}
 
 	return result
-}
-
-func (headers EventHeaders) ToJSON() []byte {
-	if len(headers) == 0 {
-		return nil
-	}
-
-	bytes, _ := json.Marshal(headers)
-	return bytes
 }
