@@ -30,9 +30,9 @@ func MustParseCommandLineWithOptions(opts interface{}, options flags.Options) {
 		cause := errors.Cause(err)
 
 		if cause, ok := cause.(*flags.Error); ok && cause.Type == flags.ErrHelp {
-			fmt.Fprintln(os.Stdout, cause)
+			_, _ = fmt.Fprintln(os.Stdout, cause)
 		} else {
-			fmt.Fprintln(os.Stderr, err)
+			_, _ = fmt.Fprintln(os.Stderr, err)
 		}
 
 		os.Exit(1)
@@ -65,7 +65,7 @@ func ParseCommandLineWithOptions(opts interface{}, options flags.Options) error 
 	v := validator.New()
 
 	// validate host:port values
-	v.RegisterValidation("hostport", func(fl validator.FieldLevel) bool {
+	_ = v.RegisterValidation("hostport", func(fl validator.FieldLevel) bool {
 		value := fl.Field().Interface().(string)
 		_, _, err := net.SplitHostPort(value)
 		return err == nil
