@@ -1,10 +1,10 @@
 package startup_events
 
 import (
-	"crypto/tls"
 	confluent "github.com/Landoop/schema-registry"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/flachnetz/startup/v2"
+	"github.com/flachnetz/startup/v2/startup_tracing"
 	"github.com/pkg/errors"
 	"io"
 	"net/http"
@@ -139,13 +139,12 @@ func kafkaSender(opts *EventOptions, clientId string) (*kafka.Producer, error) {
 		"partitioner": "murmur2_random",
 	}
 
-	enableTLS := !opts.Async.Kafka.DisableTLS
-	if enableTLS {
-		kafkaConfig["security.protocol"] = "ssl"
-	}
-
 	for key, value := range opts.Async.Kafka.Properties {
 		kafkaConfig[key] = value
+	}
+
+	if opts.Async.Kafka.DisableTLS {
+		kafkaConfig["security.protocol"] = "plaintext"
 	}
 
 	kafkaClient, err := kafka.NewProducer(&kafkaConfig)
@@ -157,14 +156,11 @@ func kafkaSender(opts *EventOptions, clientId string) (*kafka.Producer, error) {
 }
 
 func confluentClient(url startup.URL) (*confluent.Client, error) {
-	httpClient := &http.Client{
-		Timeout: 3 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
+	httpClient := startup_tracing.WithSpanPropagation(
+		&http.Client{
+			Timeout: 3 * time.Second,
 		},
-	}
+	)
 
 	return confluent.NewClient(url.String(), confluent.UsingClient(httpClient))
 }
