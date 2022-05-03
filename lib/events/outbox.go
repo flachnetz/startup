@@ -4,10 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"github.com/jackc/pgtype"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
 
-func WriteToOutbox(ctx context.Context, tx *sql.Tx, metadata EventMetadata, payload []byte) error {
+func WriteToOutbox(ctx context.Context, tx sqlx.ExecerContext, metadata EventMetadata, payload []byte) error {
 	topic := metadata.Topic
 	key := metadata.Key
 	headers := metadata.Headers.ToJSON()

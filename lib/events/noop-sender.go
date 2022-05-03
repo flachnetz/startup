@@ -2,7 +2,7 @@ package events
 
 import (
 	"context"
-	"database/sql"
+	"github.com/jmoiron/sqlx"
 )
 
 type NoopEventSender struct{}
@@ -10,7 +10,7 @@ type NoopEventSender struct{}
 func (n NoopEventSender) SendAsync(event Event) {
 }
 
-func (n NoopEventSender) SendInTx(ctx context.Context, tx *sql.Tx, event Event) error {
+func (n NoopEventSender) SendInTx(ctx context.Context, tx sqlx.ExecerContext, event Event) error {
 	return nil
 }
 

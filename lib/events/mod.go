@@ -2,7 +2,7 @@ package events
 
 import (
 	"context"
-	"database/sql"
+	"github.com/jmoiron/sqlx"
 )
 
 var Sender EventSender = &NoopEventSender{}
@@ -17,6 +17,6 @@ func SendAsync(event Event) {
 // SendTx ensures that the event is sent if the transaction is committed successfully.
 // If the transaction rollbacks, the event will be discarded.
 //
-func SendTx(ctx context.Context, tx *sql.Tx, event Event) error {
+func SendTx(ctx context.Context, tx sqlx.ExecerContext, event Event) error {
 	return Sender.SendInTx(ctx, tx, event)
 }

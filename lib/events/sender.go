@@ -2,7 +2,7 @@ package events
 
 import (
 	"context"
-	"database/sql"
+	"github.com/jmoiron/sqlx"
 	"github.com/sirupsen/logrus"
 	"io"
 	"time"
@@ -31,7 +31,7 @@ type EventSender interface {
 
 	// SendInTx sends the message in the transaction.
 	// Returns an error, if sending fails.
-	SendInTx(ctx context.Context, tx *sql.Tx, event Event) error
+	SendInTx(ctx context.Context, tx sqlx.ExecerContext, event Event) error
 
 	// Close the event sender and flush all pending events.
 	// Waits for all events to be send out.
