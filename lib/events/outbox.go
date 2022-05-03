@@ -54,7 +54,7 @@ func CreateOutbox(ctx context.Context, db *sql.DB) error {
 			kafka_key           TEXT NULL,
 			kafka_value         BYTEA NOT NULL,
 			kafka_header_keys   TEXT[] NOT NULL,
-			kafka_header_values TEXT[] NOT NULL,
+			kafka_header_values TEXT[] NOT NULL
 		)
 	`
 
