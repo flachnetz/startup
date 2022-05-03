@@ -103,8 +103,8 @@ func (ev *eventSender) launchAsyncTask() {
 
 		defer func() {
 			if ev.KafkaSender != nil {
-				for ev.KafkaSender.Flush(5_000) > 0 {
-					log.Warnf("Waiting for queued messages to be send.")
+				if count := ev.KafkaSender.Flush(5_000); count > 0 {
+					log.Warnf("Flush says there are still %d queued messages to be send.", count)
 				}
 			}
 		}()

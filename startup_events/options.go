@@ -116,7 +116,7 @@ func fileSender(file string) (io.WriteCloser, error) {
 		return nil, nil
 	}
 
-	return os.Open(file)
+	return os.OpenFile(file, os.O_CREATE|os.O_WRONLY, 0644)
 }
 
 func kafkaSender(opts *EventOptions, clientId string) (*kafka.Producer, error) {
