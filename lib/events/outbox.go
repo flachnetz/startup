@@ -46,7 +46,7 @@ func CreateOutbox(ctx context.Context, db *sql.DB) error {
 
 	createTable := `
 		CREATE TABLE IF NOT EXISTS kafka_outbox (
-		  	id     				BIGSERIAL NOT NULL PRIMARY KEY,
+			id                  BIGSERIAL NOT NULL PRIMARY KEY,
 			create_time         TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP ,
 			leader_id           UUID NULL DEFAULT NULL,
 			

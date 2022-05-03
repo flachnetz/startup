@@ -23,7 +23,7 @@ type EventOptions struct {
 
 	Async struct {
 		Kafka struct {
-			Addr        string                 `long:"event-sender-kafka-addr" default:"kafka.shared.svc.cluster.local" description:"Kafka bootstrap hosts"`
+			Addr        string                 `long:"event-sender-kafka-addr" default:"kafka.shared.svc.cluster.local:9093" description:"Kafka bootstrap hosts"`
 			DisableTLS  bool                   `long:"event-sender-kafka-disable-tls" description:"Disable TLS, might simplify local testing"`
 			Replication int16                  `long:"event-sender-kafka-replication-factor" default:"3" description:"Replication factor to use when creating kafka topics"`
 			Properties  map[string]interface{} `long:"event-sender-kafka-properties" description:"A map containing standard librdkafka configuration properties as documented in: https://github.com/edenhill/librdkafka/tree/master/CONFIGURATION.md"`
@@ -143,6 +143,7 @@ func kafkaSender(opts *EventOptions, clientId string) (*kafka.Producer, error) {
 		kafkaConfig[key] = value
 	}
 
+	// enable or disable ssl
 	if opts.Async.Kafka.DisableTLS {
 		kafkaConfig["security.protocol"] = "plaintext"
 	} else {
