@@ -11,19 +11,18 @@ import (
 func WriteToOutbox(ctx context.Context, tx sqlx.ExecerContext, metadata EventMetadata, payload []byte) error {
 	topic := metadata.Topic
 	key := metadata.Key
-	headers := metadata.Headers.ToJSON()
 
-	header_keys := make([]string, 0, len(headers))
-	header_values := make([]string, 0, len(headers))
+	header_keys := make([]string, 0, len(metadata.Headers))
+	header_values := make([]string, 0, len(metadata.Headers))
 
 	for _, header := range metadata.Headers {
 		header_keys = append(header_keys, header.Key)
-		header_values = append(header_keys, header.Value)
+		header_values = append(header_values, header.Value)
 	}
 
 	// insert event into database
 	stmt := "INSERT INTO kafka_outbox (kafka_topic, kafka_key, kafka_value, kafka_header_keys, kafka_header_values) VALUES ($1, $2, $3, $4, $5)"
-	_, err := tx.ExecContext(ctx, stmt, topic, toText(key), toTextArray(header_keys), toTextArray(header_values), payload)
+	_, err := tx.ExecContext(ctx, stmt, topic, toText(key), payload, toTextArray(header_keys), toTextArray(header_values))
 	return errors.WithMessage(err, "write event into database")
 }
 
