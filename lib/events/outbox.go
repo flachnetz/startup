@@ -3,14 +3,21 @@ package events
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"github.com/flachnetz/startup/v2/lib"
 	"github.com/jackc/pgtype"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
+	"time"
 )
 
 func WriteToOutbox(ctx context.Context, tx sqlx.ExecerContext, metadata EventMetadata, payload []byte) error {
 	topic := metadata.Topic
 	key := metadata.Key
+
+	if key == nil {
+		key = lib.PtrOf(fmt.Sprintf("%d", time.Now().UnixMilli()))
+	}
 
 	header_keys := make([]string, 0, len(metadata.Headers))
 	header_values := make([]string, 0, len(metadata.Headers))
@@ -50,7 +57,7 @@ func CreateOutbox(ctx context.Context, db *sql.DB) error {
 			leader_id           UUID NULL DEFAULT NULL,
 			
 			kafka_topic         TEXT NOT NULL,
-			kafka_key           TEXT NULL,
+			kafka_key           TEXT NOT NULL,
 			kafka_value         BYTEA NOT NULL,
 			kafka_header_keys   TEXT[] NOT NULL,
 			kafka_header_values TEXT[] NOT NULL
