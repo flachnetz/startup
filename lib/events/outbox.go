@@ -28,7 +28,7 @@ func WriteToOutbox(ctx context.Context, tx sqlx.ExecerContext, metadata EventMet
 	}
 
 	// insert event into database
-	stmt := "INSERT INTO kafka_outbox (kafka_topic, kafka_key, kafka_value, kafka_header_keys, kafka_header_values) VALUES ($1, $2, $3, $4, $5)"
+	stmt := "INSERT INTO public.kafka_outbox (kafka_topic, kafka_key, kafka_value, kafka_header_keys, kafka_header_values) VALUES ($1, $2, $3, $4, $5)"
 	_, err := tx.ExecContext(ctx, stmt, topic, toText(key), payload, toTextArray(header_keys), toTextArray(header_values))
 	return errors.WithMessage(err, "write event into database")
 }
@@ -51,7 +51,7 @@ func CreateOutbox(ctx context.Context, db *sql.DB) error {
 	}
 
 	createTable := `
-		CREATE TABLE IF NOT EXISTS kafka_outbox (
+		CREATE TABLE IF NOT EXISTS PUBLIC.kafka_outbox (
 			id                  BIGSERIAL NOT NULL PRIMARY KEY,
 			create_time         TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP ,
 			leader_id           UUID NULL DEFAULT NULL,
