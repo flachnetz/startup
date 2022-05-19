@@ -3,6 +3,7 @@ package startup_base
 import (
 	"fmt"
 	"github.com/sirupsen/logrus"
+	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 	"os"
 	"path"
 )
@@ -34,15 +35,12 @@ func (opts *BaseOptions) Initialize() {
 		logrus.SetFormatter(&logrus.JSONFormatter{})
 
 	} else {
-		logrus.SetFormatter(&logrus.TextFormatter{
-			FullTimestamp:          true,
-			DisableSorting:         false,
-			DisableLevelTruncation: true,
-			PadLevelText:           true,
-			ForceColors:            opts.ForceColor,
-			DisableColors:          !opts.ForceColor,
+		logrus.SetFormatter(&prefixed.TextFormatter{
+			FullTimestamp:   true,
+			DisableSorting:  false,
+			ForceFormatting: true,
+			ForceColors:     opts.ForceColor,
 		})
-		logrus.SetReportCaller(true)
 	}
 
 	fp, err := OpenWriter(opts.Logfile)
