@@ -40,7 +40,9 @@ func (opts *BaseOptions) Initialize() {
 			DisableLevelTruncation: true,
 			PadLevelText:           true,
 			ForceColors:            opts.ForceColor,
+			DisableColors:          !opts.ForceColor,
 		})
+		logrus.SetReportCaller(true)
 	}
 
 	fp, err := OpenWriter(opts.Logfile)
