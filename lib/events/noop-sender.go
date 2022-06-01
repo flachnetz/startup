@@ -7,7 +7,7 @@ import (
 
 type NoopEventSender struct{}
 
-func (n NoopEventSender) SendAsync(event Event) {
+func (n NoopEventSender) SendAsync(ctx context.Context, event Event) {
 }
 
 func (n NoopEventSender) SendInTx(ctx context.Context, tx sqlx.ExecerContext, event Event) error {

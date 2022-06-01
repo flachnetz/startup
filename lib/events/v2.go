@@ -7,13 +7,21 @@ import (
 	"encoding/json"
 	confluent "github.com/Landoop/schema-registry"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/flachnetz/startup/v2/startup_tracing"
 	"github.com/jmoiron/sqlx"
+	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
 	"github.com/pkg/errors"
 	"io"
 	"reflect"
 	"strings"
 	"sync"
 )
+
+type eventWithSpan struct {
+	event Event
+	span  opentracing.Span
+}
 
 type eventSender struct {
 	EventTypes *NormalizedEventTypes
@@ -25,7 +33,7 @@ type eventSender struct {
 	FileSender io.WriteCloser
 
 	// async events are queued
-	AsyncBufferCh chan Event
+	AsyncBufferCh chan eventWithSpan
 
 	// schema cache
 	SchemaIdCache map[reflect.Type]uint32
@@ -46,7 +54,7 @@ func NewInitializer(
 		bufferSize = 1024
 	}
 
-	asyncBufferCh := make(chan Event, bufferSize)
+	asyncBufferCh := make(chan eventWithSpan, bufferSize)
 
 	// normalize event topics to fix any issues with pointer/non pointer types
 	eventTopicsNormalized, err := eventTopics.Normalized()
@@ -72,9 +80,30 @@ func NewInitializer(
 	return eventSenderInitializer, nil
 }
 
-func (ev *eventSender) SendAsync(event Event) {
+func (ev *eventSender) SendAsync(ctx context.Context, event Event) {
+	var span opentracing.Span
+
+	if ev.KafkaSender != nil {
+		var parentContext opentracing.SpanContext
+
+		// get the current span from the context if there is one. We do this here
+		// so we can directly create and start the span before scheduling the event to
+		// the async send channel
+		parentSpan := startup_tracing.CurrentSpanFromContext(ctx)
+		if parentSpan != nil {
+			parentContext = parentSpan.Context()
+		}
+
+		// create a new span
+		span = opentracing.GlobalTracer().StartSpan("send",
+			ext.SpanKindRPCClient,
+			opentracing.ChildOf(parentContext))
+
+		span.SetTag("dd.service", "kafka")
+	}
+
 	select {
-	case ev.AsyncBufferCh <- event:
+	case ev.AsyncBufferCh <- eventWithSpan{event, span}:
 	default:
 		log.Warnf("Async event queue is full, discarding event %s", eventToString(event))
 	}
@@ -115,9 +144,9 @@ func (ev *eventSender) launchAsyncTask() {
 	}()
 }
 
-func (ev *eventSender) doSendAsync(event Event) {
+func (ev *eventSender) doSendAsync(event eventWithSpan) {
 	// ignore error as we're in the process of sending an async
-	if err := ev.writeToFile(event); err != nil {
+	if err := ev.writeToFile(event.event); err != nil {
 		log.Warnf("Failed to write async event to file: %s", err)
 	}
 
@@ -149,12 +178,12 @@ func (ev *eventSender) writeToFile(event Event) error {
 	return nil
 }
 
-func (ev *eventSender) sendToKafka(event Event) error {
+func (ev *eventSender) sendToKafka(event eventWithSpan) error {
 	if ev.KafkaSender == nil {
 		return nil
 	}
 
-	meta, avro, err := ev.encodeAvro(event)
+	meta, avro, err := ev.encodeAvro(event.event)
 	if err != nil {
 		return errors.WithMessage(err, "encode event")
 	}
@@ -169,11 +198,49 @@ func (ev *eventSender) sendToKafka(event Event) error {
 		Value:   avro,
 	}
 
-	if err := ev.KafkaSender.Produce(message, nil); err != nil {
+	var deliveryCh chan kafka.Event
+
+	if event.span != nil {
+		deliveryCh = make(chan kafka.Event)
+
+		event.span.SetTag("dd.resource", meta.Topic)
+		event.span.SetTag("kafka.topic", meta.Topic)
+		event.span.SetTag("avro.type", meta.Type.String())
+	}
+
+	if err := ev.KafkaSender.Produce(message, deliveryCh); err != nil {
 		return errors.WithMessage(err, "kafka produce")
 	}
 
+	if deliveryCh != nil && event.span != nil {
+		// produce was ok, message was scheduled, now wait for the delivery
+		go ev.deliveryHandler(deliveryCh, event.span)()
+	}
+
 	return nil
+}
+
+func (ev *eventSender) deliveryHandler(deliveryCh chan kafka.Event, span opentracing.Span) func() {
+	return func() {
+		report, ok := <-deliveryCh
+		if !ok || report == nil {
+			return
+		}
+
+		// value in report should be the kafka.Message that we've send out, but it should now
+		// include information about sending it.
+		if msg, ok := report.(*kafka.Message); ok {
+			defer span.Finish()
+
+			span.SetTag("kafka.partition", int(msg.TopicPartition.Partition))
+			span.SetTag("kafka.offset", int(msg.TopicPartition.Offset))
+
+			err := msg.TopicPartition.Error
+			if err != nil {
+				span.SetTag("error", err.Error())
+			}
+		}
+	}
 }
 
 func (ev *eventSender) encodeAvro(event Event) (*EventMetadata, []byte, error) {
