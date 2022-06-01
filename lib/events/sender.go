@@ -27,7 +27,7 @@ type EventSender interface {
 	// must never fail. You might want to use a channel for buffering
 	// events internally. Errors will be logged to the terminal
 	// but otherwise ignored.
-	SendAsync(event Event)
+	SendAsync(ctx context.Context, event Event)
 
 	// SendInTx sends the message in the transaction.
 	// Returns an error, if sending fails.
