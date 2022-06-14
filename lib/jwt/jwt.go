@@ -27,12 +27,17 @@ type JwtStruct struct {
 	GrantType      string        `json:"grant_type"`
 }
 
-type JwtService struct {
+type Service interface {
+	GetJwtToken(authHeader string) (*JwtStruct, error)
+	GetJwtTokenFromRequest(req *http.Request) (*JwtStruct, error)
+}
+
+type jwtService struct {
 	clock     clock.Clock
 	jwkKeySet jwk.Set
 }
 
-func NewJwtService(jwkResourceUrl string, clock clock.Clock) (*JwtService, error) {
+func NewJwtService(jwkResourceUrl string, clock clock.Clock) (Service, error) {
 	set, err := GetJwk(context.Background(), jwkResourceUrl, &http.Client{
 		Timeout: 5 * time.Second,
 		Transport: &http.Transport{
@@ -44,10 +49,10 @@ func NewJwtService(jwkResourceUrl string, clock clock.Clock) (*JwtService, error
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to receive jwk: %s")
 	}
-	return &JwtService{jwkKeySet: set, clock: clock}, nil
+	return &jwtService{jwkKeySet: set, clock: clock}, nil
 }
 
-func (j *JwtService) GetJwtToken(authHeader string) (*JwtStruct, error) {
+func (j *jwtService) GetJwtToken(authHeader string) (*JwtStruct, error) {
 	claims := &JwtStruct{}
 
 	if strings.Contains(authHeader, "Bearer") {
@@ -107,7 +112,7 @@ func (j *JwtService) GetJwtToken(authHeader string) (*JwtStruct, error) {
 	return claims, err
 }
 
-func (j *JwtService) GetJwtTokenFromRequest(req *http.Request) (*JwtStruct, error) {
+func (j *jwtService) GetJwtTokenFromRequest(req *http.Request) (*JwtStruct, error) {
 	if j.jwkKeySet == nil {
 		return nil, errors.New("cannot verify jwt because jwk key set is missing")
 	}
