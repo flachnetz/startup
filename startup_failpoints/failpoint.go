@@ -171,6 +171,7 @@ func (f *FailPointService) HandleFailPointPage(updateFailPointsEndpoint string) 
 		})
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
+			return
 		}
 	}
 }
