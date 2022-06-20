@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"net/http"
+	"sort"
 	"sync"
 	"time"
 )
@@ -59,11 +60,13 @@ type FailPointService struct {
 	failPointLocations map[FailPointLocation]*FailPoint
 }
 
-func NewFailPointService(failPoints []FailPoint, codeLocations []FailPointLocation, defaultError FailPointError, devMode bool) *FailPointService {
+func NewFailPointService(failPoints []FailPoint, codeLocations []FailPointLocation, devMode bool) *FailPointService {
 	for _, pointError := range timeoutErrors {
 		failPoints = append(failPoints, NewFailPoint(pointError))
 	}
-	failPoints = append(failPoints)
+	sort.Slice(failPoints, func(i, j int) bool {
+		return failPoints[i].Error.Error() < failPoints[j].Error.Error()
+	})
 	f := &FailPointService{
 		logger:             logrus.WithField("prefix", "failpoints"),
 		devMode:            devMode,
@@ -73,7 +76,7 @@ func NewFailPointService(failPoints []FailPoint, codeLocations []FailPointLocati
 		errorLookup:        make(map[string]FailPointError),
 	}
 	for _, v := range codeLocations {
-		point := NewFailPoint(defaultError)
+		point := failPoints[0]
 		f.failPointLocations[v] = &point
 	}
 	for _, fp := range failPoints {
