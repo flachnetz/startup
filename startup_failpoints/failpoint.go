@@ -137,7 +137,11 @@ func (f *FailPointService) UpdateFailPoint(req FailPointRequest) error {
 	}
 	f.failPointsLock.Lock()
 	defer f.failPointsLock.Unlock()
-	fp := f.failPointLocations[req.CodeLocationPointName]
+	fp, ok := f.failPointLocations[req.CodeLocationPointName]
+	if !ok {
+		return errors.New("cannot find failpoint location for " + string(req.CodeLocationPointName))
+	}
+
 	err, ok := f.errorLookup[req.FailPointErrorName]
 	if !ok {
 		return errors.New("cannot find error for " + req.FailPointErrorName)
