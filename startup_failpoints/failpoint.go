@@ -151,10 +151,12 @@ func (f *FailPointService) UpdateFailPointHandlerFunc() http.HandlerFunc {
 		err := json.NewDecoder(request.Body).Decode(&req)
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusBadRequest)
+			return
 		}
 		err = f.UpdateFailPoint(req)
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusBadRequest)
+			return
 		}
 		writer.WriteHeader(http.StatusNoContent)
 	}
