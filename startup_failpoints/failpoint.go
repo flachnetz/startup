@@ -1,4 +1,4 @@
-package failpoints
+package startup_failpoints
 
 import (
 	"context"
