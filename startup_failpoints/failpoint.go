@@ -28,9 +28,9 @@ func (t timeoutError) Error() string {
 }
 
 var timeoutErrors = []FailPointError{
-	timeoutError{"timeout_1_second", 1 * time.Second, false},
-	timeoutError{"timeout_3_seconds", 3 * time.Second, false},
-	timeoutError{"timeout_5_seconds", 5 * time.Second, false},
+	timeoutError{"timeout_01_second", 1 * time.Second, false},
+	timeoutError{"timeout_03_seconds", 3 * time.Second, false},
+	timeoutError{"timeout_05_seconds", 5 * time.Second, false},
 	timeoutError{"timeout_10_seconds", 10 * time.Second, false},
 	timeoutError{"timeout_30_seconds", 30 * time.Second, false},
 	timeoutError{"timeout_forever", 365 * 24 * time.Hour, true},
