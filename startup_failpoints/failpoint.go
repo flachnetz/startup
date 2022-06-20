@@ -37,7 +37,6 @@ var timeoutErrors = []FailPointError{
 
 type FailPointError interface {
 	error
-	Name() string
 }
 
 type FailPoint struct {
@@ -78,7 +77,7 @@ func NewFailPointService(failPoints []FailPoint, codeLocations []FailPointLocati
 		f.failPointLocations[v] = &point
 	}
 	for _, fp := range failPoints {
-		f.errorLookup[fp.Error.Name()] = fp.Error
+		f.errorLookup[fp.Error.Error()] = fp.Error
 	}
 	return f
 }
