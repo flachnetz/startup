@@ -45,14 +45,14 @@ func GetLoggerWithFields(ctx context.Context, fields ...string) *logrus.Entry {
 	return logger
 }
 
-func TracingLoggerMiddleWare(handler http.Handler) http.HandlerFunc {
-	return func(writer http.ResponseWriter, request *http.Request) {
+func TracingLoggerMiddleWare(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		ctx := request.Context()
-		if spanContext, err := b3.ExtractHTTP(request)(); err != nil {
+		if spanContext, err := b3.ExtractHTTP(request)(); err == nil {
 			ctx = ContextLoggerWithFields(ctx, "traceId", spanContext.TraceID.String(), "spanId", spanContext.ID.String())
 		}
 		handler.ServeHTTP(writer, request.WithContext(ctx))
-	}
+	})
 }
 
 func loggerOf(ctx context.Context) *logrus.Entry {
