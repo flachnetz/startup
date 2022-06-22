@@ -110,6 +110,9 @@ func (opts HTTPOptions) Serve(config Config) {
 	// merge handlers
 	handler = mergeWithAdminHandler(adminHandler, handler)
 
+	// Setup logger in context with tracing ids as fields
+	handler = TracingLoggerMiddleWare(handler)
+
 	// don't let a panic crash the server.
 	handler = handlers.RecoveryHandler(handlers.PrintRecoveryStack(true))(handler)
 
