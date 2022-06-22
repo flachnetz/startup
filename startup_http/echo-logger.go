@@ -1,8 +1,6 @@
 package startup_http
 
 import (
-	"context"
-	"github.com/flachnetz/startup/v2/startup_logrus"
 	"github.com/labstack/gommon/log"
 	"github.com/sirupsen/logrus"
 	"io"
@@ -93,9 +91,4 @@ func (l *Logger) Fatalj(j log.JSON) {
 
 func (l *Logger) Panicj(j log.JSON) {
 	logrus.WithFields(logrus.Fields(j)).Panic()
-}
-
-func LoggerContextWithFields(ctx context.Context, object interface{}, playerId string, roundId string) context.Context {
-
-	return startup_logrus.WithLogger(ctx, startup_logrus.GetLogger(ctx, object).WithField("playerId", playerId).WithField("roundId", roundId))
 }
