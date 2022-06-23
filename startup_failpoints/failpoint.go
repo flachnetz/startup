@@ -19,10 +19,6 @@ type timeoutError struct {
 	forever bool
 }
 
-func (t timeoutError) Name() string {
-	return t.name
-}
-
 func (t timeoutError) Error() string {
 	return t.name
 }
@@ -41,8 +37,10 @@ type FailPointError interface {
 }
 
 type FailPoint struct {
-	Error    FailPointError `json:"error"`
-	IsActive bool           `json:"isActive"`
+	Error FailPointError `json:"error"`
+	// when empty, Error.String() will be taken
+	ErrorName string `json:"errorName"`
+	IsActive  bool   `json:"isActive"`
 }
 
 type FailPointRequest struct {
@@ -80,7 +78,11 @@ func NewFailPointService(failPoints []FailPoint, codeLocations []FailPointLocati
 		f.failPointLocations[v] = &point
 	}
 	for _, fp := range failPoints {
-		f.errorLookup[fp.Error.Error()] = fp.Error
+		errorName := fp.ErrorName
+		if errorName == "" {
+			errorName = fp.Error.Error()
+		}
+		f.errorLookup[errorName] = fp.Error
 	}
 	return f
 }
