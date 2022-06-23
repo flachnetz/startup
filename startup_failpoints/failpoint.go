@@ -3,6 +3,7 @@ package startup_failpoints
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"net/http"
@@ -12,6 +13,17 @@ import (
 )
 
 type FailPointLocation string
+
+type FailPointError interface {
+	error
+}
+
+type FailPoint struct {
+	Error FailPointError `json:"error"`
+	// when empty, Error.String() will be taken
+	ErrorName string `json:"errorName"`
+	IsActive  bool   `json:"isActive"`
+}
 
 type timeoutError struct {
 	name    string
@@ -23,24 +35,21 @@ func (t timeoutError) Error() string {
 	return t.name
 }
 
-var timeoutErrors = []FailPointError{
-	timeoutError{"timeout_01_second", 1 * time.Second, false},
-	timeoutError{"timeout_03_seconds", 3 * time.Second, false},
-	timeoutError{"timeout_05_seconds", 5 * time.Second, false},
-	timeoutError{"timeout_10_seconds", 10 * time.Second, false},
-	timeoutError{"timeout_30_seconds", 30 * time.Second, false},
-	timeoutError{"timeout_forever", 365 * 24 * time.Hour, true},
-}
-
-type FailPointError interface {
-	error
-}
-
-type FailPoint struct {
-	Error FailPointError `json:"error"`
-	// when empty, Error.String() will be taken
-	ErrorName string `json:"errorName"`
-	IsActive  bool   `json:"isActive"`
+func timeoutErrorFailPoints(durations []int) []FailPoint {
+	var result []FailPoint
+	for _, v := range durations {
+		name := fmt.Sprintf("timeout_%02d_seconds", v*int(time.Second.Seconds()))
+		result = append(result, FailPoint{
+			Error: timeoutError{
+				name:    name,
+				timeout: time.Duration(v * int(time.Second)),
+				forever: false,
+			},
+			ErrorName: name,
+			IsActive:  false,
+		})
+	}
+	return result
 }
 
 type FailPointRequest struct {
@@ -58,31 +67,33 @@ type FailPointService struct {
 	failPointLocations map[FailPointLocation]*FailPoint
 }
 
-func NewFailPointService(failPoints []FailPoint, codeLocations []FailPointLocation, devMode bool) *FailPointService {
-	for _, pointError := range timeoutErrors {
-		failPoints = append(failPoints, NewFailPoint(pointError))
-	}
-	sort.Slice(failPoints, func(i, j int) bool {
-		return failPoints[i].Error.Error() < failPoints[j].Error.Error()
-	})
+func NewFailPointService(fps []FailPoint, codeLocations []FailPointLocation, devMode bool) *FailPointService {
 	f := &FailPointService{
 		logger:             logrus.WithField("prefix", "failpoints"),
 		devMode:            devMode,
 		failPointsLock:     sync.RWMutex{},
-		failPoints:         failPoints,
+		failPoints:         []FailPoint{},
 		failPointLocations: make(map[FailPointLocation]*FailPoint),
 		errorLookup:        make(map[string]FailPointError),
 	}
-	for _, v := range codeLocations {
-		point := failPoints[0]
-		f.failPointLocations[v] = &point
-	}
-	for _, fp := range failPoints {
-		errorName := fp.ErrorName
-		if errorName == "" {
-			errorName = fp.Error.Error()
+
+	fps = append(fps, timeoutErrorFailPoints([]int{1, 3, 5, 10, 30, 365 * 24 * 60 * 60})...)
+
+	// fix error name and copy fail points
+	for _, fp := range fps {
+		if fp.ErrorName == "" {
+			fp.ErrorName = fp.Error.Error()
 		}
-		f.errorLookup[errorName] = fp.Error
+		f.failPoints = append(f.failPoints, fp)
+		f.errorLookup[fp.ErrorName] = fp.Error
+	}
+	sort.Slice(f.failPoints, func(i, j int) bool {
+		return f.failPoints[i].Error.Error() < f.failPoints[j].Error.Error()
+	})
+
+	for _, v := range codeLocations {
+		point := f.failPoints[0]
+		f.failPointLocations[v] = &point
 	}
 	return f
 }
