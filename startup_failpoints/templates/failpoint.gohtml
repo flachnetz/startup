@@ -114,8 +114,8 @@
                             <select class="form-select" aria-label="Default select example" id="select__{{ $location }}"
                                     onchange="updateFailPoint({{$location}})">
                                 {{ range $fp := $failPoints }}
-                                    <option {{ if eq $fp.Error.Error $failpoint.Error.Error }} selected {{ end }}
-                                            value={{ $fp.Error.Error }}>{{ $fp.Error.Error }}</option>
+                                    <option {{ if eq $fp.ErrorName $failpoint.ErrorName }} selected {{ end }}
+                                            value={{ $fp.ErrorName }}>{{ $fp.ErrorName }}</option>
                                 {{ end }}
                             </select>
                         </div>
