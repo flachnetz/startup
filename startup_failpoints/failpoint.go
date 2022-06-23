@@ -78,6 +78,7 @@ func NewFailPointService(fps []FailPoint, codeLocations []FailPointLocation, dev
 	}
 
 	fps = append(fps, timeoutErrorFailPoints([]int{1, 3, 5, 10, 30, 365 * 24 * 60 * 60})...)
+	fps = append(fps, FailPoint{Error: errors.New("internal server error"), ErrorName: "internal server error", IsActive: false})
 
 	// fix error name and copy fail points
 	for _, fp := range fps {
