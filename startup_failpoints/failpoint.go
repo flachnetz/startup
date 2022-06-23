@@ -88,7 +88,7 @@ func NewFailPointService(fps []FailPoint, codeLocations []FailPointLocation, dev
 		f.errorLookup[fp.ErrorName] = fp.Error
 	}
 	sort.Slice(f.failPoints, func(i, j int) bool {
-		return f.failPoints[i].Error.Error() < f.failPoints[j].Error.Error()
+		return f.failPoints[i].ErrorName < f.failPoints[j].ErrorName
 	})
 
 	for _, v := range codeLocations {
