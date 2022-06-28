@@ -133,6 +133,8 @@ func kafkaSender(opts *EventOptions, clientId string) (*kafka.Producer, error) {
 	kafkaConfig := kafka.ConfigMap{
 		"client.id":         clientId,
 		"bootstrap.servers": strings.Join(bootstrapServers, ","),
+		"compression.codec": "gzip",
+		"compression.level": "6",
 
 		// this is the same that the java client uses. This way the client maps
 		// the same key to the same partition as the java client does.
