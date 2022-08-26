@@ -24,10 +24,13 @@ type Event interface {
 
 type EventSender interface {
 	// SendAsync sends the given event. This method should be non blocking and
-	// must never fail. You might want to use a channel for buffering
-	// events internally. Errors will be logged to the terminal
-	// but otherwise ignored.
+	// must never fail. If sending would block, you are allowed to discard the event.
+	// Errors will be logged to the terminal but otherwise ignored.
 	SendAsync(ctx context.Context, event Event)
+
+	// SendAsyncCh returns a channel you can use to enqueue events to the sender. Sending events on this
+	// channel will give you no delivery guarantees for those events.
+	SendAsyncCh() chan<- Event
 
 	// SendInTx sends the message in the transaction.
 	// Returns an error, if sending fails.

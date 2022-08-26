@@ -19,8 +19,34 @@ import (
 )
 
 type eventWithSpan struct {
-	event Event
-	span  opentracing.Span
+	Event
+	span opentracing.Span
+}
+
+func TraceEvent(ctx context.Context, event Event) Event {
+	if _, ok := event.(eventWithSpan); !ok {
+		// do not double wrap
+		return event
+	}
+
+	var parentContext opentracing.SpanContext
+
+	// get the current span from the context if there is one. We do this here
+	// so we can directly create and start the span before scheduling the event to
+	// the async send channel
+	parentSpan := startup_tracing.CurrentSpanFromContext(ctx)
+	if parentSpan != nil {
+		parentContext = parentSpan.Context()
+	}
+
+	// create a new span
+	span := opentracing.GlobalTracer().StartSpan("send",
+		ext.SpanKindRPCClient,
+		opentracing.ChildOf(parentContext))
+
+	span.SetTag("dd.service", "kafka")
+
+	return eventWithSpan{event, span}
 }
 
 type eventSender struct {
@@ -33,7 +59,7 @@ type eventSender struct {
 	FileSender io.WriteCloser
 
 	// async events are queued
-	AsyncBufferCh chan eventWithSpan
+	AsyncBufferCh chan Event
 
 	// schema cache
 	SchemaIdCache map[reflect.Type]uint32
@@ -54,7 +80,7 @@ func NewInitializer(
 		bufferSize = 1024
 	}
 
-	asyncBufferCh := make(chan eventWithSpan, bufferSize)
+	asyncBufferCh := make(chan Event, bufferSize)
 
 	// normalize event topics to fix any issues with pointer/non pointer types
 	eventTopicsNormalized, err := eventTopics.Normalized()
@@ -81,32 +107,19 @@ func NewInitializer(
 }
 
 func (ev *eventSender) SendAsync(ctx context.Context, event Event) {
-	var span opentracing.Span
-
 	if ev.KafkaSender != nil {
-		var parentContext opentracing.SpanContext
-
-		// get the current span from the context if there is one. We do this here
-		// so we can directly create and start the span before scheduling the event to
-		// the async send channel
-		parentSpan := startup_tracing.CurrentSpanFromContext(ctx)
-		if parentSpan != nil {
-			parentContext = parentSpan.Context()
-		}
-
-		// create a new span
-		span = opentracing.GlobalTracer().StartSpan("send",
-			ext.SpanKindRPCClient,
-			opentracing.ChildOf(parentContext))
-
-		span.SetTag("dd.service", "kafka")
+		event = TraceEvent(ctx, event)
 	}
 
 	select {
-	case ev.AsyncBufferCh <- eventWithSpan{event, span}:
+	case ev.AsyncBufferCh <- event:
 	default:
 		log.Warnf("Async event queue is full, discarding event %s", eventToString(event))
 	}
+}
+
+func (ev *eventSender) SendAsyncCh() chan<- Event {
+	return ev.AsyncBufferCh
 }
 
 func (ev *eventSender) SendInTx(ctx context.Context, tx sqlx.ExecerContext, event Event) error {
@@ -144,9 +157,9 @@ func (ev *eventSender) launchAsyncTask() {
 	}()
 }
 
-func (ev *eventSender) doSendAsync(event eventWithSpan) {
+func (ev *eventSender) doSendAsync(event Event) {
 	// ignore error as we're in the process of sending an async
-	if err := ev.writeToFile(event.event); err != nil {
+	if err := ev.writeToFile(event); err != nil {
 		log.Warnf("Failed to write async event to file: %s", err)
 	}
 
@@ -178,12 +191,22 @@ func (ev *eventSender) writeToFile(event Event) error {
 	return nil
 }
 
-func (ev *eventSender) sendToKafka(event eventWithSpan) error {
+func unwrap(event Event) (Event, opentracing.Span) {
+	if eventWithSpan, ok := event.(eventWithSpan); ok {
+		return eventWithSpan.Event, eventWithSpan.span
+	}
+
+	return event, nil
+}
+
+func (ev *eventSender) sendToKafka(event Event) error {
 	if ev.KafkaSender == nil {
 		return nil
 	}
 
-	meta, avro, err := ev.encodeAvro(event.event)
+	event, span := unwrap(event)
+
+	meta, avro, err := ev.encodeAvro(event)
 	if err != nil {
 		return errors.WithMessage(err, "encode event")
 	}
@@ -200,21 +223,21 @@ func (ev *eventSender) sendToKafka(event eventWithSpan) error {
 
 	var deliveryCh chan kafka.Event
 
-	if event.span != nil {
+	if span != nil {
 		deliveryCh = make(chan kafka.Event)
 
-		event.span.SetTag("dd.resource", meta.Topic)
-		event.span.SetTag("kafka.topic", meta.Topic)
-		event.span.SetTag("avro.type", meta.Type.String())
+		span.SetTag("dd.resource", meta.Topic)
+		span.SetTag("kafka.topic", meta.Topic)
+		span.SetTag("avro.type", meta.Type.String())
 	}
 
 	if err := ev.KafkaSender.Produce(message, deliveryCh); err != nil {
 		return errors.WithMessage(err, "kafka produce")
 	}
 
-	if deliveryCh != nil && event.span != nil {
+	if deliveryCh != nil && span != nil {
 		// produce was ok, message was scheduled, now wait for the delivery
-		go ev.deliveryHandler(deliveryCh, event.span)()
+		go ev.deliveryHandler(deliveryCh, span)()
 	}
 
 	return nil

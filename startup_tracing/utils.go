@@ -42,7 +42,6 @@ func TraceChildContext(ctx context.Context, op string, fn func(ctx context.Conte
 }
 
 // Returns the current span, or nil.
-//
 func CurrentSpanFromContext(ctx context.Context) opentracing.Span {
 	span := opentracing.SpanFromContext(ctx)
 	if span != nil {
