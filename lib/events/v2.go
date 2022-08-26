@@ -96,7 +96,7 @@ func NewInitializer(
 		AsyncBufferCh: asyncBufferCh,
 	}
 
-	eventSender.launchAsyncTask()
+	eventSender.launchAsyncTasks()
 
 	eventSenderInitializer := &eventSenderInitializer{
 		ConfluentClient: confluentClient,
@@ -138,7 +138,7 @@ func (ev *eventSender) Close() error {
 	return nil
 }
 
-func (ev *eventSender) launchAsyncTask() {
+func (ev *eventSender) launchAsyncTasks() {
 	ev.wg.Add(1)
 
 	go func() {
@@ -156,6 +156,19 @@ func (ev *eventSender) launchAsyncTask() {
 			ev.doSendAsync(event)
 		}
 	}()
+
+	if ev.KafkaSender != nil {
+		go func() {
+			for e := range ev.KafkaSender.Events() {
+				switch ev := e.(type) {
+				case *kafka.Message:
+					if ev.TopicPartition.Error != nil {
+						log.Warnf("Delivery to '%v' failed: %s", ev.TopicPartition, ev.TopicPartition.Error)
+					}
+				}
+			}
+		}()
+	}
 }
 
 func (ev *eventSender) doSendAsync(event Event) {
