@@ -15,20 +15,19 @@ type Batcher struct {
 // New returns a simple Batcher that can be used to buffer & batch
 // values as simple as this:
 //
-//  b := batcher.New(1024, 5*time.Second)
-//  for {
-//    select {
-//      case <- b.Await():
-//        b.Reset()
-//        flush(messages)
-//        messages = nil
+//	b := batcher.New(1024, 5*time.Second)
+//	for {
+//	  select {
+//	    case <- b.Await():
+//	      b.Reset()
+//	      flush(messages)
+//	      messages = nil
 //
-//      case msg <- kafka.Messages():
-//        b.Increment()
-//        messages = append(messages, msg)
-//    }
-//  }
-//
+//	    case msg <- kafka.Messages():
+//	      b.Increment()
+//	      messages = append(messages, msg)
+//	  }
+//	}
 func New(maxSize int, batchTime time.Duration) *Batcher {
 	return &Batcher{
 		MaxSize:   maxSize,

@@ -21,7 +21,6 @@ var reUUID = regexp.MustCompile(`/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-
 //
 // You can use the tracing middleware multiple time. Using it a second time
 // will not start a new trace but will update 'service' and 'operation'.
-//
 func Tracing(service string, op string) startup_http.HttpMiddleware {
 
 	return func(handler http.Handler) http.Handler {

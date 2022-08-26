@@ -38,7 +38,6 @@ func (h *TxHelper) WithTransactionContextAutoCommit(ctx context.Context, operati
 // the given recoverValue is nil, or rollback the transaction if it is non nil.
 //
 // Deprecated: Use a variant of this function that includes a context argument.
-//
 func WithTransaction(db TxStarter, fn func(tx *sqlx.Tx) error) (err error) {
 	return WithTransactionAutoCommitContext(context.Background(), db, func(ctx context.Context, tx *sqlx.Tx) error {
 		return fn(tx)

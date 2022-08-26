@@ -3,17 +3,35 @@ package events
 import (
 	"context"
 	"github.com/jmoiron/sqlx"
+	"sync"
 )
 
-type NoopEventSender struct{}
-
-func (n NoopEventSender) SendAsync(ctx context.Context, event Event) {
+type NoopEventSender struct {
+	eventChannel     chan Event
+	eventchannelInit sync.Once
 }
 
-func (n NoopEventSender) SendInTx(ctx context.Context, tx sqlx.ExecerContext, event Event) error {
+func (n *NoopEventSender) SendAsync(ctx context.Context, event Event) {
+}
+
+func (n *NoopEventSender) SendInTx(ctx context.Context, tx sqlx.ExecerContext, event Event) error {
 	return nil
 }
 
-func (n NoopEventSender) Close() error {
+func (n *NoopEventSender) Close() error {
 	return nil
+}
+
+func (n *NoopEventSender) SendAsyncCh() chan<- Event {
+	n.eventchannelInit.Do(func() {
+		n.eventChannel = make(chan Event)
+
+		go func() {
+			for event := range n.eventChannel {
+				n.SendAsync(context.Background(), event)
+			}
+		}()
+	})
+
+	return n.eventChannel
 }
