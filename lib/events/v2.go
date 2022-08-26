@@ -16,6 +16,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 )
 
 type eventWithSpan struct {
@@ -231,7 +232,26 @@ func (ev *eventSender) sendToKafka(event Event) error {
 		span.SetTag("avro.type", meta.Type.String())
 	}
 
-	if err := ev.KafkaSender.Produce(message, deliveryCh); err != nil {
+	for ev.KafkaSender.Len() > 64*1024 {
+		// wait until some messages are delivered before
+		// pushing more messages to kafka.
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	for {
+		err := ev.KafkaSender.Produce(message, deliveryCh)
+		if err == nil {
+			break
+		}
+
+		if err, ok := err.(kafka.Error); ok {
+			// if the internal queue is full, we block a moment and then try again
+			if err.Code() == kafka.ErrQueueFull {
+				time.Sleep(100 * time.Millisecond)
+				continue
+			}
+		}
+
 		return errors.WithMessage(err, "kafka produce")
 	}
 
