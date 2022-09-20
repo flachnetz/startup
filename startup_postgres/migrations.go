@@ -18,7 +18,9 @@ func Migration(schema, table, directory string) Initializer {
 	}
 
 	return func(db *sqlx.DB) error {
-		migrate.SetSchema(schema)
+		if schema != "" {
+			migrate.SetSchema(schema)
+		}
 		migrate.SetTable(table)
 
 		migrations := &migrate.FileMigrationSource{Dir: directory}
@@ -37,7 +39,7 @@ func Migration(schema, table, directory string) Initializer {
 // Creates an Initializer that performs a database migration by looking for
 // sql files in the default directories.
 func DefaultMigration(table string) Initializer {
-	return Migration(table, guessMigrationDirectory())
+	return Migration("", table, guessMigrationDirectory())
 }
 
 func guessMigrationDirectory() string {
