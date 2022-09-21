@@ -12,15 +12,12 @@ import (
 // Migration Runs a migration with the sql files from the given directory.
 // The directory must exist. The migration library will use the given table
 // name to store the migration progress
-func Migration(schema, table, directory string) Initializer {
+func Migration(table, directory string) Initializer {
 	if _, err := os.Stat(directory); os.IsNotExist(err) {
 		startup_base.PanicOnError(err, "No database migration files found")
 	}
 
 	return func(db *sqlx.DB) error {
-		if schema != "" {
-			migrate.SetSchema(schema)
-		}
 		migrate.SetTable(table)
 
 		migrations := &migrate.FileMigrationSource{Dir: directory}
@@ -39,7 +36,7 @@ func Migration(schema, table, directory string) Initializer {
 // Creates an Initializer that performs a database migration by looking for
 // sql files in the default directories.
 func DefaultMigration(table string) Initializer {
-	return Migration("", table, guessMigrationDirectory())
+	return Migration(table, guessMigrationDirectory())
 }
 
 func guessMigrationDirectory() string {
