@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"github.com/jackc/pgconn"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/flachnetz/startup/v2/startup_base"
@@ -41,16 +42,24 @@ func (opts *PostgresOptions) Connection() *sqlx.DB {
 	opts.connectionOnce.Do(func() {
 		logger := logrus.WithField("prefix", "postgres")
 
-		if pgUrl, err := url.Parse(opts.URL); err == nil {
+		pgUrl, err := url.Parse(opts.URL)
+		if err == nil {
 			pgUrl.User = nil
 			logger.Infof("Connecting to postgres database (username and password removed) at %s", pgUrl.String())
-
 		}
 
 		connector, err := openConnector(opts.URL)
 		startup_base.PanicOnError(err, "Failed to create a database connector")
 
 		db := opts.mustConnect(connector)
+
+		if pgUrl != nil {
+			if schema := pgUrl.Query().Get("search_path"); schema != "" {
+				logger.Infof("Ensure default schema %q exists", schema)
+				_, err := db.Exec(`CREATE SCHEMA IF NOT EXISTS ` + quoteIdentifier(schema))
+				startup_base.PanicOnError(err, "Failed to create schema %q in database", schema)
+			}
+		}
 
 		if opts.Inputs.Initializer != nil {
 			logger.Infof("Running database initializer")
@@ -133,4 +142,9 @@ func ErrIsUniqueViolation(err error) bool {
 	}
 
 	return false
+}
+
+// from pgx
+func quoteIdentifier(s string) string {
+	return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
 }
