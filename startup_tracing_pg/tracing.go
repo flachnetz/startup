@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"github.com/opentracing/opentracing-go"
+	"github.com/pkg/errors"
 	"github.com/qustavo/sqlhooks/v2"
 	"runtime"
 	"strings"
@@ -27,7 +28,8 @@ func (opts *PostgresTracingOptions) Initialize(tops *startup_tracing.TracingOpti
 	opts.once.Do(func() {
 		if tops.IsActive() {
 			pt.Use(func(driver driver.Driver) driver.Driver {
-				return sqlhooks.Wrap(driver, &dbHook{tops.Inputs.ServiceName + "-db"})
+				hooks := &dbHook{tops.Inputs.ServiceName + "-db"}
+				return wrap(driver, hooks)
 			})
 
 			// replace the new transaction function with a new hook
@@ -79,4 +81,42 @@ func (opts *PostgresTracingOptions) installTransactionTracingHook(serviceName st
 			return withTransactionContext(ctx, db, operation)
 		})
 	}
+}
+
+type extraWrapDriver struct {
+	delegate *sqlhooks.Driver
+}
+
+func wrap(driver driver.Driver, hooks sqlhooks.Hooks) driver.Driver {
+	wrapped := sqlhooks.Wrap(driver, hooks).(*sqlhooks.Driver)
+	return &extraWrapDriver{wrapped}
+}
+
+func (e extraWrapDriver) Open(name string) (driver.Conn, error) {
+	conn, err := e.delegate.Open(name)
+	if err != nil {
+		return nil, err
+	}
+
+	// A pgx connection implements 'driver.NamedValueChecker' ... The sqlhooks packages does not.
+	// Because of that we forward the implementation of the actual connection wrapped by sqlhooks.
+	// We dont do this completely generic, we only do it for the common case, as we pretty much
+	// expect the given implementation here.
+	if conn, ok := conn.(*sqlhooks.ExecerQueryerContextWithSessionResetter); ok {
+		if checker, ok := conn.Conn.Conn.(driver.NamedValueChecker); ok {
+			return &connWithNamedValueChecker{conn, checker}, nil
+		}
+	} else {
+		_ = conn.Close()
+
+		// this is unexpected and should be fixed in the implementation.
+		panic(errors.Errorf("unexpected return value by sqlhooks, please check implementation"))
+	}
+
+	return conn, nil
+}
+
+type connWithNamedValueChecker struct {
+	*sqlhooks.ExecerQueryerContextWithSessionResetter
+	driver.NamedValueChecker
 }
