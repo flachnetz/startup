@@ -2,14 +2,6 @@ package startup_http
 
 import (
 	"context"
-	"github.com/flachnetz/go-admin"
-	"github.com/flachnetz/startup/v2/startup_base"
-	. "github.com/flachnetz/startup/v2/startup_logrus"
-	"github.com/goji/httpauth"
-	"github.com/gorilla/handlers"
-	"github.com/julienschmidt/httprouter"
-	"github.com/rcrowley/go-metrics"
-	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -19,6 +11,15 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/flachnetz/go-admin"
+	"github.com/flachnetz/startup/v2/startup_base"
+	. "github.com/flachnetz/startup/v2/startup_logrus"
+	"github.com/goji/httpauth"
+	"github.com/gorilla/handlers"
+	"github.com/julienschmidt/httprouter"
+	"github.com/rcrowley/go-metrics"
+	log "github.com/sirupsen/logrus"
 )
 
 type Config struct {
@@ -137,9 +138,6 @@ func (opts HTTPOptions) Serve(config Config) {
 			},
 		}
 	}
-
-	// Setup logger in context with tracing ids as fields
-	handler = TracingLoggerMiddleWare(handler)
 
 	if config.UseMiddleware != nil {
 		handler = config.UseMiddleware(handler)
