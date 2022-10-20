@@ -1,13 +1,14 @@
 package startup_schema
 
 import (
+	"sync"
+
 	confluent "github.com/Landoop/schema-registry"
 	"github.com/flachnetz/startup/v2"
 	"github.com/flachnetz/startup/v2/lib/schema"
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/flachnetz/startup/v2/startup_consul"
 	"github.com/sirupsen/logrus"
-	"sync"
 )
 
 var log = logrus.WithField("prefix", "schema-registry")
@@ -43,7 +44,7 @@ func (opts *SchemaRegistryOptions) Initialize(consul *startup_consul.ConsulOptio
 }
 
 type ConfluentClientOptions struct {
-	ConfluentUrl startup.URL `long:"confluent-url" description:"URL to the confluent schema registry."`
+	ConfluentUrl startup.URL `long:"confluent-url" default:"http://confluent-registry.shared.svc.cluster.local" description:"URL to the confluent schema registry."`
 
 	clientOnce sync.Once
 	client     *confluent.Client
