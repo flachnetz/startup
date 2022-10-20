@@ -3,20 +3,14 @@ package startup_tracing
 import (
 	"context"
 	"database/sql"
+
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/pkg/errors"
 )
 
-// a span that does nothing
-var noopSpan = opentracing.NoopTracer{}.StartSpan("")
-
-type activeSpan struct{}
-
-var activeSpanKey = activeSpan{}
-
-// Trace a child call while propagating the span using the context.
-func TraceChildContext(ctx context.Context, op string, fn func(ctx context.Context, span opentracing.Span) error) (err error) {
+// Trace traces a child call while propagating the span using the context.
+func Trace[T any](ctx context.Context, op string, fn func(ctx context.Context, span opentracing.Span) (T, error)) (result T, err error) {
 	var parentContext opentracing.SpanContext
 
 	parentSpan := CurrentSpanFromContext(ctx)
@@ -26,7 +20,8 @@ func TraceChildContext(ctx context.Context, op string, fn func(ctx context.Conte
 
 	span := opentracing.GlobalTracer().StartSpan(op,
 		ext.SpanKindRPCClient,
-		opentracing.ChildOf(parentContext))
+		opentracing.ChildOf(parentContext),
+	)
 
 	defer func() {
 		if err != nil && isNotErrNoRows(err) {
@@ -37,11 +32,11 @@ func TraceChildContext(ctx context.Context, op string, fn func(ctx context.Conte
 		span.Finish()
 	}()
 
-	err = fn(opentracing.ContextWithSpan(ctx, span), span)
+	result, err = fn(opentracing.ContextWithSpan(ctx, span), span)
 	return
 }
 
-// Returns the current span, or nil.
+// CurrentSpanFromContext returns the current span, or nil.
 func CurrentSpanFromContext(ctx context.Context) opentracing.Span {
 	span := opentracing.SpanFromContext(ctx)
 	if span != nil {

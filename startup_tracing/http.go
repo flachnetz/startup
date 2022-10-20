@@ -2,13 +2,14 @@ package startup_tracing
 
 import (
 	"context"
+	"net/http"
+	"regexp"
+	"strings"
+
 	"github.com/flachnetz/startup/v2/startup_http"
 	. "github.com/flachnetz/startup/v2/startup_logrus"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
-	"net/http"
-	"regexp"
-	"strings"
 )
 
 var reNumber = regexp.MustCompile(`/[0-9]+`)
@@ -87,28 +88,26 @@ func Execute(op string, r *http.Request, client *http.Client) (*http.Response, e
 		client = http.DefaultClient
 	}
 
-	var err error
-	var response *http.Response
-
-	err = TraceChildContext(r.Context(), op, func(ctx context.Context, span opentracing.Span) error {
+	response, err := Trace(r.Context(), op, func(ctx context.Context, span opentracing.Span) (*http.Response, error) {
 		// inject the spans information into the request so that the
 		// other party can pick it up and continue the request.
 		_ = span.Tracer().Inject(
 			span.Context(),
 			opentracing.HTTPHeaders,
-			opentracing.HTTPHeadersCarrier(r.Header))
+			opentracing.HTTPHeadersCarrier(r.Header),
+		)
 
 		ext.HTTPMethod.Set(span, r.Method)
 		ext.HTTPUrl.Set(span, r.URL.String())
 
 		span.SetTag("dd.service", op)
 
-		response, err = client.Do(r)
+		response, err := client.Do(r)
 		if err == nil {
 			ext.HTTPStatusCode.Set(span, uint16(response.StatusCode))
 		}
 
-		return err
+		return response, err
 	})
 
 	return response, err
