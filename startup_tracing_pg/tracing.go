@@ -3,12 +3,13 @@ package startup_tracing_pg
 import (
 	"context"
 	"database/sql/driver"
-	"github.com/opentracing/opentracing-go"
-	"github.com/pkg/errors"
-	"github.com/qustavo/sqlhooks/v2"
 	"runtime"
 	"strings"
 	"sync"
+
+	"github.com/opentracing/opentracing-go"
+	"github.com/pkg/errors"
+	"github.com/qustavo/sqlhooks/v2"
 
 	pt "github.com/flachnetz/startup/v2/startup_postgres"
 	"github.com/flachnetz/startup/v2/startup_tracing"
@@ -75,11 +76,13 @@ func (opts *PostgresTracingOptions) installTransactionTracingHook(serviceName st
 			tag = "transaction"
 		}
 
-		return startup_tracing.TraceChildContext(ctx, tag, func(ctx context.Context, span opentracing.Span) error {
+		_, err = startup_tracing.Trace(ctx, tag, func(ctx context.Context, span opentracing.Span) (any, error) {
 			span.SetTag("dd.service", serviceName)
 			span.SetTag("dd.resource", "tx:"+tag)
-			return withTransactionContext(ctx, db, operation)
+			return nil, withTransactionContext(ctx, db, operation)
 		})
+
+		return err
 	}
 }
 
