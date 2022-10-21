@@ -1,11 +1,6 @@
 package startup_events
 
 import (
-	confluent "github.com/Landoop/schema-registry"
-	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/flachnetz/startup/v2"
-	"github.com/flachnetz/startup/v2/startup_tracing"
-	"github.com/pkg/errors"
 	"io"
 	"net/http"
 	"os"
@@ -13,6 +8,12 @@ import (
 	"sync"
 	"time"
 	"unicode"
+
+	confluent "github.com/Landoop/schema-registry"
+	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/flachnetz/startup/v2"
+	"github.com/flachnetz/startup/v2/startup_tracing"
+	"github.com/pkg/errors"
 
 	"github.com/flachnetz/startup/v2/lib/events"
 	"github.com/flachnetz/startup/v2/startup_base"
@@ -135,6 +136,9 @@ func kafkaSender(opts *EventOptions, clientId string) (*kafka.Producer, error) {
 		"bootstrap.servers": strings.Join(bootstrapServers, ","),
 		"compression.codec": "gzip",
 		"compression.level": "6",
+
+		// buffer messages locally before sending them in one batch
+		"queue.buffering.max.ms": "200",
 
 		// this is the same that the java client uses. This way the client maps
 		// the same key to the same partition as the java client does.
