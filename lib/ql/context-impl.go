@@ -9,7 +9,7 @@ import (
 type txContextKey struct{}
 
 func newTxContext(ctx context.Context, tx *sqlx.Tx, hooks Hooks) TxContext {
-	return &txContext{}
+	return &txContext{ctx, tx, hooks}
 }
 
 type txContext struct {
