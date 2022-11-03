@@ -2,6 +2,9 @@ package startup_tracing_pg
 
 import (
 	"context"
+	"database/sql"
+	"regexp"
+	"strings"
 
 	st "github.com/flachnetz/startup/v2/startup_tracing"
 	"github.com/jackc/pgx/v5"
@@ -9,44 +12,66 @@ import (
 	"github.com/opentracing/opentracing-go/ext"
 )
 
+var reSpace = regexp.MustCompile(`\s+`)
+
 type tracer struct {
 	ServiceName         string
 	SkipFrameworkMethod SkipFunc
 }
 
 func (t *tracer) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
-	return t.startSpan(ctx, "TraceQuery")
+	cleanQuery := cleanQuery(data.SQL)
+	span, ctx := t.startSpan(ctx, cleanQuery)
+	span.SetTag("sql.query", cleanQuery)
+	return ctx
 }
 
 func (t *tracer) TraceQueryEnd(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryEndData) {
-	t.endSpan(ctx)
+	span := t.spanOf(ctx)
+
+	if data.Err != nil && data.Err != sql.ErrNoRows {
+		span.SetTag("error", data.Err.Error())
+	}
+
+	span.Finish()
 }
 
 func (t *tracer) TracePrepareStart(ctx context.Context, conn *pgx.Conn, data pgx.TracePrepareStartData) context.Context {
-	return t.startSpan(ctx, "TracePrepare")
+	cleanQuery := cleanQuery(data.SQL)
+	span, ctx := t.startSpan(ctx, cleanQuery)
+	span.SetTag("sql.query", cleanQuery)
+	span.SetTag("sql.prepare", true)
+	return ctx
 }
 
 func (t *tracer) TracePrepareEnd(ctx context.Context, conn *pgx.Conn, data pgx.TracePrepareEndData) {
-	t.endSpan(ctx)
+	t.spanOf(ctx).Finish()
 }
 
 func (t *tracer) TraceConnectStart(ctx context.Context, data pgx.TraceConnectStartData) context.Context {
-	return t.startSpan(ctx, "TraceConnect")
+	_, ctx = t.startSpan(ctx, "CONNECT")
+	return ctx
 }
 
 func (t *tracer) TraceConnectEnd(ctx context.Context, data pgx.TraceConnectEndData) {
-	t.endSpan(ctx)
+	t.spanOf(ctx).Finish()
 }
 
 func (t *tracer) TransactionStart(ctx context.Context) context.Context {
-	return t.startSpan(ctx, "Transaction")
+	tag := findOutsideCaller(t.SkipFrameworkMethod)
+	if tag == "" {
+		tag = "transaction"
+	}
+
+	_, ctx = t.startSpan(ctx, "tx:"+tag)
+	return ctx
 }
 
 func (t *tracer) TransactionEnd(ctx context.Context) {
-	t.endSpan(ctx)
+	t.spanOf(ctx).Finish()
 }
 
-func (t *tracer) startSpan(ctx context.Context, op string) context.Context {
+func (t *tracer) startSpan(ctx context.Context, res string) (opentracing.Span, context.Context) {
 	var parentContext opentracing.SpanContext
 
 	parentSpan := st.CurrentSpanFromContext(ctx)
@@ -54,14 +79,21 @@ func (t *tracer) startSpan(ctx context.Context, op string) context.Context {
 		parentContext = parentSpan.Context()
 	}
 
-	span := opentracing.GlobalTracer().StartSpan(op,
+	span := opentracing.GlobalTracer().StartSpan(t.ServiceName,
 		ext.SpanKindRPCClient,
 		opentracing.ChildOf(parentContext),
 	)
 
-	return opentracing.ContextWithSpan(ctx, span)
+	span.SetTag("dd.service", t.ServiceName)
+	span.SetTag("dd.resource", res)
+
+	return span, opentracing.ContextWithSpan(ctx, span)
 }
 
-func (t *tracer) endSpan(ctx context.Context) {
-	st.CurrentSpanFromContext(ctx).Finish()
+func (t *tracer) spanOf(ctx context.Context) opentracing.Span {
+	return st.CurrentSpanFromContext(ctx)
+}
+
+func cleanQuery(query string) string {
+	return strings.TrimSpace(reSpace.ReplaceAllString(query, " "))
 }
