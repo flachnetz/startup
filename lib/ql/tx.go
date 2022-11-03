@@ -29,6 +29,12 @@ func NoRollback(err error) error {
 	return noRollbackTxError{wrapped: err}
 }
 
+type rStruct[R any] struct {
+	Result    R
+	Error     error
+	Recovered any
+}
+
 // InNewTransaction creates a new transaction and executes the given function within that transaction.
 // The method will automatically roll back the transaction if an error is returned or otherwise commit it.
 // This excludes the 'ErrNoRows' error. This error never triggers a rollback.
@@ -47,73 +53,103 @@ func InNewTransaction[R any](ctx context.Context, db TxStarter, fun func(ctx TxC
 		return defaultValue, ErrTransactionExistInContext
 	}
 
-	var res resultWithErr[R]
+	// tracing this transaction
+	ctx = startTraceTransaction(ctx)
+	defer endTraceTransaction(ctx)
 
 	var hooks hooks
-	var doCommit bool
 
-	// TODO do transaction handling ourself (plus tracing)
-	err := pt.WithTransactionContext(ctx, db, func(ctx context.Context, tx *sqlx.Tx) (bool, error) {
-		// call the transaction operation
-		result_, err := fun(newTxContext(ctx, tx, &hooks))
-		res = resultWithErr[R]{result_, err}
+	// begin the transaction
+	tx, err := db.BeginTxx(ctx, nil)
+	if err != nil {
+		var defaultValue R
+		return defaultValue, err
+	}
 
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				// the error `ErrNoRows` will not trigger a rollback.
-				return true, nil
-			}
-
-			var nrtxerr noRollbackTxError
-			if errors.As(err, &nrtxerr) {
-				// user does not want to rollback but still wants to return an error to the caller
-				res.error = nrtxerr.wrapped
-				doCommit = true
-				return true, nil
+	// set to true once the users code ran
+	var userCodeOk bool
+	defer func() {
+		if !userCodeOk {
+			// There was a panic in the users code.
+			// We need to rollback the transaction now.
+			if err := tx.Rollback(); err != nil {
+				// If the rollback failed, there isnt much we can do except logging
+				// the issue.
+				sl.GetLogger(ctx, InNewTransaction[R]).Warnf("Rollback during panic failed: %s", err)
 			}
 		}
+	}()
 
-		// default is rollback on error, otherwise commit.
-		doCommit = err == nil
+	// run the users transaction code
+	res, err := fun(newTxContext(ctx, tx, &hooks))
 
-		return doCommit, nil
-	})
+	// if we panic now, we dont do anything
+	userCodeOk = true
 
-	if doCommit && err == nil {
-		// if we committed with no errors, we can run the commit hooks
-		hooks.RunOnCommit()
+	// check if the user wants to rollback
+	err, rollback := requiresTxRollback(err)
+
+	if rollback {
+		// we need to perform a rollback
+		rerr := tx.Rollback()
+		if rerr != nil && !errors.Is(rerr, sql.ErrTxDone) {
+			err = rollbackError{err: err, rerr: rerr}
+		}
+
+		return res, err
 	}
 
-	return consolidateTransactionErrors(res, err)
+	// Everything is fine, customer wants to commit
+	cerr := tx.Commit()
+	if cerr != nil && !errors.Is(cerr, sql.ErrTxDone) {
+		err = commitError{err: err, cerr: cerr}
+	}
+
+	// if we committed with no errors, we can run the commit hooks
+	hooks.RunOnCommit()
+
+	return res, err
 }
 
-func consolidateTransactionErrors[T any](res resultWithErr[T], err error) (T, error) {
-	if err == nil {
-		// we dont have an extra error, just return the original
-		// application result as is.
-		return res.result, res.error
+func requiresTxRollback(err error) (error, bool) {
+	// no rollback required if we just didnt find anything
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, false
 	}
 
-	if res.error != nil {
-		// we also have a transactional level error, wrap the error
-		return res.result, errors.WithMessagef(res.error, "transaction error (%s) with application error", err)
+	// user does not want to rollback but still wants
+	// to return an error to the caller
+	var nrtxerr noRollbackTxError
+	if errors.As(err, &nrtxerr) {
+		return nrtxerr.wrapped, false
 	}
 
-	// if we have no application level error, just return the error
-	// that occurred during commit or rollback.
-	return res.result, err
+	return err, err != nil
 }
 
-type resultWithErr[R any] struct {
-	result R
-	error  error
+func startTraceTransaction(ctx context.Context) context.Context {
+	tracer := pt.GetTracer()
+	if tracer == nil {
+		return ctx
+	}
+
+	return tracer.TransactionStart(ctx)
+}
+
+func endTraceTransaction(ctx context.Context) {
+	tracer := pt.GetTracer()
+	if tracer == nil {
+		return
+	}
+
+	tracer.TransactionEnd(ctx)
 }
 
 // InExistingTransaction runs the given operation in the transaction that is hidden in the
 // provided Context instance. If the context does not contain any transaction, ErrNoTransaction
 // will be returned. The context must contain a transaction created by InNewTransaction.
 //
-// This function will rollback the transaction on error. See InNewTransaction regarding error handling.
+// This function will not rollback the transaction on error.
 func InExistingTransaction[R any](ctx context.Context, fun func(ctx TxContext) (R, error)) (R, error) {
 	tx := txContextFromContext(ctx)
 	if tx == nil {
@@ -121,28 +157,7 @@ func InExistingTransaction[R any](ctx context.Context, fun func(ctx TxContext) (
 		return defaultValue, ErrNoTransaction
 	}
 
-	result, err := fun(tx)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		// the error `ErrNoRows` will not trigger a rollback.
-		return result, err
-	}
-
-	var noRollbackTxError noRollbackTxError
-	if errors.As(err, &noRollbackTxError) {
-		// user does not want to rollback but still wants to return an error to the caller
-		return result, noRollbackTxError.wrapped
-	}
-
-	if err != nil {
-		// execute rollback and update error
-		if err := tx.Tx.Rollback(); err != nil {
-			log := sl.GetLogger(ctx, InExistingTransaction[R])
-			log.Warnf("Error during rollback: %s", err)
-		}
-	}
-
-	return result, err
+	return fun(tx)
 }
 
 // InAnyTransaction checks the context for an existing transaction created by InNewTransaction.

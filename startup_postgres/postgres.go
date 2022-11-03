@@ -4,20 +4,22 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"github.com/jackc/pgconn"
-	"net/url"
 	"strings"
 	"time"
 
 	"github.com/flachnetz/startup/v2/startup_base"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/pkg/errors"
 
 	"fmt"
-	"github.com/benbjohnson/clock"
-	_ "github.com/jackc/pgx/v4/stdlib"
-	"github.com/jmoiron/sqlx"
-	"github.com/sirupsen/logrus"
 	"io"
 	"sync"
+
+	"github.com/benbjohnson/clock"
+	pgxstd "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jmoiron/sqlx"
+	"github.com/sirupsen/logrus"
 )
 
 type Initializer func(db *sqlx.DB) error
@@ -40,25 +42,40 @@ type PostgresOptions struct {
 
 func (opts *PostgresOptions) Connection() *sqlx.DB {
 	opts.connectionOnce.Do(func() {
+		ctx, cancelTimeout := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancelTimeout()
+
 		logger := logrus.WithField("prefix", "postgres")
 
-		pgUrl, err := url.Parse(opts.URL)
+		conf, err := pgx.ParseConfig(opts.URL)
+		startup_base.PanicOnError(err, "Failed to parse database connection")
+
 		if err == nil {
-			pgUrl.User = nil
-			logger.Infof("Connecting to postgres database (username and password removed) at %s", pgUrl.String())
+			logger.Infof(
+				"Connecting to postgres database at %s@%s:%d/%s",
+				conf.User, conf.Host, conf.Port, conf.Database,
+			)
 		}
 
-		connector, err := openConnector(opts.URL)
-		startup_base.PanicOnError(err, "Failed to create a database connector")
+		conf.Tracer = tracerWrapper{}
 
-		db := opts.mustConnect(connector)
+		// create the new database connection
+		db := sqlx.NewDb(pgxstd.OpenDB(*conf), "pgx")
 
-		if pgUrl != nil {
-			if schema := pgUrl.Query().Get("search_path"); schema != "" {
-				logger.Infof("Ensure default schema %q exists", schema)
-				_, err := db.Exec(`CREATE SCHEMA IF NOT EXISTS ` + quoteIdentifier(schema))
-				startup_base.PanicOnError(err, "Failed to create schema %q in database", schema)
-			}
+		// configure pool
+		db.SetMaxOpenConns(opts.PoolSize)
+		db.SetMaxIdleConns(opts.PoolSize)
+		db.SetConnMaxLifetime(opts.ConnectionLifetime)
+
+		// check the connection
+		err = db.PingContext(ctx)
+		startup_base.PanicOnError(err, "Failed to ping database")
+
+		// create schema if needed
+		if schema := conf.RuntimeParams["search_path"]; schema != "" {
+			logger.Infof("Ensure default schema %q exists", schema)
+			_, err := db.Exec(`CREATE SCHEMA IF NOT EXISTS ` + quoteIdentifier(schema))
+			startup_base.PanicOnError(err, "Failed to create schema %q in database", schema)
 		}
 
 		if opts.Inputs.Initializer != nil {
@@ -66,7 +83,7 @@ func (opts *PostgresOptions) Connection() *sqlx.DB {
 
 			if err := opts.Inputs.Initializer(db); err != nil {
 				// close database on error
-				defer db.Close()
+				defer startup_base.Close(db, "Close database after error")
 				startup_base.PanicOnError(err, "Database initialization failed")
 			}
 		}
@@ -129,16 +146,18 @@ func (ch channelCloser) Close() error {
 }
 
 func ErrIsForeignKeyViolation(err error) bool {
-	if err, ok := err.(*pgconn.PgError); ok {
-		return err.Code == "23503"
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23503"
 	}
 
 	return false
 }
 
 func ErrIsUniqueViolation(err error) bool {
-	if err, ok := err.(*pgconn.PgError); ok {
-		return err.Code == "23505"
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23505"
 	}
 
 	return false

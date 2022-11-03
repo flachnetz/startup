@@ -1,12 +1,13 @@
 package startup_postgres
 
 import (
+	"os"
+
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/rubenv/sql-migrate"
 	"github.com/sirupsen/logrus"
-	"os"
 )
 
 // Migration Runs a migration with the sql files from the given directory.
@@ -33,7 +34,7 @@ func Migration(table, directory string) Initializer {
 	}
 }
 
-// Creates an Initializer that performs a database migration by looking for
+// DefaultMigration creates an Initializer that performs a database migration by looking for
 // sql files in the default directories.
 func DefaultMigration(table string) Initializer {
 	return Migration(table, guessMigrationDirectory())

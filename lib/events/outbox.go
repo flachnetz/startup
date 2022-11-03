@@ -4,11 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
+
 	"github.com/flachnetz/startup/v2/lib"
-	"github.com/jackc/pgtype"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"time"
 )
 
 func WriteToOutbox(ctx context.Context, tx sqlx.ExecerContext, metadata EventMetadata, payload []byte) error {
@@ -19,29 +19,18 @@ func WriteToOutbox(ctx context.Context, tx sqlx.ExecerContext, metadata EventMet
 		key = lib.PtrOf(fmt.Sprintf("%d", time.Now().UnixMilli()))
 	}
 
-	header_keys := make([]string, 0, len(metadata.Headers))
-	header_values := make([]string, 0, len(metadata.Headers))
+	headerKeys := make([]string, 0, len(metadata.Headers))
+	headerValues := make([]string, 0, len(metadata.Headers))
 
 	for _, header := range metadata.Headers {
-		header_keys = append(header_keys, header.Key)
-		header_values = append(header_values, header.Value)
+		headerKeys = append(headerKeys, header.Key)
+		headerValues = append(headerValues, header.Value)
 	}
 
 	// insert event into database
 	stmt := "INSERT INTO public.kafka_outbox (kafka_topic, kafka_key, kafka_value, kafka_header_keys, kafka_header_values) VALUES ($1, $2, $3, $4, $5)"
-	_, err := tx.ExecContext(ctx, stmt, topic, toText(key), payload, toTextArray(header_keys), toTextArray(header_values))
+	_, err := tx.ExecContext(ctx, stmt, topic, key, payload, headerKeys, headerValues)
 	return errors.WithMessage(err, "write event into database")
-}
-
-func toText(value *string) pgtype.Text {
-	var arr pgtype.Text
-	_ = arr.Set(value)
-	return arr
-}
-func toTextArray(values []string) pgtype.TextArray {
-	var arr pgtype.TextArray
-	_ = arr.Set(values)
-	return arr
 }
 
 func CreateOutbox(ctx context.Context, db *sql.DB) error {
