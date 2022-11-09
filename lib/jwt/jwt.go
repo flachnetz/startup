@@ -3,14 +3,15 @@ package jwt
 import (
 	"context"
 	"crypto/tls"
-	"github.com/benbjohnson/clock"
-	"github.com/lestrrat-go/jwx/jwk"
-	"github.com/lestrrat-go/jwx/jwt"
-	"github.com/pkg/errors"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/benbjohnson/clock"
+	"github.com/lestrrat-go/jwx/jwk"
+	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/pkg/errors"
 )
 
 type JwtStruct struct {

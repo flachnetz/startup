@@ -2,15 +2,16 @@ package startup
 
 import (
 	"fmt"
+	"net"
+	"net/url"
+	"os"
+	"reflect"
+
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/go-playground/validator.v9"
-	"net"
-	"net/url"
-	"os"
-	"reflect"
 )
 
 var log = logrus.WithField("prefix", "startup")

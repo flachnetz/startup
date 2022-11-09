@@ -2,12 +2,13 @@ package startup_http
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 // A source returns a value for a given key. A source might be backed
@@ -28,8 +29,10 @@ var CustomTypes = map[reflect.Type]Setter{
 
 // cache that maps a combination of type and tag name to a list of
 // operations to apply during mapping
-var typeCache = make(map[string]map[reflect.Type][]operation)
-var typeCacheLock sync.Mutex
+var (
+	typeCache     = make(map[string]map[reflect.Type][]operation)
+	typeCacheLock sync.Mutex
+)
 
 type operation struct {
 	// the key to look use to lookup the value in the source

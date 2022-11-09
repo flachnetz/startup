@@ -2,15 +2,14 @@ package startup_failpoints
 
 import (
 	"embed"
-	"github.com/pkg/errors"
 	"html/template"
 	"io"
+
+	"github.com/pkg/errors"
 )
 
-var (
-	//go:embed templates/failpoint.gohtml
-	fpTemplate embed.FS
-)
+//go:embed templates/failpoint.gohtml
+var fpTemplate embed.FS
 
 type TemplateResponse struct {
 	UpdateFailPointsEndpoint string

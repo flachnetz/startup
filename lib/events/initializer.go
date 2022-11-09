@@ -2,10 +2,11 @@ package events
 
 import (
 	"context"
+	"reflect"
+
 	confluent "github.com/Landoop/schema-registry"
 	rdkafka "github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/pkg/errors"
-	"reflect"
 )
 
 type EventSenderInitializer interface {

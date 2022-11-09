@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"net/http"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 type FailPointLocation string
@@ -139,7 +140,7 @@ func (f *FailPointService) ReturnErrorIfFailPointActive(ctx context.Context, loc
 				return nil
 			}
 
-			return fp.Error //rgs2.RgsErrorf(fp.Error, "%s - %s", location, fp)
+			return fp.Error // rgs2.RgsErrorf(fp.Error, "%s - %s", location, fp)
 		}
 	}
 	return nil
@@ -198,7 +199,6 @@ func (f *FailPointService) HandleFailPointPage(updateFailPointsEndpoint string) 
 }
 
 func NewFailPoint(err FailPointError) FailPoint {
-
 	return FailPoint{
 		Error:    err,
 		IsActive: false,

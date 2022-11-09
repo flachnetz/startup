@@ -1,9 +1,10 @@
 package startup_tracing
 
 import (
+	"net/http"
+
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
-	"net/http"
 )
 
 func responseLoggerOf(w http.ResponseWriter) (*responseLogger, http.ResponseWriter) {

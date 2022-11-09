@@ -2,9 +2,10 @@ package startup_logrus
 
 import (
 	"context"
+	"reflect"
+
 	"github.com/opentracing/opentracing-go"
 	"github.com/sirupsen/logrus"
-	"reflect"
 )
 
 // default empty logger

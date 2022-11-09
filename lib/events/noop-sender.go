@@ -2,8 +2,9 @@ package events
 
 import (
 	"context"
-	"github.com/jmoiron/sqlx"
 	"sync"
+
+	"github.com/jmoiron/sqlx"
 )
 
 type NoopEventSender struct {

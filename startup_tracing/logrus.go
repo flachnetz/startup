@@ -35,7 +35,6 @@ func (t logrusHook) Fire(entry *logrus.Entry) error {
 	// in most cases we will probably get a zipkin span, so we can try to get the traceId directly.
 	if zipkinSpanContext, ok := spanContext.(zipkintracer.SpanContext); ok {
 		traceId = zipkinSpanContext.TraceID.String()
-
 	} else {
 		// fallback to injecting the span id into a map and then reading it
 		// out of the map again.

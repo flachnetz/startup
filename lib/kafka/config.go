@@ -2,8 +2,9 @@ package kafka
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
 type logrusAdapter struct {
@@ -13,9 +14,11 @@ type logrusAdapter struct {
 func (l logrusAdapter) Print(v ...interface{}) {
 	l.delegate.Println(strings.TrimSpace(fmt.Sprint(v...)))
 }
+
 func (l logrusAdapter) Printf(format string, v ...interface{}) {
 	l.delegate.Println(strings.TrimSpace(fmt.Sprintf(format, v...)))
 }
+
 func (l logrusAdapter) Println(v ...interface{}) {
 	l.delegate.Println(strings.TrimSpace(fmt.Sprint(v...)))
 }

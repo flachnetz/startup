@@ -1,10 +1,11 @@
 package startup_consul
 
 import (
+	"sync"
+
 	"github.com/flachnetz/startup/v2/lib/schema"
 	"github.com/flachnetz/startup/v2/startup_base"
 	consul "github.com/hashicorp/consul/api"
-	"sync"
 )
 
 type ConsulOptions struct {

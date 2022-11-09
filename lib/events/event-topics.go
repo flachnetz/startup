@@ -1,9 +1,10 @@
 package events
 
 import (
+	"reflect"
+
 	"github.com/flachnetz/startup/v2/lib/kafka"
 	"github.com/pkg/errors"
-	"reflect"
 )
 
 // TopicsFunc builds an EventTopics instance for the given kafka replication factor.
