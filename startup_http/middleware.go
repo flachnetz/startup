@@ -2,8 +2,9 @@ package startup_http
 
 import (
 	"context"
-	"github.com/julienschmidt/httprouter"
 	"net/http"
+
+	"github.com/julienschmidt/httprouter"
 )
 
 type HttpMiddleware func(http.Handler) http.Handler

@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 type EventSource struct {
@@ -31,7 +32,6 @@ func NewConverter(registry *SchemaRegistry, options ConverterOptions) *Converter
 }
 
 func (c *Converter) Parse(data []byte) (map[string]interface{}, *EventSource, error) {
-
 	if bytes.HasPrefix(data, []byte("Obj\x01")) {
 		// This isn't used anymore, i think.
 		return nil, nil, errors.New("events in avro container format not supported")

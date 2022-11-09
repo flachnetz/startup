@@ -6,12 +6,13 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-type tracerWrapper struct {
-}
+type tracerWrapper struct{}
 
-var _ = (pgx.QueryTracer)(tracerWrapper{})
-var _ = (pgx.PrepareTracer)(tracerWrapper{})
-var _ = (pgx.ConnectTracer)(tracerWrapper{})
+var (
+	_ = (pgx.QueryTracer)(tracerWrapper{})
+	_ = (pgx.PrepareTracer)(tracerWrapper{})
+	_ = (pgx.ConnectTracer)(tracerWrapper{})
+)
 
 func (m tracerWrapper) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
 	tracer := globalTracer.Load()

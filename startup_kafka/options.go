@@ -2,10 +2,11 @@ package startup_kafka
 
 import (
 	"fmt"
-	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/flachnetz/startup/v2/startup_base"
 	"strings"
 	"time"
+
+	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/flachnetz/startup/v2/startup_base"
 )
 
 // KafkaOptions provides simple flags for to create a kafka consumer

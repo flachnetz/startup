@@ -1,9 +1,10 @@
 package startup
 
 import (
-	"github.com/jessevdk/go-flags"
 	"os"
 	"testing"
+
+	"github.com/jessevdk/go-flags"
 )
 
 type testStruct struct {

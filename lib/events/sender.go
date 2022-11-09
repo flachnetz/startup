@@ -2,10 +2,11 @@ package events
 
 import (
 	"context"
-	"github.com/jmoiron/sqlx"
-	"github.com/sirupsen/logrus"
 	"io"
 	"time"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/sirupsen/logrus"
 )
 
 func TimeToEventTimestamp(ts time.Time) int64 {

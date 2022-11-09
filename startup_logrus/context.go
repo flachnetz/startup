@@ -3,12 +3,13 @@ package startup_logrus
 import (
 	"context"
 	"fmt"
-	"github.com/openzipkin/zipkin-go/propagation/b3"
-	"github.com/sirupsen/logrus"
 	"net/http"
 	"reflect"
 	"regexp"
 	"runtime"
+
+	"github.com/openzipkin/zipkin-go/propagation/b3"
+	"github.com/sirupsen/logrus"
 )
 
 type loggerKey struct{}

@@ -4,17 +4,16 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"fmt"
+	"io"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/pkg/errors"
-
-	"fmt"
-	"io"
-	"sync"
 
 	"github.com/benbjohnson/clock"
 	pgxstd "github.com/jackc/pgx/v5/stdlib"

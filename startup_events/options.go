@@ -92,7 +92,6 @@ func initializeEventSender(opts *EventOptions, clientId string) (events.EventSen
 		eventTopics,
 		bufferSize,
 	)
-
 	if err != nil {
 		if kafkaSender != nil {
 			kafkaSender.Close()
@@ -117,7 +116,7 @@ func fileSender(file string) (io.WriteCloser, error) {
 		return nil, nil
 	}
 
-	return os.OpenFile(file, os.O_CREATE|os.O_WRONLY, 0644)
+	return os.OpenFile(file, os.O_CREATE|os.O_WRONLY, 0o644)
 }
 
 func kafkaSender(opts *EventOptions, clientId string) (*kafka.Producer, error) {

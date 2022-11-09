@@ -1,9 +1,10 @@
 package startup_http
 
 import (
+	"io"
+
 	"github.com/labstack/gommon/log"
 	"github.com/sirupsen/logrus"
-	"io"
 )
 
 // Logger Wraps logrus logger for http echo framework

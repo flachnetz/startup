@@ -12,9 +12,11 @@ import (
 	"github.com/opentracing/opentracing-go/ext"
 )
 
-var reNumber = regexp.MustCompile(`/[0-9]+`)
-var reClean = regexp.MustCompile(`/(?:tenants|sites|games|customers|tickets)/[^/]+`)
-var reUUID = regexp.MustCompile(`/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}`)
+var (
+	reNumber = regexp.MustCompile(`/[0-9]+`)
+	reClean  = regexp.MustCompile(`/(?:tenants|sites|games|customers|tickets)/[^/]+`)
+	reUUID   = regexp.MustCompile(`/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}`)
+)
 
 // Returns a middleware that adds tracing to an http handler.
 // This will create a new and empty local storage for the current go routine
@@ -23,7 +25,6 @@ var reUUID = regexp.MustCompile(`/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-
 // You can use the tracing middleware multiple time. Using it a second time
 // will not start a new trace but will update 'service' and 'operation'.
 func Tracing(service string, op string) startup_http.HttpMiddleware {
-
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			ctx := req.Context()

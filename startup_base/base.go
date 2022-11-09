@@ -2,16 +2,19 @@ package startup_base
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
-	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 	"os"
 	"path"
+
+	"github.com/sirupsen/logrus"
+	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
-var BuildPackage string
-var BuildGitHash string
-var BuildVersion string
-var BuildUnixTimestamp string
+var (
+	BuildPackage       string
+	BuildGitHash       string
+	BuildVersion       string
+	BuildUnixTimestamp string
+)
 
 type BaseOptions struct {
 	Logfile       string `long:"log-file" description:"Write logs to a different file. Defaults to stdout."`
@@ -33,7 +36,6 @@ func (opts *BaseOptions) Initialize() {
 
 	if opts.JSONFormatter {
 		logrus.SetFormatter(&logrus.JSONFormatter{})
-
 	} else {
 		logrus.SetFormatter(&prefixed.TextFormatter{
 			FullTimestamp:   true,

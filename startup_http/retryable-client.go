@@ -2,11 +2,12 @@ package startup_http
 
 import (
 	"bytes"
+	"io/ioutil"
+	"net/http"
+
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"io/ioutil"
-	"net/http"
 
 	"github.com/flachnetz/startup/v2/startup_base"
 )
@@ -59,7 +60,6 @@ func RetryableHttpClient(logger *logrus.Entry, client *http.Client, debug bool) 
 }
 
 func DoRequest(httpClient *retryablehttp.Client, httpReq *retryablehttp.Request, auth string, errorParser func([]byte) error) ([]byte, *http.Response, error) {
-
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "application/json")
 	httpReq.Header.Set("Authorization", auth)
@@ -86,7 +86,6 @@ func DoRequest(httpClient *retryablehttp.Client, httpReq *retryablehttp.Request,
 		} else {
 			return body, resp, errors.Errorf("doRequest - request:%s status:%d body:%s", httpReq.URL.String(), resp.StatusCode, string(body))
 		}
-
 	}
 
 	return body, resp, nil

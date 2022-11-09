@@ -5,6 +5,12 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"io"
+	"reflect"
+	"strings"
+	"sync"
+	"time"
+
 	confluent "github.com/Landoop/schema-registry"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/flachnetz/startup/v2/startup_tracing"
@@ -12,11 +18,6 @@ import (
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/pkg/errors"
-	"io"
-	"reflect"
-	"strings"
-	"sync"
-	"time"
 )
 
 type eventWithSpan struct {
@@ -74,8 +75,8 @@ func NewInitializer(
 	kafkaSender *kafka.Producer,
 	fileSender io.WriteCloser,
 	eventTopics EventTopics,
-	bufferSize uint) (EventSenderInitializer, error) {
-
+	bufferSize uint,
+) (EventSenderInitializer, error) {
 	if bufferSize == 0 {
 		// use default value for buffer size
 		bufferSize = 1024

@@ -10,8 +10,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-var ErrNoTransaction = errors.New("no transaction in context")
-var ErrTransactionExistInContext = errors.New("transaction exists in context")
+var (
+	ErrNoTransaction             = errors.New("no transaction in context")
+	ErrTransactionExistInContext = errors.New("transaction exists in context")
+)
 
 type noRollbackTxError struct {
 	wrapped error

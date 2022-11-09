@@ -1,9 +1,10 @@
 package events
 
 import (
+	"reflect"
+
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/pkg/errors"
-	"reflect"
 )
 
 type EventHeader struct {

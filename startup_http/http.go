@@ -58,7 +58,6 @@ type HTTPOptions struct {
 }
 
 func (opts HTTPOptions) Serve(config Config) {
-
 	// guess the app name
 	appName := config.Name
 	if appName == "" {
@@ -125,7 +124,6 @@ func (opts HTTPOptions) Serve(config Config) {
 				GetLogger(ctx, "httpd").Debug(line)
 			},
 		}
-
 	} else if opts.AccessLog != "/dev/null" {
 		fp, err := startup_base.OpenWriter(opts.AccessLog)
 		startup_base.PanicOnError(err, "Could not open log file")
@@ -172,7 +170,6 @@ func (opts HTTPOptions) Serve(config Config) {
 		// wait for server to shutdown. ListenAndServe returns directly
 		// if server.Shutdown() is called.
 		<-waitCh
-
 	} else if err != nil {
 		startup_base.PanicOnError(err, "Could not start server")
 		return

@@ -1,13 +1,14 @@
 package avro
 
 import (
+	"regexp"
+	"strconv"
+	"sync"
+
 	schemaregistry "github.com/Landoop/schema-registry"
 	"github.com/linkedin/goavro/v2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"regexp"
-	"strconv"
-	"sync"
 
 	"github.com/flachnetz/startup/v2/lib/schema"
 )

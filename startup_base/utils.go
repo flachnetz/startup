@@ -2,10 +2,11 @@ package startup_base
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"os"
+
+	"github.com/sirupsen/logrus"
 )
 
 var log = logrus.WithField("prefix", "startup-base")

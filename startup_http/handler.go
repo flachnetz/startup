@@ -4,17 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	. "github.com/flachnetz/startup/v2/startup_logrus"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"reflect"
 	"strconv"
 
-	"fmt"
+	. "github.com/flachnetz/startup/v2/startup_logrus"
+
 	"github.com/julienschmidt/httprouter"
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
-	"net/url"
 )
 
 type ResponseValue struct {
@@ -102,7 +103,6 @@ func WriteBody(writer http.ResponseWriter, statusCode int, contentType string, c
 	writer.WriteHeader(statusCode)
 
 	_, err := writer.Write(content)
-
 	// We failed to write our response, what can we do here?
 	// Not much, we will just panic.
 	if err != nil {
@@ -212,8 +212,8 @@ func ExtractAndCallWithBody(
 	w http.ResponseWriter,
 	r *http.Request,
 	params httprouter.Params,
-	handler func() (interface{}, error)) {
-
+	handler func() (interface{}, error),
+) {
 	ExtractAndCall(target, w, r, params, func() (interface{}, error) {
 		if byteSlice, ok := body.(*[]byte); ok {
 			var err error

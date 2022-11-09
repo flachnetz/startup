@@ -1,16 +1,16 @@
 package startup_tracing
 
 import (
+	log2 "log"
+	"strings"
+	"sync"
+
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/opentracing/opentracing-go"
 	zipkinot "github.com/openzipkin-contrib/zipkin-go-opentracing"
 	"github.com/openzipkin/zipkin-go"
 	zipkinhttp "github.com/openzipkin/zipkin-go/reporter/http"
 	"github.com/sirupsen/logrus"
-	log2 "log"
-	"strings"
-
-	"sync"
 )
 
 var log = logrus.WithField("prefix", "zipkin")
