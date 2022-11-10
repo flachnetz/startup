@@ -118,9 +118,7 @@ func (f *FailPointService) GetFailPoints() []FailPoint {
 	f.failPointsLock.Lock()
 	defer f.failPointsLock.Unlock()
 	var resp []FailPoint
-	for _, fp := range f.failPoints {
-		resp = append(resp, fp)
-	}
+	resp = append(resp, f.failPoints...)
 	return resp
 }
 

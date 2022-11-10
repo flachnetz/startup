@@ -134,7 +134,8 @@ func prefixRegistry(r metrics.Registry, prefix string) metrics.Registry {
 	// insert them all into the prefixed registry
 	prefixed := metrics.NewPrefixedRegistry(prefix + ".")
 	for name, metric := range backup {
-		prefixed.Register(name, metric)
+		err := prefixed.Register(name, metric)
+		startup_base.PanicOnError(err, "init prefixed registry")
 	}
 
 	return prefixed

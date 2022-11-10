@@ -3,7 +3,6 @@ package startup_base
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 
 	"github.com/sirupsen/logrus"
@@ -27,7 +26,7 @@ func OpenWriter(name string) (io.Writer, error) {
 		return os.Stdout, nil
 
 	case "/dev/null":
-		return ioutil.Discard, nil
+		return io.Discard, nil
 
 	default:
 		// some output file
