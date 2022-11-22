@@ -22,7 +22,7 @@ func Get[T any](ctx TxContext, query string, args ...interface{}) (*T, error) {
 
 // FirstOrNil is similar to Get. It will only scan the first row of the result. If the query does
 // not return any row, this method returns a value of nil and no error.
-func FirstOrNil[T any](ctx TxContext, query string, args ...interface{}) (*T, error) {
+func FirstOrNil[T any](ctx TxContext, query string, args ...any) (*T, error) {
 	result, err := Get[T](ctx, query, args...)
 	switch {
 	case err == nil, errors.Is(err, sql.ErrNoRows):
@@ -33,7 +33,7 @@ func FirstOrNil[T any](ctx TxContext, query string, args ...interface{}) (*T, er
 }
 
 // Select scans the result into a slice of element type T using sqlx.SelectContext.
-func Select[T any](ctx TxContext, query string, args ...interface{}) ([]T, error) {
+func Select[T any](ctx TxContext, query string, args ...any) ([]T, error) {
 	var resultValues []T
 
 	if err := sqlx.SelectContext(ctx, ctx, &resultValues, query, args...); err != nil {
@@ -43,15 +43,21 @@ func Select[T any](ctx TxContext, query string, args ...interface{}) ([]T, error
 	return resultValues, nil
 }
 
+// ExecNamed just execute the given statement in the provided transaction.
+func ExecNamed(ctx TxContext, stmt string, args any) error {
+	_, err := sqlx.NamedExecContext(ctx, ctx, stmt, args)
+	return err
+}
+
 // Exec just execute the given statement in the provided transaction.
-func Exec(ctx TxContext, stmt string, args ...interface{}) error {
+func Exec(ctx TxContext, stmt string, args ...any) error {
 	_, err := ctx.ExecContext(ctx, stmt, args...)
 	return err
 }
 
 // ExecAffected executes the given statement and returns the number of rows that were affected by the statement.
 // This is especially useful with an `UPDATE` statement.
-func ExecAffected(ctx TxContext, stmt string, args ...interface{}) (int, error) {
+func ExecAffected(ctx TxContext, stmt string, args ...any) (int, error) {
 	res, err := ctx.ExecContext(ctx, stmt, args...)
 	if err != nil {
 		return 0, err
@@ -68,7 +74,7 @@ func ExecAffected(ctx TxContext, stmt string, args ...interface{}) (int, error) 
 // Iter returns a typed iterator over the rows of the given query. It is the callers
 // responsibility to close the returned iterator.
 // Most of the time, you want to use Select. Only use this, if you are expecting millions of rows.
-func Iter[T any](ctx TxContext, query string, args ...interface{}) (*QueryIter[T], error) {
+func Iter[T any](ctx TxContext, query string, args ...any) (*QueryIter[T], error) {
 	rows, err := ctx.QueryxContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
