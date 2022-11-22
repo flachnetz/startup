@@ -116,7 +116,7 @@ func InNewTransaction[R any](ctx context.Context, db TxStarter, fun func(ctx TxC
 func requiresTxRollback(err error) (error, bool) {
 	// no rollback required if we just didnt find anything
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, false
+		return err, false
 	}
 
 	// user does not want to rollback but still wants
