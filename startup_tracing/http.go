@@ -89,7 +89,7 @@ func Execute(op string, r *http.Request, client *http.Client) (*http.Response, e
 		client = http.DefaultClient
 	}
 
-	response, err := Trace(r.Context(), op, func(ctx context.Context, span opentracing.Span) (*http.Response, error) {
+	response, err := TraceWithResult(r.Context(), op, func(ctx context.Context, span opentracing.Span) (*http.Response, error) {
 		// inject the spans information into the request so that the
 		// other party can pick it up and continue the request.
 		_ = span.Tracer().Inject(
