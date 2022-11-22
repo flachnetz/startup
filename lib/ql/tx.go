@@ -147,12 +147,20 @@ func endTraceTransaction(ctx context.Context) {
 	tracer.TransactionEnd(ctx)
 }
 
-// InExistingTransaction runs the given operation in the transaction that is hidden in the
+// InExistingTransaction calls InExistingTransactionWithResult without returning the error.
+func InExistingTransaction(ctx context.Context, fun func(ctx TxContext) error) error {
+	_, err := InExistingTransactionWithResult(ctx, func(ctx TxContext) (any, error) {
+		return nil, fun(ctx)
+	})
+	return err
+}
+
+// InExistingTransactionWithResult runs the given operation in the transaction that is hidden in the
 // provided Context instance. If the context does not contain any transaction, ErrNoTransaction
 // will be returned. The context must contain a transaction created by InNewTransaction.
 //
 // This function will not rollback the transaction on error.
-func InExistingTransaction[R any](ctx context.Context, fun func(ctx TxContext) (R, error)) (R, error) {
+func InExistingTransactionWithResult[R any](ctx context.Context, fun func(ctx TxContext) (R, error)) (R, error) {
 	tx := txContextFromContext(ctx)
 	if tx == nil {
 		var defaultValue R
@@ -162,15 +170,23 @@ func InExistingTransaction[R any](ctx context.Context, fun func(ctx TxContext) (
 	return fun(tx)
 }
 
-// InAnyTransaction checks the context for an existing transaction created by InNewTransaction.
+// InAnyTransaction calls InAnyTransactionWithResult without returning a result.
+func InAnyTransaction(ctx context.Context, db TxStarter, fun func(ctx TxContext) error) error {
+	_, err := InAnyTransactionWithResult(ctx, db, func(ctx TxContext) (any, error) {
+		return nil, fun(ctx)
+	})
+	return err
+}
+
+// InAnyTransactionWithResult checks the context for an existing transaction created by InNewTransaction.
 // If a transaction exists it will run the given operation in the transaction context.
 // If no transaction exists, a new transaction will be created.
 //
 // See InNewTransaction regarding error handling.
-func InAnyTransaction[R any](ctx context.Context, db TxStarter, fun func(ctx TxContext) (R, error)) (R, error) {
+func InAnyTransactionWithResult[R any](ctx context.Context, db TxStarter, fun func(ctx TxContext) (R, error)) (R, error) {
 	tx := txContextFromContext(ctx)
 	if tx != nil {
-		return InExistingTransaction[R](ctx, fun)
+		return InExistingTransactionWithResult[R](ctx, fun)
 	} else {
 		return InNewTransaction[R](ctx, db, fun)
 	}

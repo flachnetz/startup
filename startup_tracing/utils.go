@@ -9,15 +9,15 @@ import (
 	"github.com/pkg/errors"
 )
 
-func SimpleTrace(ctx context.Context, op string, fn func(ctx context.Context, span opentracing.Span) error) (err error) {
-	_, err = Trace(ctx, op, func(ctx context.Context, span opentracing.Span) (any, error) {
+func Trace(ctx context.Context, op string, fn func(ctx context.Context, span opentracing.Span) error) (err error) {
+	_, err = TraceWithResult(ctx, op, func(ctx context.Context, span opentracing.Span) (any, error) {
 		return nil, fn(ctx, span)
 	})
 	return err
 }
 
-// Trace traces a child call while propagating the span using the context.
-func Trace[T any](ctx context.Context, op string, fn func(ctx context.Context, span opentracing.Span) (T, error)) (result T, err error) {
+// TraceWithResult traces a child call while propagating the span using the context.
+func TraceWithResult[T any](ctx context.Context, op string, fn func(ctx context.Context, span opentracing.Span) (T, error)) (result T, err error) {
 	var parentContext opentracing.SpanContext
 
 	parentSpan := CurrentSpanFromContext(ctx)
