@@ -37,7 +37,15 @@ type rStruct[R any] struct {
 	Recovered any
 }
 
-// InNewTransaction creates a new transaction and executes the given function within that transaction.
+// InNewTransaction calls InNewTransactionWithResult without returning a result
+func InNewTransaction(ctx context.Context, db TxStarter, fun func(ctx TxContext) error) error {
+	_, err := InNewTransactionWithResult(ctx, db, func(ctx TxContext) (any, error) {
+		return nil, fun(ctx)
+	})
+	return err
+}
+
+// InNewTransactionWithResult creates a new transaction and executes the given function within that transaction.
 // The method will automatically roll back the transaction if an error is returned or otherwise commit it.
 // This excludes the 'ErrNoRows' error. This error never triggers a rollback.
 //
@@ -48,7 +56,7 @@ type rStruct[R any] struct {
 //
 // If the context already contains a transaction then ErrTransactionExistInContext will be returned as
 // error and the actual operation will not be executed.
-func InNewTransaction[R any](ctx context.Context, db TxStarter, fun func(ctx TxContext) (R, error)) (R, error) {
+func InNewTransactionWithResult[R any](ctx context.Context, db TxStarter, fun func(ctx TxContext) (R, error)) (R, error) {
 	if tx := txContextFromContext(ctx); tx != nil {
 		// must not have an existing transaction in context
 		var defaultValue R
@@ -77,7 +85,7 @@ func InNewTransaction[R any](ctx context.Context, db TxStarter, fun func(ctx TxC
 			if err := tx.Rollback(); err != nil {
 				// If the rollback failed, there isnt much we can do except logging
 				// the issue.
-				sl.GetLogger(ctx, InNewTransaction[R]).Warnf("Rollback during panic failed: %s", err)
+				sl.GetLogger(ctx, InNewTransactionWithResult[R]).Warnf("Rollback during panic failed: %s", err)
 			}
 		}
 	}()
@@ -157,7 +165,7 @@ func InExistingTransaction(ctx context.Context, fun func(ctx TxContext) error) e
 
 // InExistingTransactionWithResult runs the given operation in the transaction that is hidden in the
 // provided Context instance. If the context does not contain any transaction, ErrNoTransaction
-// will be returned. The context must contain a transaction created by InNewTransaction.
+// will be returned. The context must contain a transaction created by InNewTransactionWithResult.
 //
 // This function will not rollback the transaction on error.
 func InExistingTransactionWithResult[R any](ctx context.Context, fun func(ctx TxContext) (R, error)) (R, error) {
@@ -178,17 +186,17 @@ func InAnyTransaction(ctx context.Context, db TxStarter, fun func(ctx TxContext)
 	return err
 }
 
-// InAnyTransactionWithResult checks the context for an existing transaction created by InNewTransaction.
+// InAnyTransactionWithResult checks the context for an existing transaction created by InNewTransactionWithResult.
 // If a transaction exists it will run the given operation in the transaction context.
 // If no transaction exists, a new transaction will be created.
 //
-// See InNewTransaction regarding error handling.
+// See InNewTransactionWithResult regarding error handling.
 func InAnyTransactionWithResult[R any](ctx context.Context, db TxStarter, fun func(ctx TxContext) (R, error)) (R, error) {
 	tx := txContextFromContext(ctx)
 	if tx != nil {
 		return InExistingTransactionWithResult[R](ctx, fun)
 	} else {
-		return InNewTransaction[R](ctx, db, fun)
+		return InNewTransactionWithResult[R](ctx, db, fun)
 	}
 }
 
