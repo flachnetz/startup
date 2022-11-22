@@ -12,8 +12,7 @@ type Action func()
 
 // Tx describes a simple transaction
 type Tx interface {
-	sqlx.ExecerContext
-	sqlx.QueryerContext
+	sqlx.ExtContext
 }
 
 type Hooks interface {
