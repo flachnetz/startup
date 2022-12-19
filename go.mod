@@ -1,9 +1,9 @@
 module github.com/flachnetz/startup/v2
 
 require (
-	github.com/DATA-DOG/go-sqlmock v1.4.1
 	github.com/DataDog/datadog-go v4.8.3+incompatible
 	github.com/Landoop/schema-registry v0.0.0-20190327143759-50a5701c1891
+	github.com/Unleash/unleash-client-go/v3 v3.7.1
 	github.com/benbjohnson/clock v1.3.0
 	github.com/confluentinc/confluent-kafka-go v1.8.2
 	github.com/flachnetz/go-admin v1.5.3
@@ -12,8 +12,6 @@ require (
 	github.com/gorilla/handlers v1.5.1
 	github.com/hashicorp/consul/api v1.12.0
 	github.com/hashicorp/go-retryablehttp v0.7.0
-	github.com/jackc/pgconn v1.10.1
-	github.com/jackc/pgtype v1.9.1
 	github.com/jackc/pgx/v5 v5.0.4
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/jmoiron/sqlx v1.3.4
@@ -22,12 +20,10 @@ require (
 	github.com/lestrrat-go/jwx v1.2.18
 	github.com/linkedin/goavro/v2 v2.10.1
 	github.com/oklog/ulid v1.3.1
-	github.com/onsi/gomega v1.16.0
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/openzipkin-contrib/zipkin-go-opentracing v0.4.5
 	github.com/openzipkin/zipkin-go v0.4.0
 	github.com/pkg/errors v0.9.1
-	github.com/qustavo/sqlhooks/v2 v2.1.0
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/rubenv/sql-migrate v1.0.0
 	github.com/sirupsen/logrus v1.8.1
@@ -38,6 +34,7 @@ require (
 )
 
 require (
+	github.com/Masterminds/semver/v3 v3.1.1 // indirect
 	github.com/Microsoft/go-winio v0.5.1 // indirect
 	github.com/armon/go-metrics v0.3.10 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
@@ -55,10 +52,7 @@ require (
 	github.com/hashicorp/go-rootcerts v1.0.2 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/hashicorp/serf v0.9.7 // indirect
-	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
-	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
-	github.com/jackc/pgproto3/v2 v2.2.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20200714003250-2b9c44734f2b // indirect
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
@@ -67,24 +61,25 @@ require (
 	github.com/lestrrat-go/httpcc v1.0.0 // indirect
 	github.com/lestrrat-go/iter v1.0.1 // indirect
 	github.com/lestrrat-go/option v1.0.0 // indirect
+	github.com/lib/pq v1.10.2 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.4.3 // indirect
 	github.com/opentracing-contrib/go-observer v0.0.0-20170622124052-a52f23424492 // indirect
+	github.com/stretchr/objx v0.2.0 // indirect
+	github.com/twmb/murmur3 v1.1.5 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.1 // indirect
 	github.com/ziutek/mymysql v1.5.4 // indirect
 	golang.org/x/crypto v0.1.0 // indirect
-	golang.org/x/net v0.1.0 // indirect
 	golang.org/x/sys v0.1.0 // indirect
 	golang.org/x/term v0.1.0 // indirect
 	golang.org/x/text v0.4.0 // indirect
 	google.golang.org/grpc v1.43.0 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/gorp.v1 v1.7.2 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
 go 1.19
