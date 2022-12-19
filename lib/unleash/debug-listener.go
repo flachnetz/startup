@@ -29,15 +29,15 @@ func (l DebugListener) OnReady() {
 
 // OnCount prints to the console when the feature is queried.
 func (l DebugListener) OnCount(name string, enabled bool) {
-	logger.Debugf("Counted '%s'  as enabled? %v\n", name, enabled)
+	logger.Debugf("Counted '%s'  as enabled? %v", name, enabled)
 }
 
 // OnSent prints to the console when the server has uploaded metrics.
 func (l DebugListener) OnSent(payload unleash.MetricsData) {
-	logger.Debugf("Sent: %+v\n", payload)
+	logger.Debugf("Sent: %+v", payload)
 }
 
 // OnRegistered prints to the console when the client has registered.
 func (l DebugListener) OnRegistered(payload unleash.ClientData) {
-	logger.Infof("Registered: %+v\n", payload)
+	logger.Infof("Registered: %+v", payload)
 }
