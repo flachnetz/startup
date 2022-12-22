@@ -69,12 +69,11 @@ func (opts *MetricsOptions) Initialize() {
 
 			udpAddr, err := net.ResolveUDPAddr("udp", opts.Datadog.StatsDAddress)
 			startup_base.PanicOnError(err, "cannot resolve "+opts.Datadog.StatsDAddress)
-			log.Infof("Using %s (%+v) as statsd endpoint", opts.Datadog.StatsDAddress, udpAddr)
 
 			c, err := statsd.New(opts.Datadog.StatsDAddress, statsd.WithTags(tags))
 			startup_base.PanicOnError(err, "cannot create statsd client")
 
-			log.Infof("Activating statsd for metrics: '%s'", opts.Datadog.StatsDAddress)
+			log.Infof("Activating statsd for metrics: '%s' (%+v)", opts.Datadog.StatsDAddress, udpAddr)
 			r, err := datadog.NewReporter(registry, c, opts.Datadog.Interval)
 			startup_base.PanicOnError(err, "cannot start datadog statsd metrics reporter")
 			go r.Flush()
