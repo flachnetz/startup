@@ -7,7 +7,8 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/DataDog/datadog-go/statsd"
+	"github.com/DataDog/datadog-go/v5/statsd"
+
 	"github.com/flachnetz/go-datadog"
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/pkg/errors"
