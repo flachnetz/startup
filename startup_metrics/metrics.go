@@ -1,6 +1,7 @@
 package startup_metrics
 
 import (
+	"net"
 	"os"
 	"strings"
 	"sync"
@@ -65,6 +66,10 @@ func (opts *MetricsOptions) Initialize() {
 		if opts.Datadog.StatsDAddress != "" {
 			tags, err := opts.baseTags()
 			startup_base.PanicOnError(err, "cannot create base datadog tags")
+
+			udpAddr, err := net.ResolveUDPAddr("udp", opts.Datadog.StatsDAddress)
+			startup_base.PanicOnError(err, "cannot resolve "+opts.Datadog.StatsDAddress)
+			log.Infof("Using %s (%+v) as statsd endpoint", opts.Datadog.StatsDAddress, udpAddr)
 
 			c, err := statsd.New(opts.Datadog.StatsDAddress, statsd.WithTags(tags))
 			startup_base.PanicOnError(err, "cannot create statsd client")
