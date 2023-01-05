@@ -8,14 +8,14 @@ import (
 
 type txContextKey struct{}
 
-func newTxContext(ctx context.Context, tx *sqlx.Tx, hooks Hooks) TxContext {
+func newTxContext(ctx context.Context, tx *sqlx.Tx, hooks *hooks) TxContext {
 	return &txContext{ctx, tx, hooks}
 }
 
 type txContext struct {
 	context.Context
 	*sqlx.Tx
-	Hooks
+	*hooks
 }
 
 func (c *txContext) WithContext(ctx context.Context) TxContext {
@@ -30,6 +30,16 @@ func (c *txContext) Value(key any) any {
 	}
 
 	return c.Context.Value(key)
+}
+
+func (c *txContext) CommitAndChain() error {
+	if err := Exec(c, "COMMIT AND CHAIN"); err != nil {
+		return err
+	}
+
+	c.hooks.RunOnCommit()
+
+	return nil
 }
 
 func txContextFromContext(ctx context.Context) *txContext {

@@ -109,14 +109,16 @@ func InNewTransactionWithResult[R any](ctx context.Context, db TxStarter, fun fu
 		return res, err
 	}
 
-	// Everything is fine, customer wants to commit
+	// everything is fine, customer wants to commit
 	cerr := tx.Commit()
 	if cerr != nil && !errors.Is(cerr, sql.ErrTxDone) {
 		err = commitError{err: err, cerr: cerr}
 	}
 
 	// if we committed with no errors, we can run the commit hooks
-	hooks.RunOnCommit()
+	if cerr == nil {
+		hooks.RunOnCommit()
+	}
 
 	return res, err
 }
