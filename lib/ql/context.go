@@ -30,6 +30,10 @@ type TxContext interface {
 
 	// WithContext returns a new TxContext with the given "real" context.
 	WithContext(ctx context.Context) TxContext
+
+	// CommitAndChain performs a commit, runs all OnCommit hooks and creates a new transaction
+	// using the postgres `COMMIT AND CHAIN` command.
+	CommitAndChain() error
 }
 
 // WithTimeout is a wrapper around context.WithTimeout
