@@ -12,4 +12,6 @@ func (oc *hooks) RunOnCommit() {
 	for _, action := range oc.onCommit {
 		action()
 	}
+
+	oc.onCommit = oc.onCommit[:0]
 }
