@@ -116,7 +116,7 @@ func InNewTransactionWithResult[R any](ctx context.Context, db TxStarter, fun fu
 	}
 
 	// if we committed with no errors, we can run the commit hooks
-	if cerr != nil {
+	if cerr == nil {
 		hooks.RunOnCommit()
 	}
 
