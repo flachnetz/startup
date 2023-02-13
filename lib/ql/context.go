@@ -27,6 +27,7 @@ type TxContext interface {
 	context.Context
 	Tx
 	Hooks
+	sqlx.PreparerContext
 
 	// WithContext returns a new TxContext with the given "real" context.
 	WithContext(ctx context.Context) TxContext
