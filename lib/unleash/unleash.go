@@ -1,12 +1,13 @@
 package unleash
 
 import (
+	"net/http"
+	"net/url"
+
 	"github.com/Unleash/unleash-client-go/v3"
 	"github.com/flachnetz/startup/v2"
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/flachnetz/startup/v2/startup_tracing"
-	"net/http"
-	"net/url"
 )
 
 type Unleash struct {
