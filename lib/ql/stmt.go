@@ -49,6 +49,21 @@ func ExecNamed(ctx TxContext, stmt string, args any) error {
 	return err
 }
 
+// ExecNamedAffected executes the given statement and returns the number of rows that were affected by the statement.
+func ExecNamedAffected(ctx TxContext, stmt string, args any) (int, error) {
+	res, err := sqlx.NamedExecContext(ctx, ctx, stmt, args)
+	if err != nil {
+		return 0, err
+	}
+
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	return int(affected), nil
+}
+
 // Exec just execute the given statement in the provided transaction.
 func Exec(ctx TxContext, stmt string, args ...any) error {
 	_, err := ctx.ExecContext(ctx, stmt, args...)
