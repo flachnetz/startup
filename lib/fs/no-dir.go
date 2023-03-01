@@ -6,6 +6,10 @@ type NoReadDirFS struct {
 	f fs.FS
 }
 
+func NewNoReadDirFS(f fs.FS) fs.FS {
+	return NoReadDirFS{f}
+}
+
 func (n NoReadDirFS) Open(name string) (fs.File, error) {
 	file, err := n.f.Open(name)
 	if err != nil {
