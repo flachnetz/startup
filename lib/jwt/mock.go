@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"github.com/pkg/errors"
 	"net/http"
 )
 
@@ -9,9 +10,14 @@ type MockService struct {
 }
 
 func (m *MockService) GetJwtToken(authHeader string) (*JwtStruct, error) {
-	return &m.Jwt, nil
+	return GetJwtToken(authHeader)
 }
 
 func (m *MockService) GetJwtTokenFromRequest(req *http.Request) (*JwtStruct, error) {
-	return &m.Jwt, nil
+	authHeader := req.Header.Get("authorization")
+	if authHeader == "" {
+		return nil, errors.New("authorization header is empty or not set")
+	}
+
+	return m.GetJwtToken(authHeader[7:])
 }

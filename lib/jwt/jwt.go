@@ -54,6 +54,36 @@ func NewJwtService(jwkResourceUrl string, clock clock.Clock) (Service, error) {
 }
 
 func (j *jwtService) GetJwtToken(authHeader string) (*JwtStruct, error) {
+	return GetJwtToken(authHeader, jwt.WithKeySet(j.jwkKeySet), jwt.WithClock(j.clock), jwt.WithValidate(true))
+}
+
+func (j *jwtService) GetJwtTokenFromRequest(req *http.Request) (*JwtStruct, error) {
+	if j.jwkKeySet == nil {
+		return nil, errors.New("cannot verify jwt because jwk key set is missing")
+	}
+
+	authHeader := req.Header.Get("authorization")
+	if authHeader == "" {
+		return nil, errors.New("authorization header is empty or not set")
+	}
+
+	return j.GetJwtToken(authHeader[7:])
+}
+
+func GetJwk(ctx context.Context, url string, httpClient *http.Client) (jwk.Set, error) {
+	set, err := jwk.Fetch(ctx, url, jwk.WithHTTPClient(httpClient))
+	if err != nil {
+		return nil, err
+	}
+
+	if set.Len() == 0 {
+		return nil, errors.New("no jwk keys found")
+	}
+
+	return set, nil
+}
+
+func GetJwtToken(authHeader string, options ...jwt.ParseOption) (*JwtStruct, error) {
 	claims := &JwtStruct{}
 
 	if strings.Contains(authHeader, "Bearer") {
@@ -61,7 +91,7 @@ func (j *jwtService) GetJwtToken(authHeader string) (*JwtStruct, error) {
 	}
 
 	// parse and check signature
-	t, err := jwt.ParseString(authHeader, jwt.WithKeySet(j.jwkKeySet), jwt.WithClock(j.clock), jwt.WithValidate(true))
+	t, err := jwt.ParseString(authHeader, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -111,33 +141,4 @@ func (j *jwtService) GetJwtToken(authHeader string) (*JwtStruct, error) {
 	}
 
 	return claims, err
-}
-
-func (j *jwtService) GetJwtTokenFromRequest(req *http.Request) (*JwtStruct, error) {
-	if j.jwkKeySet == nil {
-		return nil, errors.New("cannot verify jwt because jwk key set is missing")
-	}
-
-	authHeader := req.Header.Get("Authorization")
-	if authHeader == "" {
-		authHeader = req.Header.Get("authorization")
-	}
-	if authHeader == "" {
-		return nil, errors.New("authorization header is empty or not set")
-	}
-
-	return j.GetJwtToken(authHeader[7:])
-}
-
-func GetJwk(ctx context.Context, url string, httpClient *http.Client) (jwk.Set, error) {
-	set, err := jwk.Fetch(ctx, url, jwk.WithHTTPClient(httpClient))
-	if err != nil {
-		return nil, err
-	}
-
-	if set.Len() == 0 {
-		return nil, errors.New("no jwk keys found")
-	}
-
-	return set, nil
 }
