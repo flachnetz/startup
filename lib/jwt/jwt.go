@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -109,7 +110,17 @@ func GetJwtToken(authHeader string, options ...jwt.ParseOption) (*JwtStruct, err
 	}
 
 	if v, ok := t.Get("customerNumber"); ok {
-		claims.CustomerNumber = strconv.Itoa(int(v.(float64)))
+		t := reflect.TypeOf(v)
+		switch t.Kind() {
+		case reflect.Int:
+			claims.CustomerNumber = strconv.Itoa(v.(int))
+		case reflect.Float64:
+			claims.CustomerNumber = strconv.Itoa(int(v.(float64)))
+		case reflect.String:
+			claims.CustomerNumber = v.(string)
+		default:
+			return nil, errors.New("customerNumber is not a string or float64")
+		}
 	}
 
 	if v, ok := t.Get("locale"); ok {
