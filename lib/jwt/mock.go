@@ -1,8 +1,9 @@
 package jwt
 
 import (
-	"github.com/pkg/errors"
 	"net/http"
+
+	"github.com/pkg/errors"
 )
 
 type MockService struct {
