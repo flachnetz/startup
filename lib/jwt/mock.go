@@ -1,10 +1,11 @@
 package jwt
 
 import (
-	"github.com/benbjohnson/clock"
-	"github.com/dgrijalva/jwt-go"
 	"net/http"
 	"time"
+
+	"github.com/benbjohnson/clock"
+	"github.com/dgrijalva/jwt-go"
 
 	"github.com/pkg/errors"
 )
@@ -41,7 +42,6 @@ func CreateJWT(clock clock.Clock, secret, site, customerNumber string) (string, 
 	// Sign the token with a secret key
 	secretKey := []byte(secret)
 	jwtString, err := token.SignedString(secretKey)
-
 	if err != nil {
 		return "", err
 	}
