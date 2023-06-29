@@ -261,7 +261,7 @@ func configureTlsHooks(ct *httptrace.ClientTrace, parentContext opentracing.Span
 			tlsSpan.Finish()
 		}
 
-		opentracing.GlobalTracer().StartSpan("http-client:tls-handshake",
+		tlsSpan = opentracing.GlobalTracer().StartSpan("http-client:tls-handshake",
 			ext.SpanKindRPCClient,
 			opentracing.ChildOf(parentContext),
 		)
