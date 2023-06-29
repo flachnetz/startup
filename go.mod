@@ -6,6 +6,7 @@ require (
 	github.com/Unleash/unleash-client-go/v3 v3.7.1
 	github.com/benbjohnson/clock v1.3.0
 	github.com/confluentinc/confluent-kafka-go v1.8.2
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/flachnetz/go-admin v1.5.3
 	github.com/flachnetz/go-datadog v1.3.1
 	github.com/goji/httpauth v0.0.0-20160601135302-2da839ab0f4d
