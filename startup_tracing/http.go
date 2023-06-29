@@ -161,13 +161,17 @@ func bodyGuard(req *http.Request, span opentracing.Span, body io.ReadCloser) io.
 	ctx := req.Context()
 	key := req.Method + " " + req.URL.String()
 
-	guard := &readCloserWithTrace{span: span, ReadCloser: body}
+	guard := &readCloserWithTrace{span: span, reader: body}
 
 	runtime.SetFinalizer(guard, func(guard *readCloserWithTrace) {
 		if !guard.closed.Load() {
-			log.WithField("prefix", "grave").
+			log.WithField("prefix", "http-client").
 				WithContext(ctx).
 				Warnf("http.Request body was not closed for %q", key)
+
+			guard.span.SetTag("error", true)
+			guard.span.SetTag("error_message", "reader was not closed")
+			guard.span.Finish()
 		}
 	})
 
@@ -288,16 +292,27 @@ func finishSpan(span opentracing.Span, err error) {
 }
 
 type readCloserWithTrace struct {
-	io.ReadCloser
+	reader io.ReadCloser
 	span   opentracing.Span
 	closed atomic.Bool
+}
+
+func (r *readCloserWithTrace) Read(p []byte) (int, error) {
+	n, err := r.reader.Read(p)
+
+	if err == io.EOF {
+		if r.closed.CompareAndSwap(false, true) {
+			r.span.Finish()
+		}
+	}
+
+	return n, err
 }
 
 func (r *readCloserWithTrace) Close() error {
 	if r.closed.CompareAndSwap(false, true) {
 		r.span.Finish()
-		return r.ReadCloser.Close()
 	}
 
-	return nil
+	return r.reader.Close()
 }
