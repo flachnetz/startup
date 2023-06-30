@@ -91,15 +91,15 @@ func WithServiceOverride(ctx context.Context, service string) context.Context {
 	return WithTags(ctx, opentracing.Tags{"dd.service": service})
 }
 
-type spansFromContext struct {
+type tagsFromContext struct {
 	ctx context.Context
 }
 
 func TagsFromContext(ctx context.Context) opentracing.StartSpanOption {
-	return spansFromContext{ctx}
+	return tagsFromContext{ctx}
 }
 
-func (s spansFromContext) Apply(options *opentracing.StartSpanOptions) {
+func (s tagsFromContext) Apply(options *opentracing.StartSpanOptions) {
 	tags, _ := s.ctx.Value(&extraTagsKey).(opentracing.Tags)
 	maps.Copy(options.Tags, tags)
 
