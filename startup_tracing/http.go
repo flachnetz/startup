@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"regexp"
-	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -158,22 +157,22 @@ func (rt tracingRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 }
 
 func bodyGuard(req *http.Request, span opentracing.Span, body io.ReadCloser) io.ReadCloser {
-	ctx := req.Context()
-	key := req.Method + " " + req.URL.String()
+	// ctx := req.Context()
+	// key := req.Method + " " + req.URL.String()
 
 	guard := &readCloserWithTrace{span: span, reader: body}
 
-	runtime.SetFinalizer(guard, func(guard *readCloserWithTrace) {
-		if !guard.closed.Load() {
-			log.WithField("prefix", "http-client").
-				WithContext(ctx).
-				Warnf("http.Request body was not closed for %q", key)
-
-			guard.span.SetTag("error", true)
-			guard.span.SetTag("error_message", "reader was not closed")
-			guard.span.Finish()
-		}
-	})
+	//runtime.SetFinalizer(guard, func(guard *readCloserWithTrace) {
+	//	if !guard.closed.Load() {
+	//		log.WithField("prefix", "http-client").
+	//			WithContext(ctx).
+	//			Warnf("http.Request body was not closed for %q", key)
+	//
+	//		guard.span.SetTag("error", true)
+	//		guard.span.SetTag("error_message", "reader was not closed")
+	//		guard.span.Finish()
+	//	}
+	//})
 
 	return guard
 }
@@ -300,7 +299,7 @@ type readCloserWithTrace struct {
 func (r *readCloserWithTrace) Read(p []byte) (int, error) {
 	n, err := r.reader.Read(p)
 
-	if err == io.EOF {
+	if err != nil {
 		if r.closed.CompareAndSwap(false, true) {
 			r.span.Finish()
 		}
