@@ -3,6 +3,7 @@ package startup_tracing
 import (
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptrace"
@@ -302,6 +303,11 @@ func (r *readCloserWithTrace) Read(p []byte) (int, error) {
 
 	if err != nil {
 		if r.closed.CompareAndSwap(false, true) {
+			if err != io.EOF {
+				r.span.SetTag("error", true)
+				r.span.SetTag("error_message", fmt.Sprintf("error in read: %s", err))
+			}
+
 			r.span.Finish()
 		}
 	}
