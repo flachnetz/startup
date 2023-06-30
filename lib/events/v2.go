@@ -26,7 +26,7 @@ type eventWithSpan struct {
 }
 
 func TraceEvent(ctx context.Context, event Event) Event {
-	if _, ok := event.(eventWithSpan); !ok {
+	if _, ok := event.(eventWithSpan); ok {
 		// do not double wrap
 		return event
 	}
