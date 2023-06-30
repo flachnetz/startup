@@ -159,23 +159,9 @@ func (rt tracingRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 }
 
 func bodyGuard(req *http.Request, span opentracing.Span, body io.ReadCloser) io.ReadCloser {
-	ctx := req.Context()
 	key := req.Method + " " + req.URL.String()
-
-	guard := &readCloserWithTrace{span: span, reader: body}
-
-	runtime.SetFinalizer(guard, func(guard *readCloserWithTrace) {
-		if !guard.closed.Load() {
-			log.WithField("prefix", "http-client").
-				WithContext(ctx).
-				Warnf("http.Request body was not closed for %q", key)
-
-			guard.span.SetTag("error", true)
-			guard.span.SetTag("error_message", "reader was not closed")
-			guard.span.Finish()
-		}
-	})
-
+	guard := &readCloserWithTrace{reader: body, span: &autoCloseSpan{Span: span, key: key}}
+	runtime.SetFinalizer(guard.span, finalizeAutoCloseSpan)
 	return guard
 }
 
@@ -294,31 +280,63 @@ func finishSpan(span opentracing.Span, err error) {
 
 type readCloserWithTrace struct {
 	reader io.ReadCloser
-	span   opentracing.Span
-	closed atomic.Bool
+	span   *autoCloseSpan
 }
 
 func (r *readCloserWithTrace) Read(p []byte) (int, error) {
 	n, err := r.reader.Read(p)
 
 	if err != nil {
-		if r.closed.CompareAndSwap(false, true) {
-			if err != io.EOF {
-				r.span.SetTag("error", true)
-				r.span.SetTag("error_message", fmt.Sprintf("error in read: %s", err))
-			}
-
-			r.span.Finish()
+		if err != io.EOF {
+			r.span.SetTag("error", true)
+			r.span.SetTag("error_message", fmt.Sprintf("error in read: %s", err))
 		}
+
+		r.span.Finish()
 	}
 
 	return n, err
 }
 
 func (r *readCloserWithTrace) Close() error {
-	if r.closed.CompareAndSwap(false, true) {
-		r.span.Finish()
-	}
+	r.span.Finish()
+	runtime.KeepAlive(r.span)
 
 	return r.reader.Close()
+}
+
+type autoCloseSpan struct {
+	opentracing.Span
+	key    string
+	closed atomic.Bool
+}
+
+func finalizeAutoCloseSpan(span *autoCloseSpan) {
+	if span.closed.CompareAndSwap(false, true) {
+		log.Warnf("unclosed http.Client span detected for %q", span.key)
+		span.Span.SetTag("error", true)
+		span.Span.SetTag("error_message", "reader was not closed")
+		span.Span.Finish()
+	}
+}
+
+func (s *autoCloseSpan) Finish() {
+	if s.closed.CompareAndSwap(false, true) {
+		s.Span.Finish()
+	}
+}
+
+func (s *autoCloseSpan) FinishWithOptions(opts opentracing.FinishOptions) {
+	if s.closed.CompareAndSwap(false, true) {
+		s.closed.Store(true)
+		s.Span.FinishWithOptions(opts)
+	}
+}
+
+func (s *autoCloseSpan) SetTag(key string, value interface{}) opentracing.Span {
+	if !s.closed.Load() {
+		return s.Span.SetTag(key, value)
+	}
+
+	return s
 }
