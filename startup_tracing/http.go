@@ -123,13 +123,14 @@ func (rt tracingRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 	span := opentracing.GlobalTracer().StartSpan("http-client",
 		ext.SpanKindRPCClient,
 		opentracing.ChildOf(parentSpan.Context()),
+		TagsFromContext(req.Context()),
 	)
 
 	ext.HTTPMethod.Set(span, req.Method)
 	ext.HTTPUrl.Set(span, req.URL.String())
 
 	// create a copy of the original request and inject the http tracing
-	httpTraceContext := httptrace.WithClientTrace(req.Context(), newClientTrace(span.Context()))
+	httpTraceContext := httptrace.WithClientTrace(req.Context(), newClientTrace(span.Context(), TagsFromContext(req.Context())))
 	reqCopy := req.Clone(httpTraceContext)
 
 	// inject the spans information into the request so that the
@@ -165,17 +166,17 @@ func bodyGuard(req *http.Request, span opentracing.Span, body io.ReadCloser) io.
 	return guard
 }
 
-func newClientTrace(parentContext opentracing.SpanContext) *httptrace.ClientTrace {
+func newClientTrace(parentContext opentracing.SpanContext, startOptions opentracing.StartSpanOption) *httptrace.ClientTrace {
 	var ct httptrace.ClientTrace
 
-	configureDnsHooks(&ct, parentContext)
-	configureConnectHooks(&ct, parentContext)
-	configureTlsHooks(&ct, parentContext)
+	configureDnsHooks(&ct, parentContext, startOptions)
+	configureConnectHooks(&ct, parentContext, startOptions)
+	configureTlsHooks(&ct, parentContext, startOptions)
 
 	return &ct
 }
 
-func configureDnsHooks(ct *httptrace.ClientTrace, parentContext opentracing.SpanContext) {
+func configureDnsHooks(ct *httptrace.ClientTrace, parentContext opentracing.SpanContext, startOptions opentracing.StartSpanOption) {
 	var mu sync.Mutex
 
 	var dnsSpan opentracing.Span
@@ -190,6 +191,7 @@ func configureDnsHooks(ct *httptrace.ClientTrace, parentContext opentracing.Span
 		dnsSpan = opentracing.GlobalTracer().StartSpan("http-client:dns",
 			ext.SpanKindRPCClient,
 			opentracing.ChildOf(parentContext),
+			startOptions,
 			opentracing.Tag{Key: "host", Value: info.Host},
 		)
 
@@ -205,7 +207,7 @@ func configureDnsHooks(ct *httptrace.ClientTrace, parentContext opentracing.Span
 	}
 }
 
-func configureConnectHooks(ct *httptrace.ClientTrace, parentContext opentracing.SpanContext) {
+func configureConnectHooks(ct *httptrace.ClientTrace, parentContext opentracing.SpanContext, startOptions opentracing.StartSpanOption) {
 	var mu sync.Mutex
 	connSpans := map[string]opentracing.Span{}
 
@@ -220,6 +222,7 @@ func configureConnectHooks(ct *httptrace.ClientTrace, parentContext opentracing.
 		connSpans[key] = opentracing.GlobalTracer().StartSpan("http-client:connect",
 			ext.SpanKindRPCClient,
 			opentracing.ChildOf(parentContext),
+			startOptions,
 			opentracing.Tag{Key: "network", Value: network},
 			opentracing.Tag{Key: "addr", Value: addr},
 		)
@@ -236,7 +239,7 @@ func configureConnectHooks(ct *httptrace.ClientTrace, parentContext opentracing.
 	}
 }
 
-func configureTlsHooks(ct *httptrace.ClientTrace, parentContext opentracing.SpanContext) {
+func configureTlsHooks(ct *httptrace.ClientTrace, parentContext opentracing.SpanContext, startOptions opentracing.StartSpanOption) {
 	var mu sync.Mutex
 	var tlsSpan opentracing.Span
 
@@ -251,6 +254,7 @@ func configureTlsHooks(ct *httptrace.ClientTrace, parentContext opentracing.Span
 		tlsSpan = opentracing.GlobalTracer().StartSpan("http-client:tls-handshake",
 			ext.SpanKindRPCClient,
 			opentracing.ChildOf(parentContext),
+			startOptions,
 		)
 	}
 
