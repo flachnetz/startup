@@ -4,9 +4,11 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/flachnetz/startup/v2/lib"
 	"io"
 	"net/http"
 	"net/http/httptrace"
+	"net/url"
 	"regexp"
 	"runtime"
 	"strings"
@@ -65,7 +67,7 @@ func Tracing(service string, op string) startup_http.HttpMiddleware {
 			// use a clean url as resource
 			serverSpan.SetTag("dd.service", service)
 			ext.HTTPMethod.Set(serverSpan, req.Method)
-			ext.HTTPUrl.Set(serverSpan, cleanUrl(req.URL.String()))
+			ext.HTTPUrl.Set(serverSpan, cleanUrl(req.URL))
 
 			// record and log the status code of the response
 			rl, w := responseLoggerOf(w)
@@ -78,17 +80,23 @@ func Tracing(service string, op string) startup_http.HttpMiddleware {
 	}
 }
 
-func cleanUrl(url string) string {
-	url = reClean.ReplaceAllStringFunc(url, func(s string) string {
+func cleanUrl(u *url.URL) string {
+	urlCopy := lib.PtrOf(*u)
+	urlCopy.RawQuery = ""
+	urlCopy.User = nil
+
+	urlStr := urlCopy.String()
+
+	urlStr = reClean.ReplaceAllStringFunc(urlStr, func(s string) string {
 		idx := strings.LastIndexByte(s, '/')
 		return s[:idx] + strings.ToUpper(s[:idx])
 	})
 
 	// clean uuid and numbers
-	url = reUUID.ReplaceAllString(url, "/UUID")
-	url = reNumber.ReplaceAllString(url, "/N")
+	urlStr = reUUID.ReplaceAllString(urlStr, "/UUID")
+	urlStr = reNumber.ReplaceAllString(urlStr, "/N")
 
-	return url
+	return urlStr
 }
 
 // WithSpanPropagation returns a new http.Client that has automatic propagation
@@ -127,7 +135,7 @@ func (rt tracingRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 	)
 
 	ext.HTTPMethod.Set(span, req.Method)
-	ext.HTTPUrl.Set(span, req.URL.String())
+	ext.HTTPUrl.Set(span, cleanUrl(req.URL))
 
 	// create a copy of the original request and inject the http tracing
 	httpTraceContext := httptrace.WithClientTrace(req.Context(), newClientTrace(span.Context(), TagsFromContext(req.Context())))
