@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/flachnetz/startup/v2/lib"
 	"io"
 	"net/http"
 	"net/http/httptrace"
@@ -14,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/flachnetz/startup/v2/lib"
 
 	"github.com/flachnetz/startup/v2/startup_http"
 	. "github.com/flachnetz/startup/v2/startup_logrus"
@@ -202,7 +203,6 @@ func configureDnsHooks(ct *httptrace.ClientTrace, parentContext opentracing.Span
 			startOptions,
 			opentracing.Tag{Key: "host", Value: info.Host},
 		)
-
 	}
 
 	ct.DNSDone = func(info httptrace.DNSDoneInfo) {
@@ -297,7 +297,6 @@ type readCloserWithTrace struct {
 
 func (r *readCloserWithTrace) Read(p []byte) (int, error) {
 	n, err := r.reader.Read(p)
-
 	if err != nil {
 		if err != io.EOF {
 			r.span.SetTag("error", true)
