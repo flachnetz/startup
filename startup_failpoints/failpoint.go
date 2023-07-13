@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/exp/slices"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,8 +24,9 @@ type FailPointError interface {
 type FailPoint struct {
 	Error FailPointError `json:"error"`
 	// when empty, Error.String() will be taken
-	ErrorName string `json:"errorName"`
-	IsActive  bool   `json:"isActive"`
+	ErrorName  string   `json:"errorName"`
+	IsActive   bool     `json:"isActive"`
+	FilterTags []string `json:"filterTags"`
 }
 
 type timeoutError struct {
@@ -57,6 +60,7 @@ type FailPointRequest struct {
 	CodeLocationPointName FailPointLocation `json:"codeLocationPointName"`
 	FailPointErrorName    string            `json:"failPointCode"`
 	Active                bool              `json:"active"`
+	FilterTags            string            `json:"filterTags"`
 }
 
 type FailPointService struct {
@@ -122,12 +126,20 @@ func (f *FailPointService) GetFailPoints() []FailPoint {
 	return resp
 }
 
-func (f *FailPointService) ReturnErrorIfFailPointActive(ctx context.Context, location FailPointLocation) error {
+// ReturnErrorIfFailPointActive returns an error if the failpoint is active.
+// If the failpoint is not active, it returns nil.
+// filterTags is a list of tags that can be used to filter the failpoint as a condition for activation.
+func (f *FailPointService) ReturnErrorIfFailPointActive(ctx context.Context, location FailPointLocation, filterTags ...string) error {
 	if f.devMode {
 		f.failPointsLock.Lock()
 		fp, exists := f.failPointLocations[location]
 		f.failPointsLock.Unlock()
 		if exists && fp.IsActive {
+			for _, tag := range filterTags {
+				if !slices.Contains(fp.FilterTags, strings.ToLower(tag)) {
+					return nil
+				}
+			}
 			var timeoutError timeoutError
 			if errors.As(fp.Error, &timeoutError) {
 				// we just wait as long as the client keeps the connection open
@@ -161,6 +173,10 @@ func (f *FailPointService) UpdateFailPoint(req FailPointRequest) error {
 	}
 	fp.Error = err
 	fp.IsActive = req.Active
+	fp.FilterTags = strings.Split(req.FilterTags, ",")
+	for i, part := range fp.FilterTags {
+		fp.FilterTags[i] = strings.ToLower(strings.TrimSpace(part))
+	}
 	f.logger.Infof("set failpoint location '%s' with error '%s' to state active:%v", req.CodeLocationPointName, req.FailPointErrorName, req.Active)
 	return nil
 }

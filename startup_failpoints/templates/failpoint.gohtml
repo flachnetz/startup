@@ -96,12 +96,13 @@
         <hr>
     </div>
 
-    <table class="table" style="width: 640px;">
+    <table class="table" style="width: 100vw;">
         <thead class="thead-dark">
         <tr>
             <th scope="col">Location</th>
             <th scope="col">Error</th>
             <th scope="col">Active</th>
+            <th scope="col">Filter Tags (comma separated)</th>
         </tr>
         </thead>
         {{ $failPoints := .FailPoints}}
@@ -122,12 +123,20 @@
                     </div>
                 </td>
                 <td class="scope">
+                    <div class="d-flex flex-column align-items-stretch flex-shrink-0 bg-white">
+                        <label for="ft__{{$location}}"></label>
+                        {{ $filterTags := join $failpoint.FilterTags "," }}
+                        <input class="form-control" type="text" id="ft__{{$location}}" value="{{$filterTags}}"></input>
+                    </div>
+                </td>
+                <td class="scope">
                     <div class="form-check form-switch">
                         <label for="cb__{{$location}}"></label>
                         <input class="form-check-input" type="checkbox" {{ if eq $failpoint.IsActive true}} checked
                                {{ end }}id="cb__{{$location}}" onchange="updateFailPoint({{$location}})">
                     </div>
                 </td>
+
             </tr>
         {{ end }}
     </table>
@@ -140,7 +149,13 @@
     function updateFailPoint(codeLocationName) {
         let select = document.getElementById('select__' + codeLocationName);
         let active = document.getElementById('cb__' + codeLocationName);
-        let body = {codeLocationPointName: codeLocationName, failPointCode: select.value, active: active.checked};
+        let filterTags = document.getElementById('ft__' + codeLocationName);
+        let body = {
+            codeLocationPointName: codeLocationName,
+            failPointCode: select.value,
+            active: active.checked,
+            filterTags: filterTags.value
+        };
         fetch({{.UpdateFailPointsEndpoint}}, {
             method: 'PUT',
             headers: {
