@@ -4,6 +4,7 @@ import (
 	"embed"
 	"html/template"
 	"io"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -18,7 +19,11 @@ type TemplateResponse struct {
 }
 
 func renderIndex(w io.Writer, model interface{}) error {
-	t := template.New("failpoint.gohtml")
+	t := template.New("failpoint.gohtml").Funcs(
+		template.FuncMap{
+			"join": strings.Join,
+		},
+	)
 	tmpl, err := t.ParseFS(fpTemplate, "templates/failpoint.gohtml")
 	if err != nil {
 		return errors.WithMessage(err, "parsing template")
