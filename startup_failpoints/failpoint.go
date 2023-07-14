@@ -136,11 +136,11 @@ func (f *FailPointService) ReturnErrorIfFailPointActive(ctx context.Context, loc
 		fp, exists := f.failPointLocations[location]
 		f.failPointsLock.Unlock()
 		if exists && fp.IsActive {
-			for _, tag := range filterTags {
-				if !slices.Contains(fp.FilterTags, strings.ToLower(tag)) {
-					return nil
-				}
+			// if filterTags are set, we only return an error if the failpoint has one of the filter tags
+			if len(fp.FilterTags) > 0 && !containsOneOf(fp, filterTags) {
+				return nil
 			}
+
 			var timeoutError timeoutError
 			if errors.As(fp.Error, &timeoutError) {
 				// we just wait as long as the client keeps the connection open
@@ -155,6 +155,18 @@ func (f *FailPointService) ReturnErrorIfFailPointActive(ctx context.Context, loc
 		}
 	}
 	return nil
+}
+
+// containsOneOf returns true if the failpoint has one of the filter tags
+func containsOneOf(fp *FailPoint, filterTags []string) bool {
+	if len(fp.FilterTags) > 0 {
+		for _, tag := range filterTags {
+			if slices.Contains(fp.FilterTags, strings.ToLower(tag)) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (f *FailPointService) UpdateFailPoint(req FailPointRequest) error {
