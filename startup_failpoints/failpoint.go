@@ -174,9 +174,12 @@ func (f *FailPointService) UpdateFailPoint(req FailPointRequest) error {
 	}
 	fp.Error = err
 	fp.IsActive = req.Active
-	fp.FilterTags = strings.Split(req.FilterTags, ",")
-	for i, part := range fp.FilterTags {
-		fp.FilterTags[i] = strings.ToLower(strings.TrimSpace(part))
+	fp.FilterTags = nil
+	if req.FilterTags != "" {
+		fp.FilterTags = strings.Split(req.FilterTags, ",")
+		for i, part := range fp.FilterTags {
+			fp.FilterTags[i] = strings.ToLower(strings.TrimSpace(part))
+		}
 	}
 	f.logger.Infof("set failpoint location '%s' with error '%s' to state active:%v", req.CodeLocationPointName, req.FailPointErrorName, req.Active)
 	return nil
