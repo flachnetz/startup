@@ -79,8 +79,8 @@ github.com/flachnetz/go-admin v1.5.3 h1:9X9yjkUaEl9N6UR/7D91IxfIMp1nWrhrSuCTCdP+
 github.com/flachnetz/go-admin v1.5.3/go.mod h1:NLn/OCLKN1xay9FvSZu36UWlaHSIB83mUu/RdI3eApY=
 github.com/flachnetz/go-datadog v1.3.1 h1:aJIVWPX1pBcO329+mThdUW3cLmhB0M51Tn+WAGNW5Yg=
 github.com/flachnetz/go-datadog v1.3.1/go.mod h1:wmFsvlDXn2T6/NzAKYLdQ1rxoeW2Hwy49wcFA8Z/aog=
-github.com/flachnetz/logrus2slog v1.0.5 h1:KM+ZK/gcYuMo1TZ5AcPDQB6n6y+Z6z9dYViqV1Is58E=
-github.com/flachnetz/logrus2slog v1.0.5/go.mod h1:OkqCZDA7ePK0K+kIEnZqDRrZEiJSr3rxUAhP8uYjyJQ=
+github.com/flachnetz/logrus2slog v1.0.6 h1:WOh7RucLltjpUIYs2cyIiuXRYfvB1MIekgEzHsAupCc=
+github.com/flachnetz/logrus2slog v1.0.6/go.mod h1:OkqCZDA7ePK0K+kIEnZqDRrZEiJSr3rxUAhP8uYjyJQ=
 github.com/frankban/quicktest v1.2.2/go.mod h1:Qh/WofXFeiAFII1aEBu529AtJo6Zg2VHscnEsbBnJ20=
 github.com/frankban/quicktest v1.7.2/go.mod h1:jaStnuzAqU1AJdCO0l53JDCJrVDKcS03DbaAcR7Ks/o=
 github.com/frankban/quicktest v1.10.0/go.mod h1:ui7WezCLWMWxVWr1GETZY3smRy0G4KWq9vcPtJmFl7Y=
