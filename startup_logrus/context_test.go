@@ -13,7 +13,7 @@ func TestGetLogger(t *testing.T) {
 	log := logrus.WithField("a", 1)
 	ctx = WithLogger(ctx, log)
 
-	value := GetLogger(ctx, nil).Data["a"].(int)
+	value := GetLogger(ctx, nil).Data[0].Value.Int64()
 	if value != 1 {
 		t.Fatalf("value should be 1, but was %d", value)
 	}

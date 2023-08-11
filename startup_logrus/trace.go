@@ -2,47 +2,23 @@ package startup_logrus
 
 import (
 	"context"
-	"reflect"
-
 	"github.com/opentracing/opentracing-go"
-	"github.com/sirupsen/logrus"
+	zipkintracer "github.com/openzipkin-contrib/zipkin-go-opentracing"
+	"log/slog"
 )
 
-// default empty logger
-var emptyEntry = logrus.NewEntry(logrus.StandardLogger())
-
-type h struct{}
-
-func NewTracingHook() logrus.Hook {
-	return h{}
-}
-
-func (h) Levels() []logrus.Level {
-	return logrus.AllLevels
-}
-
-func (h) Fire(entry *logrus.Entry) error {
-	if entry.Context == nil {
-		return nil
-	}
-
+func WithTraceId(ctx context.Context, record slog.Record) (slog.Record, bool, error) {
 	// get the span from the entries context
-	spanContext := spanContextOf(entry.Context)
-	if spanContext == nil {
-		return nil
+	spanContext := spanContextOf(ctx)
+
+	if spanContext != nil {
+		if traceId := traceIdOf(spanContext); traceId != "" {
+			// add traceId to log record
+			record.AddAttrs(slog.String("traceId", traceId))
+		}
 	}
 
-	if entry.Data == nil {
-		entry.Data = logrus.Fields{}
-	}
-
-	if traceId := traceIdOf(spanContext); traceId != "" {
-		// we can not create a new entry here, as logrus does not support "chaining" of hooks,
-		// so we will just modify the existing entry here before logging
-		entry.Data["traceId"] = traceId
-	}
-
-	return nil
+	return record, true, nil
 }
 
 func spanContextOf(ctx context.Context) opentracing.SpanContext {
@@ -55,22 +31,9 @@ func spanContextOf(ctx context.Context) opentracing.SpanContext {
 }
 
 func traceIdOf(spanContext interface{}) string {
-	type hexer interface{ ToHex() string }
-
-	rSpanContext := reflect.ValueOf(spanContext)
-	if !rSpanContext.IsValid() || rSpanContext.Kind() != reflect.Struct {
-		return ""
+	if spanContext, ok := spanContext.(zipkintracer.SpanContext); ok {
+		return spanContext.TraceID.String()
 	}
 
-	fieldTraceId := rSpanContext.FieldByName("TraceID")
-	if !fieldTraceId.IsValid() {
-		return ""
-	}
-
-	traceId, ok := fieldTraceId.Interface().(hexer)
-	if !ok {
-		return ""
-	}
-
-	return traceId.ToHex()
+	return ""
 }

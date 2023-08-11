@@ -17,7 +17,6 @@ require (
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/julienschmidt/httprouter v1.3.0
-	github.com/labstack/gommon v0.4.0
 	github.com/lestrrat-go/jwx v1.2.26
 	github.com/linkedin/goavro/v2 v2.12.0
 	github.com/oklog/ulid v1.3.1
@@ -28,7 +27,6 @@ require (
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/rubenv/sql-migrate v1.5.1
 	github.com/sirupsen/logrus v1.9.3
-	github.com/x-cray/logrus-prefixed-formatter v0.5.2
 	go.uber.org/atomic v1.11.0
 	golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df
 	gopkg.in/go-playground/validator.v9 v9.31.0
@@ -62,9 +60,9 @@ require (
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/iter v1.0.2 // indirect
 	github.com/lestrrat-go/option v1.0.1 // indirect
+	github.com/lmittmann/tint v1.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
-	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/opentracing-contrib/go-observer v0.0.0-20170622124052-a52f23424492 // indirect
@@ -72,12 +70,9 @@ require (
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/stretchr/testify v1.8.4 // indirect
 	github.com/twmb/murmur3 v1.1.8 // indirect
-	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasttemplate v1.2.2 // indirect
 	golang.org/x/crypto v0.10.0 // indirect
 	golang.org/x/mod v0.11.0 // indirect
 	golang.org/x/sys v0.9.0 // indirect
-	golang.org/x/term v0.9.0 // indirect
 	golang.org/x/text v0.10.0 // indirect
 	golang.org/x/tools v0.10.0 // indirect
 	google.golang.org/grpc v1.56.1 // indirect
@@ -85,4 +80,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-go 1.20
+replace github.com/sirupsen/logrus  => github.com/flachnetz/logrus2slog v1.0.3
+
+go 1.21

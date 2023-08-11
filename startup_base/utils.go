@@ -17,16 +17,16 @@ func FatalOnError(err error, reason string, args ...interface{}) {
 	}
 }
 
-func OpenWriter(name string) (io.Writer, error) {
+func OpenWriter(name string) (*os.File, error) {
 	switch name {
 	case "", "/dev/stderr":
 		return os.Stderr, nil
 
-	case "/dev/stdout":
+	case "/dev/stdout", "-":
 		return os.Stdout, nil
 
 	case "/dev/null":
-		return io.Discard, nil
+		return nil, nil
 
 	default:
 		// some output file

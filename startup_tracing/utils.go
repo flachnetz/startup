@@ -3,7 +3,6 @@ package startup_tracing
 import (
 	"context"
 	"database/sql"
-
 	"github.com/flachnetz/startup/v2/startup_logrus"
 	"golang.org/x/exp/maps"
 
@@ -105,11 +104,12 @@ func (s tagsFromContext) Apply(options *opentracing.StartSpanOptions) {
 	maps.Copy(options.Tags, tags)
 
 	logger := startup_logrus.GetLogger(s.ctx, nil)
-	for key, value := range logger.Data {
-		if key == "prefix" {
+	for _, attr := range logger.Data {
+		if attr.Key == "prefix" {
 			continue
 		}
 
-		options.Tags["logger."+key] = value
+		value := attr.Value.Resolve().String()
+		options.Tags["logger."+attr.Key] = value
 	}
 }

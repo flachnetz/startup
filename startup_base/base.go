@@ -1,12 +1,13 @@
 package startup_base
 
 import (
+	"context"
 	"fmt"
+	"github.com/flachnetz/startup/v2/startup_base/tint"
+	"github.com/mattn/go-isatty"
+	"log/slog"
 	"os"
 	"path"
-
-	"github.com/sirupsen/logrus"
-	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
 var (
@@ -15,6 +16,13 @@ var (
 	BuildVersion       string
 	BuildUnixTimestamp string
 )
+
+var LogLevel slog.LevelVar
+
+func init() {
+	LogLevel.Set(slog.LevelInfo)
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
+}
 
 type BaseOptions struct {
 	Logfile       string `long:"log-file" description:"Write logs to a different file. Defaults to stdout."`
@@ -34,24 +42,54 @@ func (opts *BaseOptions) Initialize() {
 		os.Exit(0)
 	}
 
-	if opts.JSONFormatter {
-		logrus.SetFormatter(&logrus.JSONFormatter{})
+	var handler slog.Handler
+
+	writer, err := OpenWriter(opts.Logfile)
+	FatalOnError(err, "Failed to open ")
+
+	if writer != nil {
+		if opts.JSONFormatter {
+			handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+				AddSource: true,
+				Level:     &LogLevel,
+			})
+		} else {
+			handler = tint.NewHandler(os.Stderr, &tint.Options{
+				AddSource:  true,
+				Level:      &LogLevel,
+				TimeFormat: "2006-01-02 15:04:05.000",
+				NoColor:    !isatty.IsTerminal(os.Stderr.Fd()),
+			})
+		}
 	} else {
-		logrus.SetFormatter(&prefixed.TextFormatter{
-			FullTimestamp:   true,
-			DisableSorting:  false,
-			ForceFormatting: true,
-			ForceColors:     opts.ForceColor,
-		})
+		// discard logging
+		handler = nilhandler{}
 	}
 
-	fp, err := OpenWriter(opts.Logfile)
-	PanicOnError(err, "Cannot open log file")
-
-	logrus.SetOutput(fp)
+	// use the handler for the default handler
+	logger := slog.New(handler)
+	slog.SetDefault(logger)
 
 	if opts.Verbose {
-		logrus.SetLevel(logrus.DebugLevel)
-		logrus.WithField("prefix", "main").Debug("Enabled verbose logging")
+		LogLevel.Set(slog.LevelDebug)
+		logger.Debug("Enabled verbose logging")
 	}
+}
+
+type nilhandler struct{}
+
+func (n nilhandler) Enabled(ctx context.Context, level slog.Level) bool {
+	return false
+}
+
+func (n nilhandler) Handle(ctx context.Context, record slog.Record) error {
+	return nil
+}
+
+func (n nilhandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return n
+}
+
+func (n nilhandler) WithGroup(name string) slog.Handler {
+	return n
 }
