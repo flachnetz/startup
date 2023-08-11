@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	logrus "github.com/sirupsen/logrus"
 	"net/http"
 	"sort"
 	"strings"
@@ -13,7 +14,6 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 type FailPointLocation string

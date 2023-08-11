@@ -61,6 +61,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 	"unicode"
@@ -75,6 +76,7 @@ const (
 	ansiBrightGreen    = "\033[92m"
 	ansiBrightYellow   = "\033[93m"
 	ansiBrightRedFaint = "\033[91;2m"
+	ansiBlue           = "\033[34m"
 )
 
 const errKey = "err"
@@ -288,6 +290,11 @@ func (h *handler) WithAttrs(attrs []slog.Attr) slog.Handler {
 		if h.replaceAttr != nil {
 			attr = h.replaceAttr(h.groups, attr)
 		}
+
+		if attr.Key == "prefix" {
+			continue
+		}
+
 		h.appendAttr(buf, attr, h.groupPrefix)
 	}
 	h2.attrsPrefix = h.attrsPrefix + string(*buf)
@@ -321,16 +328,18 @@ func (h *handler) appendLevel(buf *buffer, level slog.Level) {
 
 	switch {
 	case level < slog.LevelInfo:
+		buf.WriteStringIf(!h.noColor, ansiBlue)
 		buf.WriteString("DEBUG")
 		delta(buf, level-slog.LevelDebug)
+		buf.WriteStringIf(!h.noColor, ansiReset)
 	case level < slog.LevelWarn:
 		buf.WriteStringIf(!h.noColor, ansiBrightGreen)
-		buf.WriteString("INFO ")
+		buf.WriteString(" INFO")
 		delta(buf, level-slog.LevelInfo)
 		buf.WriteStringIf(!h.noColor, ansiReset)
 	case level < slog.LevelError:
 		buf.WriteStringIf(!h.noColor, ansiBrightYellow)
-		buf.WriteString("WARN ")
+		buf.WriteString(" WARN")
 		delta(buf, level-slog.LevelWarn)
 		buf.WriteStringIf(!h.noColor, ansiReset)
 	default:
@@ -342,14 +351,21 @@ func (h *handler) appendLevel(buf *buffer, level slog.Level) {
 }
 
 func (h *handler) appendSource(buf *buffer, src *slog.Source) {
-	dir, file := filepath.Split(src.File)
+	_, file := filepath.Split(src.File)
 
 	buf.WriteStringIf(!h.noColor, ansiFaint)
-	buf.WriteString(filepath.Join(filepath.Base(dir), file))
+	// buf.WriteString(filepath.Join(filepath.Base(dir), file))
+	buf.WriteString(file)
 	buf.WriteByte(':')
 	buf.WriteString(strconv.Itoa(src.Line))
-	buf.WriteByte('/')
-	buf.WriteString(src.Function)
+	buf.WriteByte(' ')
+
+	fn := src.Function
+	if idx := strings.LastIndexByte(fn, '/'); idx >= 0 {
+		fn = fn[idx+1:]
+	}
+	buf.WriteString(fn)
+
 	buf.WriteStringIf(!h.noColor, ansiReset)
 }
 

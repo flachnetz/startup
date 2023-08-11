@@ -3,7 +3,7 @@ package schema
 import (
 	consul "github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	logrus "github.com/sirupsen/logrus"
 )
 
 type consulSchemaRegistry struct {

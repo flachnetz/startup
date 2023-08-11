@@ -2,9 +2,8 @@ package kafka
 
 import (
 	"fmt"
+	logrus "github.com/sirupsen/logrus"
 	"strings"
-
-	"github.com/sirupsen/logrus"
 )
 
 type logrusAdapter struct {

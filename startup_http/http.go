@@ -16,7 +16,6 @@ import (
 
 	"github.com/flachnetz/go-admin"
 	"github.com/flachnetz/startup/v2/startup_base"
-	. "github.com/flachnetz/startup/v2/startup_logrus"
 	"github.com/goji/httpauth"
 	"github.com/gorilla/handlers"
 	"github.com/julienschmidt/httprouter"
@@ -116,26 +115,29 @@ func (opts HTTPOptions) Serve(config Config) {
 	handler = handlers.RecoveryHandler(handlers.PrintRecoveryStack(true))(handler)
 
 	if opts.AccessLog == "" {
-		// log all requests using logrus logger
+		// log all requests using slog logger
 		handler = loggingHandler{
 			handler: handler,
 			log: func(ctx context.Context, line string) {
 				if !opts.AccessLogAdminRoute && strings.Contains(line, "GET /admin/") {
 					return
 				}
-				GetLogger(ctx, "httpd").Debug(line)
+
+				access(ctx, line)
 			},
 		}
 	} else if opts.AccessLog != "/dev/null" {
 		fp, err := startup_base.OpenWriter(opts.AccessLog)
 		startup_base.PanicOnError(err, "Could not open log file")
 
-		// write events directly to log file
-		handler = loggingHandler{
-			handler: handler,
-			log: func(ctx context.Context, line string) {
-				_, _ = fp.Write([]byte(line + "\n"))
-			},
+		if fp != nil {
+			// write events directly to log file
+			handler = loggingHandler{
+				handler: handler,
+				log: func(ctx context.Context, line string) {
+					_, _ = fp.Write([]byte(line + "\n"))
+				},
+			}
 		}
 	}
 
@@ -178,6 +180,10 @@ func (opts HTTPOptions) Serve(config Config) {
 	}
 
 	log.Info("Server shutdown completed.")
+}
+
+func access(ctx context.Context, line string) {
+	slog.DebugContext(ctx, line)
 }
 
 func RegisterSignalHandlerForServer(server *http.Server) <-chan struct{} {

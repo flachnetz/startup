@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	logrus "github.com/sirupsen/logrus"
 	"io"
 	"strings"
 	"sync"
@@ -18,7 +19,6 @@ import (
 	"github.com/benbjohnson/clock"
 	pgxstd "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
-	"github.com/sirupsen/logrus"
 )
 
 type Initializer func(db *sqlx.DB) error

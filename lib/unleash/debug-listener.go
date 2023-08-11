@@ -2,7 +2,7 @@ package unleash
 
 import (
 	"github.com/Unleash/unleash-client-go/v3"
-	"github.com/sirupsen/logrus"
+	logrus "github.com/sirupsen/logrus"
 )
 
 var logger = logrus.WithField("prefix", "unleash")

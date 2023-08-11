@@ -2,9 +2,8 @@ package startup_logrus
 
 import (
 	"context"
-	"testing"
-
 	"github.com/sirupsen/logrus"
+	"testing"
 )
 
 func TestGetLogger(t *testing.T) {
