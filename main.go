@@ -16,12 +16,6 @@ import (
 
 var log = logrus.WithField("prefix", "startup")
 
-func init() {
-	if os.Getenv("STARTUP_VERBOSE") == "true" {
-		logrus.SetLevel(logrus.DebugLevel)
-	}
-}
-
 func MustParseCommandLine(opts interface{}) {
 	MustParseCommandLineWithOptions(opts, flags.HelpFlag|flags.PassDoubleDash)
 }

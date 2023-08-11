@@ -1,8 +1,10 @@
 package startup_http
 
 import (
+	"bytes"
 	"context"
-	"io/ioutil"
+	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -71,7 +73,7 @@ func (opts HTTPOptions) Serve(config Config) {
 		admin.WithPProfHandlers(),
 		admin.WithHeapDump(),
 		admin.WithMetrics(metrics.DefaultRegistry),
-		withUpdateLogLevel(),
+		updateLogLevelHandler(),
 	}
 
 	if startup_base.BuildGitHash != "" {
@@ -237,26 +239,27 @@ func requireAuth(disableAuth bool, user, pass string, handler http.Handler) http
 	}
 }
 
-func withUpdateLogLevel() admin.RouteConfig {
+func updateLogLevelHandler() admin.RouteConfig {
 	return admin.Describe(
 		"Configure logging by posting a log level like 'info', 'debug' or 'warn' to this endpoint.",
 		admin.WithHandlerFunc("", "log/level", func(w http.ResponseWriter, req *http.Request) {
 			if strings.ToUpper(req.Method) == "GET" {
 				w.Header().Set("Content-Type", "text/plain")
-				_, _ = w.Write([]byte(log.GetLevel().String()))
+				_, _ = w.Write([]byte(startup_base.LogLevel.Level().String()))
 				return
 			}
 
 			if strings.ToUpper(req.Method) == "POST" {
-				body, _ := ioutil.ReadAll(req.Body)
-				level, err := log.ParseLevel(strings.TrimSpace(string(body)))
-				if err != nil {
+				body, _ := io.ReadAll(req.Body)
+
+				var level slog.Level
+				if err := level.UnmarshalText(bytes.TrimSpace(body)); err != nil {
 					http.Error(w, err.Error(), http.StatusBadRequest)
 					return
 				}
 
-				log.WithField("prefix", "admin").Infof("Set log level to %s", level)
-				log.SetLevel(level)
+				slog.With("prefix", "admin").Info("Set log level", "level", level)
+				startup_base.LogLevel.Set(level)
 				return
 			}
 
