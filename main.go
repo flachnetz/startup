@@ -99,7 +99,10 @@ func ParseCommandLineWithOptions(opts interface{}, options flags.Options) error 
 				inputValues = append(inputValues, inputValue)
 			}
 
-			log.Infof("Calling %s.Initialize()", fieldValue.Type().String())
+			if _, ok := fieldValue.Interface().(startup_base.BaseOptions); !ok {
+				log.Infof("Calling %s.Initialize()", fieldValue.Type().String())
+			}
+
 			init.Call(inputValues)
 		}
 	}

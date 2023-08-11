@@ -1,6 +1,7 @@
 package startup_metrics
 
 import (
+	logrus "github.com/sirupsen/logrus"
 	"net"
 	"os"
 	"strings"
@@ -14,7 +15,6 @@ import (
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/pkg/errors"
 	"github.com/rcrowley/go-metrics"
-	"github.com/sirupsen/logrus"
 )
 
 var log = logrus.WithField("prefix", "main")

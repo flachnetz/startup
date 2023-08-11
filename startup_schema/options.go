@@ -1,6 +1,7 @@
 package startup_schema
 
 import (
+	logrus "github.com/sirupsen/logrus"
 	"sync"
 
 	confluent "github.com/Landoop/schema-registry"
@@ -8,7 +9,6 @@ import (
 	"github.com/flachnetz/startup/v2/lib/schema"
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/flachnetz/startup/v2/startup_consul"
-	"github.com/sirupsen/logrus"
 )
 
 var log = logrus.WithField("prefix", "schema-registry")

@@ -1,12 +1,12 @@
 package startup_kafka
 
 import (
+	logrus "github.com/sirupsen/logrus"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
 
 	"github.com/flachnetz/startup/v2/lib/events/avro"

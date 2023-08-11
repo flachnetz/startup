@@ -1,6 +1,7 @@
 package avro
 
 import (
+	logrus "github.com/sirupsen/logrus"
 	"regexp"
 	"strconv"
 	"sync"
@@ -8,7 +9,6 @@ import (
 	schemaregistry "github.com/Landoop/schema-registry"
 	"github.com/linkedin/goavro/v2"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	"github.com/flachnetz/startup/v2/lib/schema"
 )

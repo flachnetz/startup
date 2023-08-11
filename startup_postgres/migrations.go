@@ -1,13 +1,13 @@
 package startup_postgres
 
 import (
+	logrus "github.com/sirupsen/logrus"
 	"os"
 
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/rubenv/sql-migrate"
-	"github.com/sirupsen/logrus"
 )
 
 // Migration Runs a migration with the sql files from the given directory.
