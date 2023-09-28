@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	logrus "github.com/sirupsen/logrus"
 	"net/http"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	logrus "github.com/sirupsen/logrus"
 
 	"golang.org/x/exp/slices"
 

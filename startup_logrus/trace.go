@@ -2,10 +2,11 @@ package startup_logrus
 
 import (
 	"context"
+	"log/slog"
+
 	"github.com/labstack/echo/v4"
 	"github.com/opentracing/opentracing-go"
 	zipkintracer "github.com/openzipkin-contrib/zipkin-go-opentracing"
-	"log/slog"
 )
 
 func EchoTraceLoggerMiddleware() echo.MiddlewareFunc {

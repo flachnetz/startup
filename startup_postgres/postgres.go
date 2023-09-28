@@ -5,11 +5,12 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
-	logrus "github.com/sirupsen/logrus"
 	"io"
 	"strings"
 	"sync"
 	"time"
+
+	logrus "github.com/sirupsen/logrus"
 
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/jackc/pgx/v5"

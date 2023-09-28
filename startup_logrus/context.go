@@ -3,10 +3,11 @@ package startup_logrus
 import (
 	"context"
 	"fmt"
-	logrus "github.com/sirupsen/logrus"
 	"reflect"
 	"regexp"
 	"runtime"
+
+	logrus "github.com/sirupsen/logrus"
 )
 
 type loggerKey struct{}

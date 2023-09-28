@@ -1,8 +1,9 @@
 package startup_postgres
 
 import (
-	logrus "github.com/sirupsen/logrus"
 	"os"
+
+	logrus "github.com/sirupsen/logrus"
 
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/jmoiron/sqlx"
