@@ -1,10 +1,11 @@
 package avro
 
 import (
-	logrus "github.com/sirupsen/logrus"
 	"regexp"
 	"strconv"
 	"sync"
+
+	logrus "github.com/sirupsen/logrus"
 
 	schemaregistry "github.com/Landoop/schema-registry"
 	"github.com/linkedin/goavro/v2"

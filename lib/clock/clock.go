@@ -2,11 +2,12 @@ package clock
 
 import (
 	"context"
-	"github.com/benbjohnson/clock"
-	"github.com/oklog/ulid"
 	"log/slog"
 	"math/rand"
 	"sync"
+
+	"github.com/benbjohnson/clock"
+	"github.com/oklog/ulid"
 )
 
 var GlobalClock clock.Clock = realtimeClock{clock.New()}

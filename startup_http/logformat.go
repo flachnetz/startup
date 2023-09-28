@@ -3,12 +3,13 @@ package startup_http
 import (
 	"context"
 	"fmt"
-	"github.com/felixge/httpsnoop"
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/felixge/httpsnoop"
 )
 
 type loggingHandler struct {

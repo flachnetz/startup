@@ -1,8 +1,9 @@
 package startup_schema
 
 import (
-	logrus "github.com/sirupsen/logrus"
 	"sync"
+
+	logrus "github.com/sirupsen/logrus"
 
 	confluent "github.com/Landoop/schema-registry"
 	"github.com/flachnetz/startup/v2"

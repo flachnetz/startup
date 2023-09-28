@@ -3,13 +3,14 @@ package startup_base
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"os"
+	"path"
+
 	"github.com/flachnetz/startup/v2/lib/clock"
 	"github.com/flachnetz/startup/v2/startup_base/tint"
 	sl "github.com/flachnetz/startup/v2/startup_logrus"
 	"github.com/mattn/go-isatty"
-	"log/slog"
-	"os"
-	"path"
 )
 
 var (

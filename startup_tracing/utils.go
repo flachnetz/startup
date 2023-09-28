@@ -3,6 +3,7 @@ package startup_tracing
 import (
 	"context"
 	"database/sql"
+
 	"github.com/flachnetz/startup/v2/startup_logrus"
 	"golang.org/x/exp/maps"
 

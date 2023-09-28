@@ -1,13 +1,14 @@
 package startup_metrics
 
 import (
-	logrus "github.com/sirupsen/logrus"
 	"net"
 	"os"
 	"strings"
 	"sync"
 	"time"
 	"unicode"
+
+	logrus "github.com/sirupsen/logrus"
 
 	"github.com/DataDog/datadog-go/v5/statsd"
 

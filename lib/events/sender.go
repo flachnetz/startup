@@ -2,9 +2,10 @@ package events
 
 import (
 	"context"
-	logrus "github.com/sirupsen/logrus"
 	"io"
 	"time"
+
+	logrus "github.com/sirupsen/logrus"
 
 	"github.com/jmoiron/sqlx"
 )
