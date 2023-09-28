@@ -2,10 +2,22 @@ package startup_logrus
 
 import (
 	"context"
+	"github.com/labstack/echo/v4"
 	"github.com/opentracing/opentracing-go"
 	zipkintracer "github.com/openzipkin-contrib/zipkin-go-opentracing"
 	"log/slog"
 )
+
+func EchoTraceLoggerMiddleware() echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			traceId := c.Request().Header.Get("X-Trace-Id")
+			ctx := ContextLoggerWithFields(c.Request().Context(), "traceId", traceId)
+			c.SetRequest(c.Request().Clone(ctx))
+			return next(c)
+		}
+	}
+}
 
 func WithTraceId(ctx context.Context, record slog.Record) (slog.Record, bool, error) {
 	// get the span from the entries context
