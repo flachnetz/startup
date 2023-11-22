@@ -186,6 +186,7 @@ func (f *FailPointService) UpdateFailPoint(req FailPointRequest) error {
 		return errors.New("cannot find error for " + req.FailPointErrorName)
 	}
 	fp.Error = err
+	fp.ErrorName = req.FailPointErrorName
 	fp.IsActive = req.Active
 	fp.FilterTags = nil
 	if req.FilterTags != "" {
