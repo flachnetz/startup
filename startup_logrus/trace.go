@@ -23,6 +23,10 @@ func WithTraceId(ctx context.Context, record slog.Record) (slog.Record, bool, er
 }
 
 func spanContextOf(ctx context.Context) opentracing.SpanContext {
+	if ctx == nil {
+		return nil
+	}
+
 	span := opentracing.SpanFromContext(ctx)
 	if span == nil {
 		return nil
