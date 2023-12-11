@@ -42,7 +42,7 @@ func (c *txContext) CommitAndChain() error {
 	return nil
 }
 
-func txContextFromContext(ctx context.Context) *txContext {
+func TxContextFromContext(ctx context.Context) TxContext {
 	value := ctx.Value(txContextKey{})
 	if value != nil {
 		if txContext, ok := value.(*txContext); ok {

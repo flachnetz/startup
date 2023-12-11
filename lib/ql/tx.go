@@ -57,7 +57,7 @@ func InNewTransaction(ctx context.Context, db TxStarter, fun func(ctx TxContext)
 // If the context already contains a transaction then ErrTransactionExistInContext will be returned as
 // error and the actual operation will not be executed.
 func InNewTransactionWithResult[R any](ctx context.Context, db TxStarter, fun func(ctx TxContext) (R, error)) (R, error) {
-	if tx := txContextFromContext(ctx); tx != nil {
+	if tx := TxContextFromContext(ctx); tx != nil {
 		// must not have an existing transaction in context
 		var defaultValue R
 		return defaultValue, ErrTransactionExistInContext
@@ -171,7 +171,7 @@ func InExistingTransaction(ctx context.Context, fun func(ctx TxContext) error) e
 //
 // This function will not rollback the transaction on error.
 func InExistingTransactionWithResult[R any](ctx context.Context, fun func(ctx TxContext) (R, error)) (R, error) {
-	tx := txContextFromContext(ctx)
+	tx := TxContextFromContext(ctx)
 	if tx == nil {
 		var defaultValue R
 		return defaultValue, ErrNoTransaction
@@ -194,7 +194,7 @@ func InAnyTransaction(ctx context.Context, db TxStarter, fun func(ctx TxContext)
 //
 // See InNewTransactionWithResult regarding error handling.
 func InAnyTransactionWithResult[R any](ctx context.Context, db TxStarter, fun func(ctx TxContext) (R, error)) (R, error) {
-	tx := txContextFromContext(ctx)
+	tx := TxContextFromContext(ctx)
 	if tx != nil {
 		return InExistingTransactionWithResult[R](ctx, fun)
 	} else {
