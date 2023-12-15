@@ -60,16 +60,16 @@ func (opts *BaseOptions) Initialize() {
 
 	if writer != nil {
 		if opts.JSONFormatter {
-			handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+			handler = slog.NewJSONHandler(writer, &slog.HandlerOptions{
 				AddSource: true,
 				Level:     &LogLevel,
 			})
 		} else {
-			handler = tint.NewHandler(os.Stderr, &tint.Options{
+			handler = tint.NewHandler(writer, &tint.Options{
 				AddSource:  true,
 				Level:      &LogLevel,
 				TimeFormat: "2006-01-02 15:04:05.000",
-				NoColor:    !isatty.IsTerminal(os.Stderr.Fd()),
+				NoColor:    !isatty.IsTerminal(writer.Fd()),
 			})
 		}
 	} else {
