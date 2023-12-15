@@ -11,7 +11,6 @@ import (
 
 	confluent "github.com/Landoop/schema-registry"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/flachnetz/startup/v2"
 	"github.com/flachnetz/startup/v2/startup_tracing"
 	"github.com/pkg/errors"
 
@@ -20,7 +19,7 @@ import (
 )
 
 type EventOptions struct {
-	ConfluentURL startup.URL `long:"event-sender-confluent-url" default:"http://confluent-registry.shared.svc.cluster.local" description:"Confluent schema registry url."`
+	ConfluentURL string `long:"event-sender-confluent-url" default:"http://confluent-registry.shared.svc.cluster.local" description:"Confluent schema registry url."`
 
 	Async struct {
 		Kafka struct {
@@ -163,12 +162,16 @@ func kafkaSender(opts *EventOptions, clientId string) (*kafka.Producer, error) {
 	return kafkaClient, nil
 }
 
-func confluentClient(url startup.URL) (*confluent.Client, error) {
+func confluentClient(baseUrl string) (*confluent.Client, error) {
+	if baseUrl == "" {
+		return nil, nil
+	}
+
 	httpClient := startup_tracing.WithSpanPropagation(
 		&http.Client{
 			Timeout: 3 * time.Second,
 		},
 	)
 
-	return confluent.NewClient(url.String(), confluent.UsingClient(httpClient))
+	return confluent.NewClient(baseUrl, confluent.UsingClient(httpClient))
 }
