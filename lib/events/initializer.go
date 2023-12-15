@@ -61,6 +61,15 @@ func (esi *eventSenderInitializer) Initialize() (EventSender, error) {
 }
 
 func (esi *eventSenderInitializer) registerSchemaCache() (map[reflect.Type]uint32, error) {
+	if esi.eventSender.KafkaSender != nil && esi.ConfluentClient == nil {
+		return nil, errors.Errorf("confluent url must be defined if kafka is enabled")
+	}
+
+	if esi.ConfluentClient == nil {
+		// skip schema registration
+		return nil, nil
+	}
+
 	log.Infof("Registering event schemas in confluent registry")
 
 	schemaIdCache := map[reflect.Type]uint32{}
