@@ -52,3 +52,11 @@ func TxContextFromContext(ctx context.Context) TxContext {
 
 	return nil
 }
+
+func TryTxFromContext(ctx TxContext) *sqlx.Tx {
+	if ctx, ok := ctx.(*txContext); ok {
+		return ctx.Tx
+	}
+
+	return nil
+}
