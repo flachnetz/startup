@@ -60,3 +60,8 @@ func TryTxFromContext(ctx TxContext) *sqlx.Tx {
 
 	return nil
 }
+
+// ContextWithoutTx returns a new transaction with any existing txContext masked.
+func ContextWithoutTx(ctx context.Context) context.Context {
+	return context.WithValue(ctx, txContextKey{}, nil)
+}
