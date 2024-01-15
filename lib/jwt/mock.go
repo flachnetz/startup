@@ -1,11 +1,11 @@
 package jwt
 
 import (
+	"github.com/golang-jwt/jwt/v5"
 	"net/http"
 	"time"
 
 	"github.com/benbjohnson/clock"
-	"github.com/dgrijalva/jwt-go"
 
 	"github.com/pkg/errors"
 )
