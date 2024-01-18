@@ -138,8 +138,12 @@ func (f *FailPointService) ReturnErrorIfFailPointActive(ctx context.Context, loc
 		f.failPointsLock.Unlock()
 		if exists && fp.IsActive {
 			// if filterTags are set, we only return an error if the failpoint has one of the filter tags
-			if len(fp.FilterTags) > 0 && !containsOneOf(fp, filterTags) {
-				return nil
+			if len(fp.FilterTags) > 0 {
+				f.logger.Debugf("checking whether failpoint '%s' has one of the filter tags '%s'", location, strings.Join(filterTags, ","))
+				// no match, return no error
+				if !containsOneOf(fp, filterTags) {
+					return nil
+				}
 			}
 
 			var timeoutError timeoutError
