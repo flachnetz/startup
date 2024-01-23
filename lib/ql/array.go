@@ -2,6 +2,7 @@ package ql
 
 import (
 	"database/sql/driver"
+
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
