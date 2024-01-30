@@ -10,7 +10,9 @@ var logger = logrus.WithField("prefix", "unleash")
 // DebugListener is an implementation of all the listener interfaces that simply logs
 // debug info. It is meant for debugging purposes and an example of implementing
 // the listener interfaces.
-type DebugListener struct{}
+type DebugListener struct {
+	EnableOnCountLog bool
+}
 
 // OnError prints out errors.
 func (l DebugListener) OnError(err error) {
@@ -29,7 +31,9 @@ func (l DebugListener) OnReady() {
 
 // OnCount prints to the console when the feature is queried.
 func (l DebugListener) OnCount(name string, enabled bool) {
-	logger.Debugf("Counted '%s'  as enabled? %v", name, enabled)
+	if l.EnableOnCountLog {
+		logger.Debugf("Counted '%s'  as enabled? %v", name, enabled)
+	}
 }
 
 // OnSent prints to the console when the server has uploaded metrics.
