@@ -2,10 +2,11 @@ package api
 
 import "fmt"
 
-var ErrSiteMissing = Error{
-	ErrorCode:        "SITE_MISSING",
-	ErrorDescription: "missing site",
-}
+var (
+	ErrSiteMissing         = Error{ErrorCode: "SITE_MISSING", ErrorDescription: "missing site"}
+	ErrUnknown             = Error{ErrorCode: "UNKNOWN_ERROR", ErrorDescription: "error is unknown"}
+	ErrInternalServerError = Error{ErrorCode: "INTERNAL_SERVER_ERROR", ErrorDescription: "internal server error"}
+)
 
 type Error struct {
 	ErrorCode        string                  `json:"errorCode"`
