@@ -9,6 +9,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+func CustomErrorHandler[E error](errorHandler ErrorHandler[E]) func(error, echo.Context) {
+	return func(err error, c echo.Context) {
+		errorHandler.HandleError(c.Request().Context(), c, err)
+	}
+}
+
 type ErrorHandler[E error] struct {
 	NewUnknownError func(msg string) E
 	NewTimeoutError func(msg string) E
