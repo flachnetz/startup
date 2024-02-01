@@ -32,6 +32,13 @@ func (e Error) ToErrorResponse() ErrorResponse {
 	}
 }
 
+func Errorf(code string, format string, args ...interface{}) Error {
+	return Error{
+		ErrorCode:        code,
+		ErrorDescription: fmt.Sprintf(format, args...),
+	}
+}
+
 type ErrorResponse struct {
 	MainError Error   `json:"mainError"`
 	AllErrors []Error `json:"allErrors"`
