@@ -32,9 +32,9 @@ func (eh *ErrorHandler[E]) toApiError(err error) error {
 
 func (eh *ErrorHandler[E]) timeoutError(msg string) error {
 	if eh.TimeoutError != nil {
-		return errors.New(msg)
+		return eh.TimeoutError(msg)
 	}
-	return ErrTimeout
+	return ErrTimeout.WithDescription(msg)
 }
 
 func (eh *ErrorHandler[E]) unknownError(msg string) error {
@@ -48,40 +48,26 @@ func (eh *ErrorHandler[E]) httpStatusFrom(ctx context.Context, err error) int {
 	if eh.HttpStatusFrom != nil {
 		return eh.HttpStatusFrom(ctx, err)
 	}
-	return http.StatusInternalServerError
+	httpStatusFrom := http.StatusInternalServerError
+	var he *echo.HTTPError
+	if errors.As(err, &he) {
+		httpStatusFrom = he.Code
+	}
+	return httpStatusFrom
 }
 
 func (eh *ErrorHandler[E]) HandleError(ctx context.Context, c echo.Context, err error) {
 	logger := startup_logrus.GetLogger(ctx, "HandleError")
+	apiError := eh.toApiError(err)
+	httpStatusFrom := eh.httpStatusFrom(ctx, err)
+	if httpStatusFrom == 499 {
+		apiError = eh.timeoutError(apiError.Error())
+	}
 
-	var e E
-	ok := errors.As(err, &e)
-	if ok {
-		httpStatusFrom := eh.httpStatusFrom(ctx, e)
-		LogHttpError(logger, c.Path(), httpStatusFrom, err)
-		jErr := c.JSON(httpStatusFrom, eh.toApiError(e))
-		if jErr != nil {
-			logger.Error(jErr)
-		}
-	} else {
-		httpStatusFrom := eh.httpStatusFrom(ctx, e)
-		undefinedErr := eh.unknownError(err.Error())
-
-		switch httpStatusFrom {
-		case 499:
-			undefinedErr = eh.timeoutError(err.Error())
-		default:
-			var he *echo.HTTPError
-			if errors.As(err, &he) {
-				httpStatusFrom = he.Code
-			}
-		}
-		LogHttpError(logger, c.Path(), httpStatusFrom, err)
-
-		jErr := c.JSON(httpStatusFrom, eh.toApiError(undefinedErr))
-		if jErr != nil {
-			logger.Error(jErr)
-		}
+	LogHttpError(logger, c.Path(), httpStatusFrom, apiError)
+	jErr := c.JSON(httpStatusFrom, err)
+	if jErr != nil {
+		logger.Error(jErr)
 	}
 }
 
