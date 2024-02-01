@@ -10,7 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func CustomErrorHandler[E error](errorHandler ErrorHandler[E]) func(error, echo.Context) {
+func CustomErrorHandler(errorHandler ErrorHandler) func(error, echo.Context) {
 	return func(err error, c echo.Context) {
 		errorHandler.HandleError(c.Request().Context(), c, err)
 	}
