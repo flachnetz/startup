@@ -16,8 +16,8 @@ type Error struct {
 	Info             *map[string]interface{} `json:"info,omitempty"`
 }
 
-func (e Error) WithDescription(msg string) Error {
-	e.ErrorDescription = msg
+func (e Error) WithDescription(format string, args ...any) Error {
+	e.ErrorDescription = fmt.Sprintf(format, args...)
 	return e
 }
 
@@ -32,7 +32,7 @@ func (e Error) ToErrorResponse() ErrorResponse {
 	}
 }
 
-func Errorf(code string, format string, args ...interface{}) Error {
+func Errorf(code string, format string, args ...any) Error {
 	return Error{
 		ErrorCode:        code,
 		ErrorDescription: fmt.Sprintf(format, args...),
