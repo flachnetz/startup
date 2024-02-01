@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/flachnetz/startup/v2/startup_logrus"
 	"github.com/labstack/echo/v4"
@@ -16,10 +17,38 @@ func CustomErrorHandler[E error](errorHandler ErrorHandler[E]) func(error, echo.
 }
 
 type ErrorHandler[E error] struct {
-	NewUnknownError func(msg string) E
-	NewTimeoutError func(msg string) E
-	HttpStatusFrom  func(ctx context.Context, err error) int
-	ToApiError      func(err error) error
+	UnknownError   func(msg string) error
+	TimeoutError   func(msg string) error
+	HttpStatusFrom func(ctx context.Context, err error) int
+	ToApiError     func(err error) error
+}
+
+func (eh *ErrorHandler[E]) toApiError(err error) error {
+	if eh.ToApiError != nil {
+		return eh.ToApiError(err)
+	}
+	return ErrUnknown.WithDescription(err.Error())
+}
+
+func (eh *ErrorHandler[E]) timeoutError(msg string) error {
+	if eh.TimeoutError != nil {
+		return errors.New(msg)
+	}
+	return ErrTimeout
+}
+
+func (eh *ErrorHandler[E]) unknownError(msg string) error {
+	if eh.UnknownError != nil {
+		return errors.New(msg)
+	}
+	return ErrUnknown
+}
+
+func (eh *ErrorHandler[E]) httpStatusFrom(ctx context.Context, err error) int {
+	if eh.HttpStatusFrom != nil {
+		return eh.HttpStatusFrom(ctx, err)
+	}
+	return http.StatusInternalServerError
 }
 
 func (eh *ErrorHandler[E]) HandleError(ctx context.Context, c echo.Context, err error) {
@@ -28,28 +57,28 @@ func (eh *ErrorHandler[E]) HandleError(ctx context.Context, c echo.Context, err 
 	var e E
 	ok := errors.As(err, &e)
 	if ok {
-		httpStatusFrom := eh.HttpStatusFrom(ctx, e)
+		httpStatusFrom := eh.httpStatusFrom(ctx, e)
 		LogHttpError(logger, c.Path(), httpStatusFrom, err)
-		jErr := c.JSON(httpStatusFrom, eh.ToApiError(e))
+		jErr := c.JSON(httpStatusFrom, eh.toApiError(e))
 		if jErr != nil {
 			logger.Error(jErr)
 		}
 	} else {
-		code := eh.HttpStatusFrom(ctx, e)
-		e = eh.NewUnknownError(err.Error())
+		httpStatusFrom := eh.httpStatusFrom(ctx, e)
+		undefinedErr := eh.unknownError(err.Error())
 
-		switch code {
+		switch httpStatusFrom {
 		case 499:
-			e = eh.NewTimeoutError(err.Error())
+			undefinedErr = eh.timeoutError(err.Error())
 		default:
 			var he *echo.HTTPError
 			if errors.As(err, &he) {
-				code = he.Code
+				httpStatusFrom = he.Code
 			}
 		}
-		LogHttpError(logger, c.Path(), code, err)
+		LogHttpError(logger, c.Path(), httpStatusFrom, err)
 
-		jErr := c.JSON(code, eh.ToApiError(e))
+		jErr := c.JSON(httpStatusFrom, eh.toApiError(undefinedErr))
 		if jErr != nil {
 			logger.Error(jErr)
 		}
