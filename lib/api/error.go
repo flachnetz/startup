@@ -2,12 +2,10 @@ package api
 
 import "fmt"
 
-var (
-	ErrSiteMissing = Error{
-		ErrorCode:        "SITE_MISSING",
-		ErrorDescription: "missing site",
-	}
-)
+var ErrSiteMissing = Error{
+	ErrorCode:        "SITE_MISSING",
+	ErrorDescription: "missing site",
+}
 
 type Error struct {
 	ErrorCode        string                  `json:"errorCode"`
