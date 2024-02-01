@@ -16,6 +16,11 @@ type Error struct {
 	Info             *map[string]interface{} `json:"info,omitempty"`
 }
 
+func (e Error) WithDescription(msg string) Error {
+	e.ErrorDescription = msg
+	return e
+}
+
 func (e Error) Error() string {
 	return fmt.Sprintf("%s: %s", e.ErrorCode, e.ErrorDescription)
 }
