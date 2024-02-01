@@ -5,6 +5,7 @@ import "fmt"
 var (
 	ErrSiteMissing         = Error{ErrorCode: "SITE_MISSING", ErrorDescription: "missing site"}
 	ErrUnknown             = Error{ErrorCode: "UNKNOWN_ERROR", ErrorDescription: "error is unknown"}
+	ErrTimeout             = Error{ErrorCode: "TIMEOUT", ErrorDescription: "request timeout"}
 	ErrInternalServerError = Error{ErrorCode: "INTERNAL_SERVER_ERROR", ErrorDescription: "internal server error"}
 )
 
