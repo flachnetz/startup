@@ -16,35 +16,35 @@ func CustomErrorHandler[E error](errorHandler ErrorHandler[E]) func(error, echo.
 	}
 }
 
-type ErrorHandler[E error] struct {
+type ErrorHandler struct {
 	UnknownError   func(msg string) error
 	TimeoutError   func(msg string) error
 	HttpStatusFrom func(ctx context.Context, err error) int
 	ToApiError     func(err error) error
 }
 
-func (eh *ErrorHandler[E]) toApiError(err error) error {
+func (eh *ErrorHandler) toApiError(err error) error {
 	if eh.ToApiError != nil {
 		return eh.ToApiError(err)
 	}
 	return ErrUnknown.WithDescription(err.Error())
 }
 
-func (eh *ErrorHandler[E]) timeoutError(msg string) error {
+func (eh *ErrorHandler) timeoutError(msg string) error {
 	if eh.TimeoutError != nil {
 		return eh.TimeoutError(msg)
 	}
 	return ErrTimeout.WithDescription(msg)
 }
 
-func (eh *ErrorHandler[E]) unknownError(msg string) error {
+func (eh *ErrorHandler) unknownError(msg string) error {
 	if eh.UnknownError != nil {
 		return errors.New(msg)
 	}
 	return ErrUnknown
 }
 
-func (eh *ErrorHandler[E]) httpStatusFrom(ctx context.Context, err error) int {
+func (eh *ErrorHandler) httpStatusFrom(ctx context.Context, err error) int {
 	if eh.HttpStatusFrom != nil {
 		return eh.HttpStatusFrom(ctx, err)
 	}
@@ -56,7 +56,7 @@ func (eh *ErrorHandler[E]) httpStatusFrom(ctx context.Context, err error) int {
 	return httpStatusFrom
 }
 
-func (eh *ErrorHandler[E]) HandleError(ctx context.Context, c echo.Context, err error) {
+func (eh *ErrorHandler) HandleError(ctx context.Context, c echo.Context, err error) {
 	logger := startup_logrus.GetLogger(ctx, "HandleError")
 	apiError := eh.toApiError(err)
 	httpStatusFrom := eh.httpStatusFrom(ctx, err)
