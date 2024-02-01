@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+
 	"github.com/flachnetz/startup/v2/startup_logrus"
 	"github.com/labstack/echo/v4"
 	"github.com/pkg/errors"
