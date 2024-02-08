@@ -12,7 +12,7 @@ import (
 	"time"
 
 	confluent "github.com/Landoop/schema-registry"
-	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )

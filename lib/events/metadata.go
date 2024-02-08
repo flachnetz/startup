@@ -3,7 +3,7 @@ package events
 import (
 	"reflect"
 
-	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/pkg/errors"
 )
 
