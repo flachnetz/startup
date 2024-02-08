@@ -5,7 +5,7 @@ import (
 	"reflect"
 
 	confluent "github.com/Landoop/schema-registry"
-	rdkafka "github.com/confluentinc/confluent-kafka-go/kafka"
+	rdkafka "github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/pkg/errors"
 )
 

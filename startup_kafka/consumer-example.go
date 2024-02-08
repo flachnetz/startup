@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	logrus "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
-	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"go.uber.org/atomic"
 
 	"github.com/flachnetz/startup/v2/lib/events/avro"
