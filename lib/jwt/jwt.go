@@ -65,7 +65,7 @@ func (j *jwtService) GetJwtTokenFromRequest(req *http.Request) (*JwtStruct, erro
 
 	authHeader := req.Header.Get("authorization")
 	if authHeader == "" {
-		return nil, errors.New("authorization header is empty or not set")
+		return nil, jwt.NewValidationError(errors.New("authorization header is empty or not set"))
 	}
 
 	return j.GetJwtToken(authHeader[7:])
