@@ -39,3 +39,13 @@ func NoCancelContext(lookupContext context.Context) context.Context {
 func (ctx *noCancelContext) Value(key interface{}) interface{} {
 	return ctx.lookupContext.Value(key)
 }
+
+func IsStruct(v interface{}) bool {
+	_, isStruct := v.(struct{})
+	return isStruct
+}
+
+func IsInterface(v interface{}) bool {
+	_, isInterface := v.(interface{})
+	return isInterface
+}
