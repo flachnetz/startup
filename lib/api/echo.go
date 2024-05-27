@@ -10,27 +10,32 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func CustomErrorHandler[E error](errorHandler ErrorHandler[E]) func(error, echo.Context) {
+func CustomErrorHandler[E ApiError](errorHandler ErrorHandler[E]) func(error, echo.Context) {
 	return func(err error, c echo.Context) {
 		errorHandler.HandleError(c.Request().Context(), c, err)
 	}
 }
 
-type ErrorHandler[E error] struct {
+type ApiError interface {
+	error
+	ToErrorResponse() ErrorResponse
+}
+
+type ErrorHandler[E ApiError] struct {
 	UnknownError   func(msg string) error
-	TimeoutError   func(msg string) error
+	TimeoutError   func(msg string) ApiError
 	HttpStatusFrom func(ctx context.Context, err error) int
 	ToApiError     func(err error) E
 }
 
-func (eh *ErrorHandler[E]) toApiError(err error) error {
+func (eh *ErrorHandler[E]) toApiError(err error) ApiError {
 	if eh.ToApiError != nil {
 		return eh.ToApiError(err)
 	}
 	return ErrUnknown.WithDescription(err.Error())
 }
 
-func (eh *ErrorHandler[E]) timeoutError(msg string) error {
+func (eh *ErrorHandler[E]) timeoutError(msg string) ApiError {
 	if eh.TimeoutError != nil {
 		return eh.TimeoutError(msg)
 	}
@@ -39,7 +44,7 @@ func (eh *ErrorHandler[E]) timeoutError(msg string) error {
 
 func (eh *ErrorHandler[E]) unknownError(msg string) error {
 	if eh.UnknownError != nil {
-		return errors.New(msg)
+		return eh.UnknownError(msg)
 	}
 	return ErrUnknown
 }
@@ -65,7 +70,7 @@ func (eh *ErrorHandler[E]) HandleError(ctx context.Context, c echo.Context, err 
 	}
 
 	LogHttpError(logger, c.Path(), httpStatusFrom, apiError)
-	jErr := c.JSON(httpStatusFrom, apiError)
+	jErr := c.JSON(httpStatusFrom, apiError.ToErrorResponse())
 	if jErr != nil {
 		logger.Error(jErr)
 	}
