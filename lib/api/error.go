@@ -1,12 +1,15 @@
 package api
 
-import "fmt"
+import (
+	"fmt"
+	"net/http"
+)
 
 var (
-	ErrSiteMissing         = Error{ErrorCode: "SITE_MISSING", ErrorDescription: "missing site"}
-	ErrUnknown             = Error{ErrorCode: "UNKNOWN_ERROR", ErrorDescription: "error is unknown"}
-	ErrTimeout             = Error{ErrorCode: "TIMEOUT", ErrorDescription: "request timeout"}
-	ErrInternalServerError = Error{ErrorCode: "INTERNAL_SERVER_ERROR", ErrorDescription: "internal server error"}
+	ErrSiteMissing         = Error{ErrorCode: "SITE_MISSING", ErrorDescription: "missing site", HttpStatusCode: http.StatusBadRequest}
+	ErrUnknown             = Error{ErrorCode: "UNKNOWN_ERROR", ErrorDescription: "error is unknown", HttpStatusCode: http.StatusInternalServerError}
+	ErrTimeout             = Error{ErrorCode: "TIMEOUT", ErrorDescription: "request timeout", HttpStatusCode: 499}
+	ErrInternalServerError = Error{ErrorCode: "INTERNAL_SERVER_ERROR", ErrorDescription: "internal server error", HttpStatusCode: http.StatusInternalServerError}
 )
 
 type Error struct {
@@ -14,6 +17,7 @@ type Error struct {
 	ErrorDescription string                  `json:"errorDescription"`
 	Field            *string                 `json:"field,omitempty"`
 	Info             *map[string]interface{} `json:"info,omitempty"`
+	HttpStatusCode   int                     `json:"-"`
 }
 
 func (e Error) WithDescription(format string, args ...any) Error {
