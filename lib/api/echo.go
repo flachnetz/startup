@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"github.com/labstack/echo/v4/middleware"
 	"net/http"
 
 	"github.com/flachnetz/startup/v2/startup_logrus"
@@ -82,5 +83,14 @@ func LogHttpError(logger *logrus.Entry, path string, code int, err error) {
 		logger.Errorf("%s req=%s", err.Error(), path)
 	} else {
 		logger.Warnf("%s req=%s", err.Error(), path)
+	}
+}
+
+func BasicAuthValidator(basicAuthUser string, basicAuthPassword string) middleware.BasicAuthValidator {
+	return func(user string, password string, context echo.Context) (bool, error) {
+		if user == basicAuthUser && password == basicAuthPassword {
+			return true, nil
+		}
+		return false, nil
 	}
 }
