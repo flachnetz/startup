@@ -46,7 +46,7 @@ func TxContextFromContext(ctx context.Context) TxContext {
 	value := ctx.Value(txContextKey{})
 	if value != nil {
 		if txContext, ok := value.(*txContext); ok {
-			return txContext
+			return txContext.WithContext(ctx)
 		}
 	}
 
