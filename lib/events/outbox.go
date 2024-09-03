@@ -27,8 +27,17 @@ func WriteToOutbox(ctx context.Context, tx sqlx.ExecerContext, metadata EventMet
 		headerValues = append(headerValues, header.Value)
 	}
 
-	// insert event into database
-	stmt := "INSERT INTO public.kafka_outbox (kafka_topic, kafka_key, kafka_value, kafka_header_keys, kafka_header_values) VALUES ($1, $2, $3, $4, $5)"
+	// insert event into database and notify listeners
+	stmt := `
+		WITH
+			ids AS (
+				INSERT INTO public.kafka_outbox (kafka_topic, kafka_key, kafka_value, kafka_header_keys, kafka_header_values)
+				VALUES ($1, $2, $3, $4, $5)
+				RETURNING id)
+		
+		SELECT pg_notify('kafka-message', id::text)
+		FROM ids;
+	`
 	_, err := tx.ExecContext(ctx, stmt, topic, key, payload, headerKeys, headerValues)
 	return errors.WithMessage(err, "write event into database")
 }
@@ -41,15 +50,15 @@ func CreateOutbox(ctx context.Context, db *sql.DB) error {
 
 	createTable := `
 		CREATE TABLE IF NOT EXISTS PUBLIC.kafka_outbox (
-			id                  BIGSERIAL NOT NULL PRIMARY KEY,
-			create_time         TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP ,
+			id                  bigserial NOT NULL PRIMARY KEY,
+			create_time         timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP ,
 			leader_id           UUID NULL DEFAULT NULL,
 			
-			kafka_topic         TEXT NOT NULL,
-			kafka_key           TEXT NOT NULL,
+			kafka_topic         text NOT NULL,
+			kafka_key           text NOT NULL,
 			kafka_value         BYTEA NOT NULL,
-			kafka_header_keys   TEXT[] NOT NULL,
-			kafka_header_values TEXT[] NOT NULL
+			kafka_header_keys   text[] NOT NULL,
+			kafka_header_values text[] NOT NULL
 		)
 	`
 
