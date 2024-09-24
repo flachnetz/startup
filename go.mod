@@ -4,6 +4,7 @@ require (
 	github.com/DataDog/datadog-go/v5 v5.3.0
 	github.com/Landoop/schema-registry v0.0.0-20190327143759-50a5701c1891
 	github.com/Unleash/unleash-client-go/v3 v3.7.4
+	github.com/Unleash/unleash-client-go/v4 v4.1.3
 	github.com/benbjohnson/clock v1.3.5
 	github.com/confluentinc/confluent-kafka-go/v2 v2.4.0
 	github.com/felixge/httpsnoop v1.0.4
