@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	logrus "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/jackc/pgx/v5"
@@ -25,8 +25,9 @@ import (
 type Initializer func(db *sqlx.DB) error
 
 type PostgresOptions struct {
-	URL      string `long:"postgres" default:"postgres://postgres:postgres@localhost:5432?sslmode=disable" description:"Postgres server url."`
-	PoolSize int    `long:"postgres-pool" validate:"min=1" default:"8" description:"Maximum number of (idle) connections in the postgres connection pool."`
+	URL                string `long:"postgres" default:"postgres://postgres:postgres@localhost:5432?sslmode=disable" description:"Postgres server url."`
+	PoolSize           int    `long:"postgres-pool" validate:"min=1" default:"8" description:"Maximum number of (idle) connections in the postgres connection pool."`
+	EnableQueryLogging bool   `long:"enable-query-logging" description:"Enable query logging."`
 
 	ConnectionLifetime time.Duration `long:"postgres-lifetime" default:"10m" description:"Maximum time a connection in the pool can be used."`
 
@@ -58,6 +59,9 @@ func (opts *PostgresOptions) Connection() *sqlx.DB {
 		}
 
 		conf.Tracer = tracerWrapper{}
+		if opts.EnableQueryLogging {
+			conf.Tracer = tracerWrapper{logger: logger}
+		}
 
 		// create the new database connection
 		db := sqlx.NewDb(pgxstd.OpenDB(*conf), "pgx")
