@@ -2,6 +2,7 @@ package startup_postgres
 
 import (
 	"context"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/jackc/pgx/v5"
