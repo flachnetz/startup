@@ -2,11 +2,14 @@ package startup_postgres
 
 import (
 	"context"
+	"github.com/sirupsen/logrus"
 
 	"github.com/jackc/pgx/v5"
 )
 
-type tracerWrapper struct{}
+type tracerWrapper struct {
+	logger *logrus.Entry
+}
 
 var (
 	_ = (pgx.QueryTracer)(tracerWrapper{})
@@ -15,6 +18,12 @@ var (
 )
 
 func (m tracerWrapper) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
+	if m.logger != nil {
+		m.logger.WithFields(logrus.Fields{
+			"query": data.SQL,
+			"args":  data.Args,
+		}).Debug("Query start")
+	}
 	tracer := globalTracer.Load()
 	if tracer == nil {
 		return ctx
@@ -33,6 +42,12 @@ func (m tracerWrapper) TraceQueryEnd(ctx context.Context, conn *pgx.Conn, data p
 }
 
 func (m tracerWrapper) TracePrepareStart(ctx context.Context, conn *pgx.Conn, data pgx.TracePrepareStartData) context.Context {
+	if m.logger != nil {
+		m.logger.WithFields(logrus.Fields{
+			"name": data.Name,
+			"sql":  data.SQL,
+		}).Debug("Prepare start")
+	}
 	tracer := globalTracer.Load()
 	if tracer == nil {
 		return ctx
