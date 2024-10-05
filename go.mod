@@ -3,7 +3,6 @@ module github.com/flachnetz/startup/v2
 require (
 	github.com/DataDog/datadog-go/v5 v5.3.0
 	github.com/Landoop/schema-registry v0.0.0-20190327143759-50a5701c1891
-	github.com/Unleash/unleash-client-go/v3 v3.7.4
 	github.com/Unleash/unleash-client-go/v4 v4.1.3
 	github.com/benbjohnson/clock v1.3.5
 	github.com/confluentinc/confluent-kafka-go/v2 v2.4.0
@@ -36,7 +35,7 @@ require (
 )
 
 require (
-	github.com/Masterminds/semver/v3 v3.2.1 // indirect
+	github.com/Masterminds/semver/v3 v3.3.0 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
