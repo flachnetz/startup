@@ -1,9 +1,10 @@
-package startup_postgres
+package pg
 
 import (
+	"hash/fnv"
+
 	"github.com/flachnetz/startup/v2/lib/ql"
 	"github.com/pkg/errors"
-	"hash/fnv"
 )
 
 func LockWithTransaction(ctx ql.TxContext, key string) error {
