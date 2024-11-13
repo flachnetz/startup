@@ -111,14 +111,6 @@ func (c *Converter) ConvertAvroToGo(input interface{}) interface{} {
 
 		return result
 
-	case string:
-		// limit to maximum field length in elasticsearch
-		if len(input) > 32760 {
-			return input[:32760]
-		}
-
-		return input
-
 	default:
 		return input
 	}
