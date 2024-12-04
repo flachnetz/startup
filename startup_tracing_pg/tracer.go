@@ -3,6 +3,7 @@ package startup_tracing_pg
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"regexp"
 	"strings"
 
@@ -29,7 +30,7 @@ func (t *tracer) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data pgx.T
 func (t *tracer) TraceQueryEnd(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryEndData) {
 	span := t.spanOf(ctx)
 
-	if data.Err != nil && data.Err != sql.ErrNoRows {
+	if data.Err != nil && !errors.Is(data.Err, sql.ErrNoRows) {
 		span.SetTag("error", data.Err.Error())
 	}
 
@@ -68,6 +69,15 @@ func (t *tracer) TransactionStart(ctx context.Context) context.Context {
 }
 
 func (t *tracer) TransactionEnd(ctx context.Context) {
+	t.spanOf(ctx).Finish()
+}
+
+func (t *tracer) AcquireConnectionStart(ctx context.Context) context.Context {
+	_, ctx = t.startSpan(ctx, "tx:acquire-connection")
+	return ctx
+}
+
+func (t *tracer) AcquireConnectionEnd(ctx context.Context) {
 	t.spanOf(ctx).Finish()
 }
 
