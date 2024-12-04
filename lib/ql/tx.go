@@ -58,6 +58,10 @@ func InNewTransactionWithResult[R any](ctx context.Context, db TxStarter, fun fu
 		return defaultValue, ErrTransactionExistInContext
 	}
 
+	// warn if we're going into a second transaction within the same goroutine
+	// at the same time
+	defer reentrantWarn(ctx)()
+
 	// tracing this transaction
 	ctx = startTraceTransaction(ctx)
 	defer endTraceTransaction(ctx)
