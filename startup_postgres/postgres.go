@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"github.com/rcrowley/go-metrics"
 	"io"
 	"strings"
 	"sync"
@@ -92,10 +93,41 @@ func (opts *PostgresOptions) Connection() *sqlx.DB {
 			}
 		}
 
+		go observeStats(db)
+
 		opts.connection = db
 	})
 
 	return opts.connection
+}
+
+func observeStats(db *sqlx.DB) {
+	go func() {
+		prevStats := db.Stats()
+
+		for {
+			time.Sleep(1 * time.Second)
+
+			stats := db.Stats()
+
+			reg := metrics.DefaultRegistry
+			metrics.GetOrRegisterGauge("db.pool.idle", reg).Update(int64(stats.Idle))
+			metrics.GetOrRegisterGauge("db.pool.inuse", reg).Update(int64(stats.InUse))
+			metrics.GetOrRegisterGauge("db.pool.open", reg).Update(int64(stats.OpenConnections))
+
+			metrics.GetOrRegisterGauge("db.pool.wait-count", reg).Update(stats.WaitCount)
+			metrics.GetOrRegisterGauge("db.pool.wait-duration", reg).Update(stats.WaitDuration.Milliseconds())
+
+			metrics.GetOrRegisterMeter("db.pool.wait-count", reg).Mark(stats.WaitCount - prevStats.WaitCount)
+			metrics.GetOrRegisterTimer("db.pool.wait-duration", reg).Update(stats.WaitDuration - stats.WaitDuration)
+
+			metrics.GetOrRegisterGauge("db.pool.closed.lifetime", reg).Update(stats.MaxLifetimeClosed)
+			metrics.GetOrRegisterGauge("db.pool.closed.idletime", reg).Update(stats.MaxIdleTimeClosed)
+			metrics.GetOrRegisterGauge("db.pool.closed.idle", reg).Update(stats.MaxIdleClosed)
+
+			prevStats = stats
+		}
+	}()
 }
 
 func (opts *PostgresOptions) StartVacuumTask(db *sqlx.DB, table string, interval time.Duration, clock clock.Clock) io.Closer {
