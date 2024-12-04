@@ -60,3 +60,9 @@ func currentGoroutineId() uint64 {
 
 	return n
 }
+
+func init() {
+	// validate that the method works and will not just crash sometime later
+	// at runtime. fail fast!
+	currentGoroutineId()
+}
