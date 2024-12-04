@@ -3,6 +3,7 @@ package ql
 import (
 	"context"
 	"database/sql"
+	"github.com/hashicorp/go-multierror"
 
 	sl "github.com/flachnetz/startup/v2/startup_logrus"
 	pt "github.com/flachnetz/startup/v2/startup_postgres"
@@ -31,12 +32,6 @@ func NoRollback(err error) error {
 	return noRollbackTxError{wrapped: err}
 }
 
-type rStruct[R any] struct {
-	Result    R
-	Error     error
-	Recovered any
-}
-
 // InNewTransaction calls InNewTransactionWithResult without returning a result
 func InNewTransaction(ctx context.Context, db TxStarter, fun func(ctx TxContext) error) error {
 	_, err := InNewTransactionWithResult(ctx, db, func(ctx TxContext) (any, error) {
@@ -63,6 +58,10 @@ func InNewTransactionWithResult[R any](ctx context.Context, db TxStarter, fun fu
 		return defaultValue, ErrTransactionExistInContext
 	}
 
+	// warn if we're going into a second transaction within the same goroutine
+	// at the same time
+	defer reentrantWarn(ctx)()
+
 	// tracing this transaction
 	ctx = startTraceTransaction(ctx)
 	defer endTraceTransaction(ctx)
@@ -70,11 +69,13 @@ func InNewTransactionWithResult[R any](ctx context.Context, db TxStarter, fun fu
 	var hooks hooks
 
 	// begin the transaction
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, closeConn, err := beginTx(ctx, db)
 	if err != nil {
 		var defaultValue R
 		return defaultValue, err
 	}
+
+	defer closeConn()
 
 	// set to true once the users code ran
 	var userCodeOk bool
@@ -123,6 +124,45 @@ func InNewTransactionWithResult[R any](ctx context.Context, db TxStarter, fun fu
 	return res, err
 }
 
+func noop() {}
+
+func acquireConnection(ctx context.Context, db *sqlx.DB) (*sqlx.Conn, error) {
+	ctx = startTraceAcquireConnection(ctx)
+	defer endTraceAcquireConnection(ctx)
+
+	return db.Connx(ctx)
+}
+
+func beginTx(ctx context.Context, txStarter TxStarter) (*sqlx.Tx, func(), error) {
+	switch pool := txStarter.(type) {
+	case *sqlx.DB:
+		// get the connection from the pool
+		conn, err := acquireConnection(ctx, pool)
+		if err != nil {
+			return nil, nil, errors.WithMessage(err, "get connection from pool")
+		}
+
+		// and begin a connection on this trace
+		tx, err := conn.BeginTxx(ctx, nil)
+		if err != nil {
+			// we still own the connection, so we need to close it
+			if errClose := conn.Close(); errClose != nil {
+				err = multierror.Append(err, errClose)
+			}
+
+			return nil, nil, errors.WithMessage(err, "start transaction")
+		}
+
+		closeConn := func() { _ = conn.Close() }
+		return tx, closeConn, nil
+
+	default:
+		// probably already a sqlx.Conn, so we can just use it
+		tx, err := txStarter.BeginTxx(ctx, nil)
+		return tx, noop, err
+	}
+}
+
 func requiresTxRollback(err error) (error, bool) {
 	// no rollback required if we just didnt find anything
 	if errors.Is(err, sql.ErrNoRows) {
@@ -155,6 +195,24 @@ func endTraceTransaction(ctx context.Context) {
 	}
 
 	tracer.TransactionEnd(ctx)
+}
+
+func startTraceAcquireConnection(ctx context.Context) context.Context {
+	tracer := pt.GetTracer()
+	if tracer == nil {
+		return ctx
+	}
+
+	return tracer.AcquireConnectionStart(ctx)
+}
+
+func endTraceAcquireConnection(ctx context.Context) {
+	tracer := pt.GetTracer()
+	if tracer == nil {
+		return
+	}
+
+	tracer.AcquireConnectionEnd(ctx)
 }
 
 // InExistingTransaction calls InExistingTransactionWithResult without returning the error.

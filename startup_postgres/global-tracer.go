@@ -14,6 +14,9 @@ type Tracer interface {
 
 	TransactionStart(ctx context.Context) context.Context
 	TransactionEnd(ctx context.Context)
+
+	AcquireConnectionStart(ctx context.Context) context.Context
+	AcquireConnectionEnd(ctx context.Context)
 }
 
 var globalTracer atomic.Pointer[Tracer]
