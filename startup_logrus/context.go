@@ -17,6 +17,10 @@ func WithLogger(ctx context.Context, logger *logrus.Entry) context.Context {
 	return context.WithValue(ctx, loggerKey{}, logger)
 }
 
+func LoggerOf(ctx context.Context) *logrus.Entry {
+	return GetLogger(ctx, nil)
+}
+
 // GetLogger returns the current logger with the given prefix or type name from the context.
 func GetLogger(ctx context.Context, object interface{}) *logrus.Entry {
 	log := loggerOf(ctx).WithContext(ctx)
