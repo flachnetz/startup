@@ -115,11 +115,11 @@ func observeStats(db *sqlx.DB) {
 			metrics.GetOrRegisterGauge("db.pool.inuse", reg).Update(int64(stats.InUse))
 			metrics.GetOrRegisterGauge("db.pool.open", reg).Update(int64(stats.OpenConnections))
 
-			metrics.GetOrRegisterGauge("db.pool.wait-count", reg).Update(stats.WaitCount)
-			metrics.GetOrRegisterGauge("db.pool.wait-duration", reg).Update(stats.WaitDuration.Milliseconds())
+			metrics.GetOrRegisterGauge("db.pool.gauge.wait-count", reg).Update(stats.WaitCount)
+			metrics.GetOrRegisterGauge("db.pool.gauge.wait-duration", reg).Update(stats.WaitDuration.Milliseconds())
 
-			metrics.GetOrRegisterMeter("db.pool.wait-count", reg).Mark(stats.WaitCount - prevStats.WaitCount)
-			metrics.GetOrRegisterTimer("db.pool.wait-duration", reg).Update(stats.WaitDuration - stats.WaitDuration)
+			metrics.GetOrRegisterMeter("db.pool.meter.wait-count", reg).Mark(stats.WaitCount - prevStats.WaitCount)
+			metrics.GetOrRegisterTimer("db.pool.meter.wait-duration", reg).Update(stats.WaitDuration - stats.WaitDuration)
 
 			metrics.GetOrRegisterGauge("db.pool.closed.lifetime", reg).Update(stats.MaxLifetimeClosed)
 			metrics.GetOrRegisterGauge("db.pool.closed.idletime", reg).Update(stats.MaxIdleTimeClosed)
