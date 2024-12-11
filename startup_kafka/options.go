@@ -15,6 +15,7 @@ type KafkaOptions struct {
 	KafkaConsumerGroup    string   `long:"kafka-consumer-group" description:"Consumer group of kafka messages. Set to RANDOM to get a unique consumer group each time."`
 	KafkaOffsetReset      string   `long:"kafka-offset-reset" default:"smallest" description:"Offset reset for kafka topic" choice:"smallest" choice:"largest"`
 	KafkaSecurityProtocol string   `long:"kafka-security-protocol" default:"ssl" description:"Security protocol" choice:"ssl" choice:"plaintext"`
+	KafkaProperties       []string `long:"kafka-property" description:"Rdkafka properties in key=value format"`
 }
 
 func (opts KafkaOptions) NewConsumer(config kafka.ConfigMap) *kafka.Consumer {
@@ -34,6 +35,11 @@ func (opts KafkaOptions) NewConsumer(config kafka.ConfigMap) *kafka.Consumer {
 
 	for key, value := range config {
 		configMap[key] = value
+	}
+
+	for _, prop := range opts.KafkaProperties {
+		err := configMap.Set(prop)
+		startup_base.FatalOnError(err, "Set kafka property %q", prop)
 	}
 
 	consumer, err := kafka.NewConsumer(&configMap)
