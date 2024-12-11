@@ -23,10 +23,10 @@ type EventOptions struct {
 
 	Async struct {
 		Kafka struct {
-			Addr        string                 `long:"event-sender-kafka-addr" default:"kafka.shared.svc.cluster.local:9093" description:"Kafka bootstrap hosts"`
-			DisableTLS  bool                   `long:"event-sender-kafka-disable-tls" description:"Disable TLS, might simplify local testing"`
-			Replication int16                  `long:"event-sender-kafka-replication-factor" default:"3" description:"Replication factor to use when creating kafka topics"`
-			Properties  map[string]interface{} `long:"event-sender-kafka-properties" description:"A map containing standard librdkafka configuration properties as documented in: https://github.com/edenhill/librdkafka/tree/master/CONFIGURATION.md"`
+			Addr        string   `long:"event-sender-kafka-addr" default:"kafka.shared.svc.cluster.local:9093" description:"Kafka bootstrap hosts"`
+			DisableTLS  bool     `long:"event-sender-kafka-disable-tls" description:"Disable TLS, might simplify local testing"`
+			Replication int16    `long:"event-sender-kafka-replication-factor" default:"3" description:"Replication factor to use when creating kafka topics"`
+			Properties  []string `long:"event-sender-kafka-properties" description:"Pairs of key=value containing standard librdkafka configuration properties as documented in: https://github.com/edenhill/librdkafka/tree/master/CONFIGURATION.md"`
 		}
 
 		BufferSize uint `long:"event-sender-async-buffer-size" default:"1024" description:"Number of elements to buffer in async event sender. If the buffer is full, new events will be discarded."`
@@ -143,15 +143,17 @@ func kafkaSender(opts *EventOptions, clientId string) (*kafka.Producer, error) {
 		"partitioner": "murmur2_random",
 	}
 
-	for key, value := range opts.Async.Kafka.Properties {
-		kafkaConfig[key] = value
-	}
-
 	// enable or disable ssl
 	if opts.Async.Kafka.DisableTLS {
 		kafkaConfig["security.protocol"] = "plaintext"
 	} else {
 		kafkaConfig["security.protocol"] = "ssl"
+	}
+
+	for _, value := range opts.Async.Kafka.Properties {
+		if err := kafkaConfig.Set(value); err != nil {
+			return nil, errors.WithMessagef(err, "parse kafka config %q", value)
+		}
 	}
 
 	kafkaClient, err := kafka.NewProducer(&kafkaConfig)
