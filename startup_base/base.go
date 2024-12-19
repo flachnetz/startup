@@ -26,8 +26,10 @@ var LogLevel slog.LevelVar
 
 var handlerVar slog.Handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{AddSource: true})
 
-var lock sync.RWMutex
-var baseOptions BaseOptions
+var (
+	lock        sync.RWMutex
+	baseOptions BaseOptions
+)
 
 func init() {
 	lazy := &LazyHandler{
