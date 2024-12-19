@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/flachnetz/startup/v2/startup_logrus"
 	"runtime"
 	"strconv"
 	"sync"
 	"unsafe"
+
+	"github.com/flachnetz/startup/v2/startup_logrus"
 )
 
 var goroutineIdCache sync.Map

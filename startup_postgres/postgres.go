@@ -5,11 +5,12 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
-	"github.com/rcrowley/go-metrics"
 	"io"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/rcrowley/go-metrics"
 
 	"github.com/sirupsen/logrus"
 
