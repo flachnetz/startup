@@ -114,6 +114,13 @@ func (opts *BaseOptions) Initialize() {
 	lock.Unlock()
 }
 
+func IsVerboseLoggingEnabled() bool {
+	lock.RLock()
+	enabled := baseOptions.Verbose
+	lock.RUnlock()
+	return enabled
+}
+
 func GetEnvironment() string {
 	lock.RLock()
 	defer lock.RUnlock()
