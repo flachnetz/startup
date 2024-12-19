@@ -114,6 +114,12 @@ func (opts *BaseOptions) Initialize() {
 	lock.Unlock()
 }
 
+func GetEnvironment() string {
+	lock.RLock()
+	defer lock.RUnlock()
+	return baseOptions.Environment
+}
+
 func IsDevelopment() bool {
 	lock.RLock()
 	environment := strings.ToLower(baseOptions.Environment)
