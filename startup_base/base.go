@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/flachnetz/startup/v2/lib/clock"
 	"github.com/flachnetz/startup/v2/startup_base/tint"
@@ -40,8 +41,9 @@ type BaseOptions struct {
 	ForceColor    bool   `long:"log-color" description:"Forces colored output even on non TTYs."`
 	JSONFormatter bool   `long:"log-json" description:"Log using the logrus json formatter."`
 
-	Verbose bool `long:"verbose" description:"Show verbose logging output."`
-	Version bool `long:"version" description:"Prints the build information about this application if available."`
+	Verbose     bool   `long:"verbose" description:"Show verbose logging output."`
+	Version     bool   `long:"version" description:"Prints the build information about this application if available."`
+	Environment string `long:"environment" description:"The environment this application is running in."`
 }
 
 func (opts *BaseOptions) Initialize() {
@@ -90,6 +92,37 @@ func (opts *BaseOptions) Initialize() {
 		LogLevel.Set(slog.LevelDebug)
 		logger.Debug("Enabled verbose logging")
 	}
+
+	if opts.Environment == "" {
+		stage := os.Getenv("STAGE")
+		if stage != "" {
+			logger.Info("Using environment from STAGE environment variable: ", stage)
+			opts.Environment = stage
+		} else {
+			opts.Environment = "development"
+		}
+	}
+	logger.Info("Environment: ", opts.Environment)
+}
+
+func (opts *BaseOptions) IsDevelopment() bool {
+	environment := strings.ToLower(opts.Environment)
+	return environment == "development" || environment == "dev"
+}
+
+func (opts *BaseOptions) IsTesting() bool {
+	environment := strings.ToLower(opts.Environment)
+	return environment == "testing" || environment == "test"
+}
+
+func (opts *BaseOptions) IsStaging() bool {
+	environment := strings.ToLower(opts.Environment)
+	return environment == "staging" || environment == "stage"
+}
+
+func (opts *BaseOptions) IsProduction() bool {
+	environment := strings.ToLower(opts.Environment)
+	return environment == "production" || environment == "prod" || environment == "live"
 }
 
 type nilhandler struct{}
