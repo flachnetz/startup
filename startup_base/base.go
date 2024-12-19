@@ -96,13 +96,13 @@ func (opts *BaseOptions) Initialize() {
 	if opts.Environment == "" {
 		stage := os.Getenv("STAGE")
 		if stage != "" {
-			logger.Info("Using environment from STAGE environment variable: ", stage)
+			logger.Info("Using environment from STAGE environment variable: " + stage)
 			opts.Environment = stage
 		} else {
 			opts.Environment = "development"
 		}
 	}
-	logger.Info("Environment: ", opts.Environment)
+	logger.Info("Environment: " + opts.Environment)
 }
 
 func (opts *BaseOptions) IsDevelopment() bool {
