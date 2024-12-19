@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 
 	"github.com/flachnetz/startup/v2/lib/clock"
 	"github.com/flachnetz/startup/v2/startup_base/tint"
@@ -24,6 +25,9 @@ var (
 var LogLevel slog.LevelVar
 
 var handlerVar slog.Handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{AddSource: true})
+
+var lock sync.RWMutex
+var baseOptions BaseOptions
 
 func init() {
 	lazy := &LazyHandler{
@@ -103,25 +107,36 @@ func (opts *BaseOptions) Initialize() {
 		}
 	}
 	logger.Info("Environment: " + opts.Environment)
+	lock.Lock()
+	baseOptions = *opts
+	lock.Unlock()
 }
 
-func (opts *BaseOptions) IsDevelopment() bool {
-	environment := strings.ToLower(opts.Environment)
+func IsDevelopment() bool {
+	lock.RLock()
+	environment := strings.ToLower(baseOptions.Environment)
+	lock.RUnlock()
 	return environment == "development" || environment == "dev"
 }
 
-func (opts *BaseOptions) IsTesting() bool {
-	environment := strings.ToLower(opts.Environment)
+func IsTesting() bool {
+	lock.RLock()
+	environment := strings.ToLower(baseOptions.Environment)
+	lock.RUnlock()
 	return environment == "testing" || environment == "test"
 }
 
-func (opts *BaseOptions) IsStaging() bool {
-	environment := strings.ToLower(opts.Environment)
+func IsStaging() bool {
+	lock.RLock()
+	environment := strings.ToLower(baseOptions.Environment)
+	lock.RUnlock()
 	return environment == "staging" || environment == "stage"
 }
 
-func (opts *BaseOptions) IsProduction() bool {
-	environment := strings.ToLower(opts.Environment)
+func IsProduction() bool {
+	lock.RLock()
+	environment := strings.ToLower(baseOptions.Environment)
+	lock.RUnlock()
 	return environment == "production" || environment == "prod" || environment == "live"
 }
 
