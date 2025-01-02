@@ -18,6 +18,12 @@ type Error struct {
 	Field            *string                 `json:"field,omitempty"`
 	Info             *map[string]interface{} `json:"info,omitempty"`
 	HttpStatusCode   int                     `json:"-"`
+	BaseError        error                   `json:"-"`
+}
+
+func (e Error) WithBaseError(err error) Error {
+	e.BaseError = err
+	return e
 }
 
 func (e Error) WithDescription(format string, args ...any) Error {
@@ -34,6 +40,10 @@ func (e Error) ToErrorResponse() ErrorResponse {
 		MainError: e,
 		AllErrors: []Error{e},
 	}
+}
+
+func (e Error) Unwrap() error {
+	return e.BaseError
 }
 
 func Errorf(code string, format string, args ...any) Error {
