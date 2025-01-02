@@ -43,10 +43,7 @@ func (e Error) ToErrorResponse() ErrorResponse {
 }
 
 func (e Error) Unwrap() error {
-	if e.BaseError == nil {
-		return e.BaseError
-	}
-	return nil
+	return e.BaseError
 }
 
 func Errorf(code string, format string, args ...any) Error {
