@@ -21,6 +21,11 @@ type Error struct {
 	BaseError        error                   `json:"-"`
 }
 
+func (e Error) WithBaseError(err error) Error {
+	e.BaseError = err
+	return e
+}
+
 func (e Error) WithDescription(format string, args ...any) Error {
 	e.ErrorDescription = fmt.Sprintf(format, args...)
 	return e
