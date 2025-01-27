@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/benbjohnson/clock"
 	"github.com/oklog/ulid"
@@ -37,4 +38,9 @@ func AdjustTimeInLog(ctx context.Context, record slog.Record) (slog.Record, bool
 
 type realtimeClock struct {
 	clock.Clock
+}
+
+// Now returns the current time in UTC, this is different to the original clock implementation which returned the local time.
+func (receiver realtimeClock) Now() time.Time {
+	return receiver.Clock.Now().UTC()
 }
