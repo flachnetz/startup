@@ -44,3 +44,8 @@ type realtimeClock struct {
 func (receiver realtimeClock) Now() time.Time {
 	return receiver.Clock.Now().UTC()
 }
+
+// We always want to use UTC time.
+func init() {
+	time.Local = time.UTC
+}
