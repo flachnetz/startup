@@ -14,6 +14,10 @@ func TimeToEventTimestamp(ts time.Time) int64 {
 	return ts.UnixNano() / int64(time.Millisecond)
 }
 
+func FromEventTimestamp(timestamp int64) time.Time {
+	return time.Unix(0, timestamp*int64(time.Millisecond))
+}
+
 var log = logrus.WithField("prefix", "events")
 
 type Event interface {
