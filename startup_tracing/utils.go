@@ -104,7 +104,7 @@ func (s tagsFromContext) Apply(options *opentracing.StartSpanOptions) {
 	tags, _ := s.ctx.Value(&extraTagsKey).(opentracing.Tags)
 	maps.Copy(options.Tags, tags)
 
-	logger := startup_logrus.GetLogger(s.ctx, nil)
+	logger := startup_logrus.GetLogger(s.ctx)
 	for _, attr := range logger.Data {
 		if attr.Key == "prefix" {
 			continue
