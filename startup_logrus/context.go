@@ -12,25 +12,13 @@ import (
 
 type loggerKey struct{}
 
-// WithLogger stores the entry into the context so it can be retrieved with GetLogger later.
+// WithLogger stores the entry into the context so it can be retrieved with LoggerOf later.
 func WithLogger(ctx context.Context, logger *logrus.Entry) context.Context {
 	return context.WithValue(ctx, loggerKey{}, logger)
 }
 
 func LoggerOf(ctx context.Context) *logrus.Entry {
-	return GetLogger(ctx, nil)
-}
-
-// GetLogger returns the current logger with the given prefix or type name from the context.
-func GetLogger(ctx context.Context, object interface{}) *logrus.Entry {
-	log := loggerOf(ctx).WithContext(ctx)
-
-	prefix := prefixOf(object)
-	if prefix == "" {
-		return log
-	}
-
-	return log.WithField("prefix", prefix)
+	return loggerOf(ctx).WithContext(ctx)
 }
 
 func ContextLoggerWithFields(ctx context.Context, fields ...string) context.Context {
@@ -39,7 +27,7 @@ func ContextLoggerWithFields(ctx context.Context, fields ...string) context.Cont
 }
 
 func GetLoggerWithFields(ctx context.Context, fields ...string) *logrus.Entry {
-	logger := GetLogger(ctx, "")
+	logger := LoggerOf(ctx)
 	for i := 0; i < len(fields)-1; i += 2 {
 		k := fields[i]
 		v := fields[i+1]

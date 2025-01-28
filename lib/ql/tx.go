@@ -87,7 +87,7 @@ func InNewTransactionWithResult[R any](ctx context.Context, db TxStarter, fun fu
 			if err := tx.Rollback(); err != nil {
 				// If the rollback failed, there isnt much we can do except logging
 				// the issue.
-				sl.GetLogger(ctx, InNewTransactionWithResult[R]).Warnf("Rollback during panic failed: %s", err)
+				sl.LoggerOf(ctx).Warnf("Rollback during panic failed: %s", err)
 			}
 		}
 	}()

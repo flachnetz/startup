@@ -70,7 +70,7 @@ func WriteError(writer http.ResponseWriter, status int, err error) {
 }
 
 func WriteErrorContext(ctx context.Context, writer http.ResponseWriter, status int, err error) {
-	GetLogger(ctx, "httpd").Warn("Writing response error: ", err)
+	LoggerOf(ctx).Warn("Writing response error: ", err)
 
 	if status < 400 {
 		status = http.StatusInternalServerError
