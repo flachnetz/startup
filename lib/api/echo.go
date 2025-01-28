@@ -64,7 +64,7 @@ func (eh *ErrorHandler[E]) httpStatusFrom(ctx context.Context, err error) int {
 }
 
 func (eh *ErrorHandler[E]) HandleError(ctx context.Context, c echo.Context, err error) {
-	logger := startup_logrus.GetLogger(ctx)
+	logger := startup_logrus.LoggerOf(ctx)
 	apiError := eh.toApiError(err)
 	httpStatusFrom := eh.httpStatusFrom(ctx, err)
 	if httpStatusFrom == 499 {
