@@ -18,19 +18,12 @@ func WithLogger(ctx context.Context, logger *logrus.Entry) context.Context {
 }
 
 func LoggerOf(ctx context.Context) *logrus.Entry {
-	return GetLogger(ctx, nil)
+	return GetLogger(ctx)
 }
 
 // GetLogger returns the current logger with the given prefix or type name from the context.
-func GetLogger(ctx context.Context, object interface{}) *logrus.Entry {
-	log := loggerOf(ctx).WithContext(ctx)
-
-	prefix := prefixOf(object)
-	if prefix == "" {
-		return log
-	}
-
-	return log.WithField("prefix", prefix)
+func GetLogger(ctx context.Context) *logrus.Entry {
+	return loggerOf(ctx).WithContext(ctx)
 }
 
 func ContextLoggerWithFields(ctx context.Context, fields ...string) context.Context {
@@ -39,7 +32,7 @@ func ContextLoggerWithFields(ctx context.Context, fields ...string) context.Cont
 }
 
 func GetLoggerWithFields(ctx context.Context, fields ...string) *logrus.Entry {
-	logger := GetLogger(ctx, "")
+	logger := GetLogger(ctx)
 	for i := 0; i < len(fields)-1; i += 2 {
 		k := fields[i]
 		v := fields[i+1]

@@ -57,7 +57,7 @@ func Tracing(service string, op string) startup_http.HttpMiddleware {
 
 			if err != nil && err != opentracing.ErrSpanContextNotFound {
 				// ignore errors but show a small warning.
-				log := GetLogger(ctx, "httpd")
+				log := GetLogger(ctx)
 				log.Warnf("Could not extract tracer from http headers: %s", err)
 			}
 
