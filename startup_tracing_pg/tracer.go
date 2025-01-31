@@ -4,13 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"regexp"
-	"strings"
-
 	st "github.com/flachnetz/startup/v2/startup_tracing"
+	"github.com/hashicorp/golang-lru"
 	"github.com/jackc/pgx/v5"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
+	"regexp"
+	"strings"
 )
 
 var reSpace = regexp.MustCompile(`\s+`)
@@ -104,6 +104,19 @@ func (t *tracer) spanOf(ctx context.Context) opentracing.Span {
 	return st.CurrentSpanFromContext(ctx)
 }
 
+var cleanQueryCache *lru.Cache
+
+func init() {
+	cleanQueryCache, _ = lru.New(10_000)
+}
+
 func cleanQuery(query string) string {
-	return strings.TrimSpace(reSpace.ReplaceAllString(query, " "))
+	cached, ok := cleanQueryCache.Get(query)
+	if ok {
+		return cached.(string)
+	}
+
+	cleaned := strings.TrimSpace(reSpace.ReplaceAllString(query, " "))
+	cleanQueryCache.Add(query, cleaned)
+	return cleaned
 }
