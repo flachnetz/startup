@@ -46,7 +46,10 @@ func (opts *TracingOptions) Initialize() {
 		logAdapter := log2.New(log.WriterLevel(logrus.InfoLevel), "", 0)
 
 		url := strings.ReplaceAll(opts.Zipkin, "/v1/spans", "/v2/spans")
-		reporter := zipkinhttp.NewReporter(url, zipkinhttp.Logger(logAdapter))
+		reporter := zipkinhttp.NewReporter(url,
+			zipkinhttp.Logger(logAdapter),
+			zipkinhttp.Serializer(sonicSerializer{}),
+		)
 
 		endpoint, err := zipkin.NewEndpoint(opts.Inputs.ServiceName, "")
 		startup_base.PanicOnError(err, "Unable to create zipkin endpoint")
