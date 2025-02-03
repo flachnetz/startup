@@ -5,7 +5,6 @@ require (
 	github.com/Landoop/schema-registry v0.0.0-20190327143759-50a5701c1891
 	github.com/Unleash/unleash-client-go/v4 v4.1.3
 	github.com/benbjohnson/clock v1.3.5
-	github.com/bytedance/sonic v1.12.8
 	github.com/confluentinc/confluent-kafka-go/v2 v2.4.0
 	github.com/felixge/httpsnoop v1.0.4
 	github.com/flachnetz/go-admin v1.5.3
@@ -23,6 +22,7 @@ require (
 	github.com/labstack/echo/v4 v4.11.4
 	github.com/lestrrat-go/jwx v1.2.26
 	github.com/linkedin/goavro/v2 v2.12.0
+	github.com/mailru/easyjson v0.7.6
 	github.com/mattn/go-isatty v0.0.20
 	github.com/oklog/ulid v1.3.1
 	github.com/opentracing/opentracing-go v1.2.0
@@ -41,8 +41,6 @@ require (
 	github.com/Masterminds/semver/v3 v3.3.0 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
-	github.com/bytedance/sonic/loader v0.2.2 // indirect
-	github.com/cloudwego/base64x v0.1.5 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/fatih/color v1.17.0 // indirect
@@ -61,8 +59,8 @@ require (
 	github.com/hashicorp/serf v0.10.1 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
+	github.com/josharian/intern v1.0.0 // indirect
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
-	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lestrrat-go/backoff/v2 v2.0.8 // indirect
@@ -77,11 +75,9 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/stretchr/testify v1.9.0 // indirect
-	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/twmb/murmur3 v1.1.8 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
-	golang.org/x/arch v0.0.0-20210923205945-b76863e36670 // indirect
 	golang.org/x/crypto v0.23.0 // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/net v0.25.0 // indirect

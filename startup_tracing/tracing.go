@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	logrus "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/opentracing/opentracing-go"
@@ -48,7 +48,7 @@ func (opts *TracingOptions) Initialize() {
 		url := strings.ReplaceAll(opts.Zipkin, "/v1/spans", "/v2/spans")
 		reporter := zipkinhttp.NewReporter(url,
 			zipkinhttp.Logger(logAdapter),
-			zipkinhttp.Serializer(sonicSerializer{}),
+			zipkinhttp.Serializer(spanSerializer{}),
 		)
 
 		endpoint, err := zipkin.NewEndpoint(opts.Inputs.ServiceName, "")
