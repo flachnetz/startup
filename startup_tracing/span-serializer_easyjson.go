@@ -103,11 +103,11 @@ func easyjson857ccc77DecodeGithubComFlachnetzStartupV2StartupTracing1(in *jlexer
 		}
 		switch key {
 		case "traceId":
-			out.TraceID = string(in.String())
+			easyjson857ccc77DecodeGithubComFlachnetzStartupV2StartupTracing2(in, &out.TraceID)
 		case "id":
-			out.ID = string(in.String())
+			out.ID = jsonId(in.Uint64())
 		case "parentId":
-			out.ParentID = string(in.String())
+			out.ParentID = jsonId(in.Uint64())
 		case "debug":
 			out.Debug = bool(in.Bool())
 		case "name":
@@ -121,9 +121,25 @@ func easyjson857ccc77DecodeGithubComFlachnetzStartupV2StartupTracing1(in *jlexer
 		case "duration":
 			out.Duration = int64(in.Int64())
 		case "localEndpoint":
-			(out.LocalEndpoint).UnmarshalEasyJSON(in)
+			if in.IsNull() {
+				in.Skip()
+				out.LocalEndpoint = nil
+			} else {
+				if out.LocalEndpoint == nil {
+					out.LocalEndpoint = new(jsonEndpoint)
+				}
+				(*out.LocalEndpoint).UnmarshalEasyJSON(in)
+			}
 		case "remoteEndpoint":
-			(out.RemoteEndpoint).UnmarshalEasyJSON(in)
+			if in.IsNull() {
+				in.Skip()
+				out.RemoteEndpoint = nil
+			} else {
+				if out.RemoteEndpoint == nil {
+					out.RemoteEndpoint = new(jsonEndpoint)
+				}
+				(*out.RemoteEndpoint).UnmarshalEasyJSON(in)
+			}
 		case "annotations":
 			if in.IsNull() {
 				in.Skip()
@@ -184,17 +200,17 @@ func easyjson857ccc77EncodeGithubComFlachnetzStartupV2StartupTracing1(out *jwrit
 	{
 		const prefix string = ",\"traceId\":"
 		out.RawString(prefix[1:])
-		out.String(string(in.TraceID))
+		(in.TraceID).MarshalEasyJSON(out)
 	}
 	{
 		const prefix string = ",\"id\":"
 		out.RawString(prefix)
-		out.String(string(in.ID))
+		(in.ID).MarshalEasyJSON(out)
 	}
-	if in.ParentID != "" {
+	if in.ParentID != 0 {
 		const prefix string = ",\"parentId\":"
 		out.RawString(prefix)
-		out.String(string(in.ParentID))
+		(in.ParentID).MarshalEasyJSON(out)
 	}
 	if in.Debug {
 		const prefix string = ",\"debug\":"
@@ -226,15 +242,15 @@ func easyjson857ccc77EncodeGithubComFlachnetzStartupV2StartupTracing1(out *jwrit
 		out.RawString(prefix)
 		out.Int64(int64(in.Duration))
 	}
-	if true {
+	if in.LocalEndpoint != nil {
 		const prefix string = ",\"localEndpoint\":"
 		out.RawString(prefix)
-		(in.LocalEndpoint).MarshalEasyJSON(out)
+		(*in.LocalEndpoint).MarshalEasyJSON(out)
 	}
-	if true {
+	if in.RemoteEndpoint != nil {
 		const prefix string = ",\"remoteEndpoint\":"
 		out.RawString(prefix)
-		(in.RemoteEndpoint).MarshalEasyJSON(out)
+		(*in.RemoteEndpoint).MarshalEasyJSON(out)
 	}
 	if len(in.Annotations) != 0 {
 		const prefix string = ",\"annotations\":"
@@ -295,7 +311,56 @@ func (v *jsonSpanModel) UnmarshalJSON(data []byte) error {
 func (v *jsonSpanModel) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjson857ccc77DecodeGithubComFlachnetzStartupV2StartupTracing1(l, v)
 }
-func easyjson857ccc77DecodeGithubComFlachnetzStartupV2StartupTracing2(in *jlexer.Lexer, out *jsonEndpoint) {
+func easyjson857ccc77DecodeGithubComFlachnetzStartupV2StartupTracing2(in *jlexer.Lexer, out *jsonTraceId) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		if in.IsNull() {
+			in.Skip()
+			in.WantComma()
+			continue
+		}
+		switch key {
+		case "High":
+			out.High = uint64(in.Uint64())
+		case "Low":
+			out.Low = uint64(in.Uint64())
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjson857ccc77EncodeGithubComFlachnetzStartupV2StartupTracing2(out *jwriter.Writer, in jsonTraceId) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"High\":"
+		out.RawString(prefix[1:])
+		out.Uint64(uint64(in.High))
+	}
+	{
+		const prefix string = ",\"Low\":"
+		out.RawString(prefix)
+		out.Uint64(uint64(in.Low))
+	}
+	out.RawByte('}')
+}
+func easyjson857ccc77DecodeGithubComFlachnetzStartupV2StartupTracing3(in *jlexer.Lexer, out *jsonEndpoint) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -317,12 +382,11 @@ func easyjson857ccc77DecodeGithubComFlachnetzStartupV2StartupTracing2(in *jlexer
 		case "serviceName":
 			out.ServiceName = string(in.String())
 		case "ipv4":
-			if data := in.UnsafeBytes(); in.Ok() {
-				in.AddError((out.IPv4).UnmarshalText(data))
-			}
-		case "ipv6":
-			if data := in.UnsafeBytes(); in.Ok() {
-				in.AddError((out.IPv6).UnmarshalText(data))
+			if in.IsNull() {
+				in.Skip()
+				out.IPv4 = nil
+			} else {
+				out.IPv4 = in.Bytes()
 			}
 		case "port":
 			out.Port = uint16(in.Uint16())
@@ -336,7 +400,7 @@ func easyjson857ccc77DecodeGithubComFlachnetzStartupV2StartupTracing2(in *jlexer
 		in.Consumed()
 	}
 }
-func easyjson857ccc77EncodeGithubComFlachnetzStartupV2StartupTracing2(out *jwriter.Writer, in jsonEndpoint) {
+func easyjson857ccc77EncodeGithubComFlachnetzStartupV2StartupTracing3(out *jwriter.Writer, in jsonEndpoint) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -354,17 +418,7 @@ func easyjson857ccc77EncodeGithubComFlachnetzStartupV2StartupTracing2(out *jwrit
 		} else {
 			out.RawString(prefix)
 		}
-		out.RawText((in.IPv4).MarshalText())
-	}
-	if len(in.IPv6) != 0 {
-		const prefix string = ",\"ipv6\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
-		out.RawText((in.IPv6).MarshalText())
+		(in.IPv4).MarshalEasyJSON(out)
 	}
 	if in.Port != 0 {
 		const prefix string = ",\"port\":"
@@ -382,27 +436,27 @@ func easyjson857ccc77EncodeGithubComFlachnetzStartupV2StartupTracing2(out *jwrit
 // MarshalJSON supports json.Marshaler interface
 func (v jsonEndpoint) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjson857ccc77EncodeGithubComFlachnetzStartupV2StartupTracing2(&w, v)
+	easyjson857ccc77EncodeGithubComFlachnetzStartupV2StartupTracing3(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v jsonEndpoint) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson857ccc77EncodeGithubComFlachnetzStartupV2StartupTracing2(w, v)
+	easyjson857ccc77EncodeGithubComFlachnetzStartupV2StartupTracing3(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *jsonEndpoint) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjson857ccc77DecodeGithubComFlachnetzStartupV2StartupTracing2(&r, v)
+	easyjson857ccc77DecodeGithubComFlachnetzStartupV2StartupTracing3(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *jsonEndpoint) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson857ccc77DecodeGithubComFlachnetzStartupV2StartupTracing2(l, v)
+	easyjson857ccc77DecodeGithubComFlachnetzStartupV2StartupTracing3(l, v)
 }
-func easyjson857ccc77DecodeGithubComFlachnetzStartupV2StartupTracing3(in *jlexer.Lexer, out *jsonAnnotation) {
+func easyjson857ccc77DecodeGithubComFlachnetzStartupV2StartupTracing4(in *jlexer.Lexer, out *jsonAnnotation) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -435,7 +489,7 @@ func easyjson857ccc77DecodeGithubComFlachnetzStartupV2StartupTracing3(in *jlexer
 		in.Consumed()
 	}
 }
-func easyjson857ccc77EncodeGithubComFlachnetzStartupV2StartupTracing3(out *jwriter.Writer, in jsonAnnotation) {
+func easyjson857ccc77EncodeGithubComFlachnetzStartupV2StartupTracing4(out *jwriter.Writer, in jsonAnnotation) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -455,23 +509,23 @@ func easyjson857ccc77EncodeGithubComFlachnetzStartupV2StartupTracing3(out *jwrit
 // MarshalJSON supports json.Marshaler interface
 func (v jsonAnnotation) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjson857ccc77EncodeGithubComFlachnetzStartupV2StartupTracing3(&w, v)
+	easyjson857ccc77EncodeGithubComFlachnetzStartupV2StartupTracing4(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v jsonAnnotation) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson857ccc77EncodeGithubComFlachnetzStartupV2StartupTracing3(w, v)
+	easyjson857ccc77EncodeGithubComFlachnetzStartupV2StartupTracing4(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *jsonAnnotation) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjson857ccc77DecodeGithubComFlachnetzStartupV2StartupTracing3(&r, v)
+	easyjson857ccc77DecodeGithubComFlachnetzStartupV2StartupTracing4(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *jsonAnnotation) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson857ccc77DecodeGithubComFlachnetzStartupV2StartupTracing3(l, v)
+	easyjson857ccc77DecodeGithubComFlachnetzStartupV2StartupTracing4(l, v)
 }
