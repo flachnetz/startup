@@ -72,9 +72,21 @@ func (eh *ErrorHandler[E]) HandleError(ctx context.Context, c echo.Context, err 
 	}
 
 	LogHttpError(logger, c.Path(), httpStatusFrom, apiError)
-	jErr := c.JSON(httpStatusFrom, apiError.ToErrorResponse())
-	if jErr != nil {
-		logger.Error(jErr)
+	if c.Response().Committed {
+		logger.Warn("response already committed")
+		return
+	}
+	switch c.Request().Method {
+	case http.MethodHead, http.MethodOptions:
+		cErr := c.NoContent(httpStatusFrom)
+		if cErr != nil {
+			logger.Error(cErr)
+		}
+	default:
+		jErr := c.JSON(httpStatusFrom, apiError.ToErrorResponse())
+		if jErr != nil {
+			logger.Error(jErr)
+		}
 	}
 }
 
