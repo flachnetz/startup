@@ -55,7 +55,7 @@ func Tracing(service string, op string) startup_http.HttpMiddleware {
 			wireContext, err := opentracing.GlobalTracer().Extract(
 				opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(req.Header))
 
-			if err != nil && err != opentracing.ErrSpanContextNotFound {
+			if err != nil && errors.Is(err, opentracing.ErrSpanContextNotFound) {
 				// ignore errors but show a small warning.
 				log := LoggerOf(ctx)
 				log.Warnf("Could not extract tracer from http headers: %s", err)
@@ -70,13 +70,19 @@ func Tracing(service string, op string) startup_http.HttpMiddleware {
 			ext.HTTPMethod.Set(serverSpan, req.Method)
 			ext.HTTPUrl.Set(serverSpan, cleanUrl(req.URL))
 
-			// record and log the status code of the response
-			rl, w := responseLoggerOf(w)
-			defer rl.addStatusToSpan(serverSpan)
+			// record the status code of the response
+			rl := statusWriter(w)
+
+			defer func() {
+				ext.HTTPStatusCode.Set(serverSpan, uint16(rl.status))
+				if rl.status == http.StatusNotFound {
+					ext.Error.Set(serverSpan, false)
+				}
+			}()
 
 			// put the span into the context
 			ctx = opentracing.ContextWithSpan(ctx, serverSpan)
-			handler.ServeHTTP(w, req.WithContext(ctx))
+			handler.ServeHTTP(rl, req.WithContext(ctx))
 		})
 	}
 }
