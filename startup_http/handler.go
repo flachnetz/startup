@@ -3,9 +3,8 @@ package startup_http
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -16,6 +15,8 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
+
+	"github.com/go-json-experiment/json"
 )
 
 type ResponseValue struct {
@@ -33,21 +34,45 @@ func (err ErrorResponse) Error() string {
 	return err.ErrorValue
 }
 
-func ErrorNotFound(err error) error {
-	return ErrorResponse{Status: http.StatusNotFound, ErrorValue: err.Error()}
+func WriteJSON(ctx context.Context, w http.ResponseWriter, status int, value interface{}) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	if status == 0 {
+		status = http.StatusOK
+	}
+	w.WriteHeader(status)
+
+	err := json.MarshalWrite(w, value, json.FormatNilSliceAsNull(false), json.FormatNilMapAsNull(false))
+	if err != nil {
+		LoggerOf(ctx).Warnf("Failed to write json response: %s", err)
+	}
 }
 
-func ErrorBadRequest(err error) error {
-	return ErrorResponse{Status: http.StatusBadRequest, ErrorValue: err.Error()}
+// WriteError formats an error value. The default implementation wraps the error text into
+// a ErrorResponse object and serializes it to json.
+//
+// You can set this variable to do your own custom error mapping.
+var WriteError = func(ctx context.Context, writer http.ResponseWriter, statusCode int, err error) {
+	LoggerOf(ctx).Warnf("Writing response error: %s", err)
+
+	if statusCode == 0 {
+		statusCode = MapErrorToStatusCode(err)
+	}
+
+	WriteJSON(ctx, writer, statusCode, ErrorResponse{
+		Status:     statusCode,
+		ErrorValue: err.Error(),
+	})
 }
 
-func ErrorInternalServerError(err error) error {
-	return ErrorResponse{Status: http.StatusInternalServerError, ErrorValue: err.Error()}
-}
-
-var ErrorMapper = func(err error) int {
-	switch errors.Cause(err) {
-	case sql.ErrNoRows:
+// MapErrorToStatusCode maps an error to a status code. The default implementation
+// converts [sql.ErrNoRows] into status code 404, and returns [http.StatusInternalServerError]
+// in all other cases.
+//
+// You can set this variable to do your own custom error mapping.
+var MapErrorToStatusCode = func(err error) int {
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
 		return http.StatusNotFound
 
 	default:
@@ -55,34 +80,7 @@ var ErrorMapper = func(err error) int {
 	}
 }
 
-func WriteJSON(w http.ResponseWriter, status int, value interface{}) {
-	body, err := json.Marshal(value)
-	if err != nil {
-		WriteError(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	WriteBody(w, status, "application/json; charset=utf-8", body)
-}
-
-func WriteError(writer http.ResponseWriter, status int, err error) {
-	WriteErrorContext(context.Background(), writer, status, err)
-}
-
-func WriteErrorContext(ctx context.Context, writer http.ResponseWriter, status int, err error) {
-	LoggerOf(ctx).Warn("Writing response error: ", err)
-
-	if status < 400 {
-		status = http.StatusInternalServerError
-	}
-
-	WriteJSON(writer, status, ErrorResponse{
-		Status:     status,
-		ErrorValue: err.Error(),
-	})
-}
-
-func WriteBody(writer http.ResponseWriter, statusCode int, contentType string, content []byte) {
+func WriteBody(ctx context.Context, writer http.ResponseWriter, statusCode int, contentType string, content []byte) {
 	writer.Header().Set("Content-Length", strconv.Itoa(len(content)))
 
 	if contentType != "" {
@@ -103,108 +101,80 @@ func WriteBody(writer http.ResponseWriter, statusCode int, contentType string, c
 	writer.WriteHeader(statusCode)
 
 	_, err := writer.Write(content)
-	// We failed to write our response, what can we do here?
-	// Not much, we will just panic.
+
 	if err != nil {
-		panic(err)
+		// We failed to write our response. The client probably disconnected
+		LoggerOf(ctx).Warnf("Failed to write response body: %s", err)
 	}
 }
 
-func WriteGenericError(w http.ResponseWriter, err error) {
-	WriteResponseValue(w, nil, err)
-}
-
-func marshalResponseValue(body interface{}) ([]byte, string, error) {
-	if body == nil {
-		return []byte{}, "", nil
-	}
-
-	if body, ok := body.([]byte); ok {
-		return body, "", nil
-	}
-
-	if isSliceAndNil(body) {
-		return []byte("[]"), "application/json", nil
-	}
-
-	data, err := json.Marshal(body)
-	if err != nil {
-		return nil, "", err
-	}
-
-	return data, "application/json", nil
-}
-
-func WriteResponseValue(w http.ResponseWriter, value interface{}, err error) {
+func WriteResponseValue(ctx context.Context, w http.ResponseWriter, value interface{}, err error) {
 	if err != nil {
 		// handle ErrorResponse errors correctly
-		if errorValue, ok := err.(ErrorResponse); ok {
-			WriteError(w, errorValue.Status, errorValue)
+		if errorValue := (ErrorResponse{}); errors.As(err, &errorValue) {
+			WriteError(ctx, w, errorValue.Status, errorValue)
 			return
 		}
 
 		// map error to status code
-		WriteError(w, ErrorMapper(err), err)
+		WriteError(ctx, w, MapErrorToStatusCode(err), err)
 		return
 	}
 
 	// now check special response value type
 	if responseValue, ok := value.(ResponseValue); ok {
-		data, contentType, err := marshalResponseValue(responseValue.Body)
-		if err != nil {
-			WriteError(w, http.StatusInternalServerError, err)
-			return
-		}
-
-		if contentType != "" {
-			w.Header().Set("Content-Type", contentType)
-		}
-
-		// set headers
+		// copy headers to response
 		for name, values := range responseValue.Headers {
 			w.Header()[name] = values
 		}
 
-		WriteBody(w, responseValue.StatusCode, "", data)
+		if responseValue.Body == nil {
+			WriteBody(ctx, w, responseValue.StatusCode, "", []byte(""))
+			return
+		}
+
+		if body, ok := responseValue.Body.([]byte); ok {
+			WriteBody(ctx, w, responseValue.StatusCode, "", body)
+			return
+		}
+
+		// fallback to json encoding
+		WriteJSON(ctx, w, responseValue.StatusCode, responseValue.Body)
 		return
 	}
 
 	// pointer to a response value need to be handled
 	if responseValue, ok := value.(*ResponseValue); ok {
 		// recurse to te code above
-		WriteResponseValue(w, *responseValue, nil)
+		WriteResponseValue(ctx, w, *responseValue, nil)
 		return
 	}
 
 	// re-use the code from above
 	responseValue := ResponseValue{StatusCode: 200, Body: value}
-	WriteResponseValue(w, responseValue, nil)
+	WriteResponseValue(ctx, w, responseValue, nil)
 }
 
-// for a value that is wrapped into an interface, this method
-// tries to check, if the value is a slice and if that one is nil.
-func isSliceAndNil(value interface{}) bool {
-	return value != nil && reflect.TypeOf(value).Kind() == reflect.Slice && reflect.ValueOf(value).IsNil()
-}
-
-// Extracts and validates the path and request parameters before
+// ExtractAndCall extracts and validates the path and request parameters before
 // calling the given method.
 func ExtractAndCall(target interface{}, w http.ResponseWriter, r *http.Request, params httprouter.Params, handler func() (interface{}, error)) {
+	ctx := r.Context()
+
 	if target != nil {
 		// parse 'path' and 'url' parameters
 		err := ExtractParameters(target, r, params)
 		if err != nil {
-			WriteErrorContext(r.Context(), w, http.StatusBadRequest, err)
+			WriteError(ctx, w, http.StatusBadRequest, err)
 			return
 		}
 	}
 
 	// run the handler and write the response values
 	value, err := handler()
-	WriteResponseValue(w, value, err)
+	WriteResponseValue(ctx, w, value, err)
 }
 
-// Parses the body, path and request parameters and
+// ExtractAndCallWithBody parses the body, path and request parameters and
 // then calls the given handler function.
 func ExtractAndCallWithBody(
 	target interface{},
@@ -219,13 +189,13 @@ func ExtractAndCallWithBody(
 			var err error
 
 			// read the body into the provided slice
-			*byteSlice, err = ioutil.ReadAll(r.Body)
+			*byteSlice, err = io.ReadAll(r.Body)
 			if err != nil {
 				return nil, errors.WithMessage(err, "reading body to bytes")
 			}
 
 		} else {
-			if err := json.NewDecoder(r.Body).Decode(body); err != nil {
+			if err := json.UnmarshalRead(r.Body, &body); err != nil {
 				return nil, errors.WithMessage(err, "parsing request body as json")
 			}
 
@@ -256,7 +226,7 @@ func (s valuesSource) Get(key string) (string, bool) {
 	return value, value != ""
 }
 
-// Parses the 'path' parameters as well as the 'query' parameters into the given object.
+// ExtractParameters parses the 'path' parameters as well as the 'query' parameters into the given object.
 // Returns an error, if parsing failed.
 func ExtractParameters(target interface{}, r *http.Request, params httprouter.Params) error {
 	if err := Map("path", paramsSource(params), target); err != nil {
