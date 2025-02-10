@@ -3,6 +3,7 @@ package startup_http
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -170,7 +171,7 @@ func (opts HTTPOptions) Serve(config Config) {
 		err = server.ListenAndServeTLS(opts.TLSCertFile, opts.TLSKeyFile)
 	}
 
-	if err == http.ErrServerClosed {
+	if errors.Is(err, http.ErrServerClosed) {
 		// wait for server to shutdown. ListenAndServe returns directly
 		// if server.Shutdown() is called.
 		<-waitCh
