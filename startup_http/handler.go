@@ -195,7 +195,7 @@ func ExtractAndCallWithBody(
 			}
 
 		} else {
-			if err := json.UnmarshalRead(r.Body, body); err != nil {
+			if err := json.UnmarshalRead(r.Body, body, json.MatchCaseInsensitiveNames(true)); err != nil {
 				return nil, errors.WithMessage(err, "parsing request body as json")
 			}
 
