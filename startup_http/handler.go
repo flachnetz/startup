@@ -101,7 +101,6 @@ func WriteBody(ctx context.Context, writer http.ResponseWriter, statusCode int, 
 	writer.WriteHeader(statusCode)
 
 	_, err := writer.Write(content)
-
 	if err != nil {
 		// We failed to write our response. The client probably disconnected
 		LoggerOf(ctx).Warnf("Failed to write response body: %s", err)

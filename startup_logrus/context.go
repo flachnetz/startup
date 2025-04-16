@@ -2,6 +2,7 @@ package startup_logrus
 
 import (
 	"context"
+
 	"github.com/sirupsen/logrus"
 )
 
