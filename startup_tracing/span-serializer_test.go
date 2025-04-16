@@ -3,13 +3,14 @@ package startup_tracing
 import (
 	"bytes"
 	"encoding/json"
+	"net"
+	"testing"
+	"time"
+
 	"github.com/flachnetz/startup/v2/lib"
 	"github.com/openzipkin/zipkin-go/model"
 	"github.com/openzipkin/zipkin-go/reporter"
 	"github.com/stretchr/testify/require"
-	"net"
-	"testing"
-	"time"
 )
 
 func demoSpan(spanId model.ID) *model.SpanModel {
@@ -23,7 +24,7 @@ func demoSpan(spanId model.ID) *model.SpanModel {
 		},
 		Name:      "name of span",
 		Kind:      model.Client,
-		Timestamp: time.Date(2012, 7, 3, 11, 14, 00, 0, time.UTC),
+		Timestamp: time.Date(2012, 7, 3, 11, 14, 0, 0, time.UTC),
 		Duration:  1337 * time.Microsecond,
 		LocalEndpoint: &model.Endpoint{
 			ServiceName: "the service name",

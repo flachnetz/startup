@@ -4,13 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"regexp"
+	"strings"
+
 	st "github.com/flachnetz/startup/v2/startup_tracing"
 	"github.com/hashicorp/golang-lru"
 	"github.com/jackc/pgx/v5"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
-	"regexp"
-	"strings"
 )
 
 var reSpace = regexp.MustCompile(`\s+`)
