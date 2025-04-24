@@ -28,13 +28,14 @@ func (m *MockService) GetJwtTokenFromRequest(req *http.Request) (*JwtStruct, err
 	return m.GetJwtToken(authHeader[7:])
 }
 
-func CreateJWT(clock clock.Clock, secret, site, customerNumber string) (string, error) {
+func CreateJWT(clock clock.Clock, secret, site, customerNumber string, scope []string) (string, error) {
 	// Define the claims for the JWT
 	claims := jwt.MapClaims{
 		"site":           site,
 		"customerNumber": customerNumber,
 		"iat":            clock.Now().Unix(),
 		"exp":            clock.Now().Add(time.Hour * 24).Unix(),
+		"scope":          scope,
 	}
 
 	// Create a new JWT token with the claims
