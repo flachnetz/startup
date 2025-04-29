@@ -120,7 +120,7 @@ func (opts HTTPOptions) Serve(config Config) {
 		handler = loggingHandler{
 			handler: handler,
 			log: func(ctx context.Context, line string) {
-				if !opts.AccessLogAdminRoute && strings.Contains(line, "GET /admin/") {
+				if !opts.AccessLogAdminRoute && strings.Contains(line, "/admin/") {
 					return
 				}
 
