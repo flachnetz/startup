@@ -2,13 +2,14 @@ package startup_metrics
 
 import (
 	"context"
-	"github.com/prometheus/client_golang/prometheus"
 	"net"
 	"os"
 	"strings"
 	"sync"
 	"time"
 	"unicode"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/flachnetz/startup/v2/startup_logrus"
 
