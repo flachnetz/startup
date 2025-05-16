@@ -31,63 +31,63 @@ func (c *rcrowleyCollector) Describe(ch chan<- *prometheus.Desc) {
 func (c *rcrowleyCollector) Collect(ch chan<- prometheus.Metric) {
 	metricsRegistry := metrics.DefaultRegistry
 	metricsRegistry.Each(func(name string, i interface{}) {
-		safeName := sanitizeMetricName(name)
+		baseName, labels := parseMetricNameAndLabels(name)
 
 		switch metric := i.(type) {
 		case metrics.Counter:
 			ch <- prometheus.MustNewConstMetric(
-				prometheus.NewDesc(safeName, "Counter from go-metrics", nil, nil),
+				prometheus.NewDesc(baseName, "Counter from go-metrics", nil, labels),
 				prometheus.CounterValue,
 				float64(metric.Count()),
 			)
 		case metrics.Gauge:
 			ch <- prometheus.MustNewConstMetric(
-				prometheus.NewDesc(safeName, "Gauge from go-metrics", nil, nil),
+				prometheus.NewDesc(baseName, "Gauge from go-metrics", nil, labels),
 				prometheus.GaugeValue,
 				float64(metric.Value()),
 			)
 		case metrics.GaugeFloat64:
 			ch <- prometheus.MustNewConstMetric(
-				prometheus.NewDesc(safeName, "GaugeFloat64 from go-metrics", nil, nil),
+				prometheus.NewDesc(baseName, "GaugeFloat64 from go-metrics", nil, labels),
 				prometheus.GaugeValue,
 				metric.Value(),
 			)
 		case metrics.Timer:
 			snapshot := metric.Snapshot()
 			ch <- prometheus.MustNewConstMetric(
-				prometheus.NewDesc(safeName+"_count", "Timer count", nil, nil),
+				prometheus.NewDesc(baseName+"_count", "Timer count", nil, labels),
 				prometheus.CounterValue,
 				float64(snapshot.Count()),
 			)
 			ch <- prometheus.MustNewConstMetric(
-				prometheus.NewDesc(safeName+"_mean", "Timer mean", nil, nil),
+				prometheus.NewDesc(baseName+"_mean", "Timer mean", nil, labels),
 				prometheus.GaugeValue,
 				snapshot.Mean()/float64(time.Millisecond),
 			)
 			ch <- prometheus.MustNewConstMetric(
-				prometheus.NewDesc(safeName+"_95th_percentile", "Timer 95th percentile", nil, nil),
+				prometheus.NewDesc(baseName+"_95th_percentile", "Timer 95th percentile", nil, labels),
 				prometheus.GaugeValue,
 				snapshot.Percentile(0.95)/float64(time.Millisecond),
 			)
 		case metrics.Meter:
 			snapshot := metric.Snapshot()
 			ch <- prometheus.MustNewConstMetric(
-				prometheus.NewDesc(safeName+"_rate1", "Meter 1m rate", nil, nil),
+				prometheus.NewDesc(baseName+"_rate1", "Meter 1m rate", nil, labels),
 				prometheus.GaugeValue,
 				snapshot.Rate1(),
 			)
 			ch <- prometheus.MustNewConstMetric(
-				prometheus.NewDesc(safeName+"_rate5", "Meter 5m rate", nil, nil),
+				prometheus.NewDesc(baseName+"_rate5", "Meter 5m rate", nil, labels),
 				prometheus.GaugeValue,
 				snapshot.Rate5(),
 			)
 			ch <- prometheus.MustNewConstMetric(
-				prometheus.NewDesc(safeName+"_rate15", "Meter 15m rate", nil, nil),
+				prometheus.NewDesc(baseName+"_rate15", "Meter 15m rate", nil, labels),
 				prometheus.GaugeValue,
 				snapshot.Rate15(),
 			)
 			ch <- prometheus.MustNewConstMetric(
-				prometheus.NewDesc(safeName+"_count", "Meter count", nil, nil),
+				prometheus.NewDesc(baseName+"_count", "Meter count", nil, labels),
 				prometheus.CounterValue,
 				float64(snapshot.Count()),
 			)
@@ -102,6 +102,26 @@ func sanitizeMetricName(name string) string {
 	safe = strings.ReplaceAll(safe, ",", "_")
 	safe = strings.ReplaceAll(safe, ":", "_")
 	return safe
+}
+
+func parseMetricNameAndLabels(name string) (string, map[string]string) {
+	labels := make(map[string]string)
+
+	// Split on '[' and assume tags are like operatorId:123,operatorSiteId:456
+	if idx := strings.Index(name, "["); idx != -1 {
+		base := name[:idx]
+		tagsPart := strings.TrimSuffix(name[idx+1:], "]")
+		tags := strings.Split(tagsPart, ",")
+		for _, tag := range tags {
+			parts := strings.SplitN(tag, ":", 2)
+			if len(parts) == 2 {
+				labels[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+			}
+		}
+		return sanitizeMetricName(base), labels
+	}
+
+	return sanitizeMetricName(name), labels
 }
 
 func startPrometheusMetrics(opts PrometheusConfig) *http.Server {
