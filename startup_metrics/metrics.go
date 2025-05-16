@@ -2,13 +2,15 @@ package startup_metrics
 
 import (
 	"context"
-	"github.com/flachnetz/startup/v2/startup_logrus"
+	"github.com/prometheus/client_golang/prometheus"
 	"net"
 	"os"
 	"strings"
 	"sync"
 	"time"
 	"unicode"
+
+	"github.com/flachnetz/startup/v2/startup_logrus"
 
 	logrus "github.com/sirupsen/logrus"
 
@@ -89,6 +91,7 @@ func (opts *MetricsOptions) Initialize() {
 		}
 
 		if opts.PrometheusConfig.Enabled {
+			prometheus.MustRegister(&rcrowleyCollector{})
 			startPrometheusMetrics(opts.PrometheusConfig)
 		}
 	})
@@ -107,6 +110,7 @@ func (opts *MetricsOptions) setupDatadogMetricsReporter(registry metrics.Registr
 
 	return nil
 }
+
 func (opts *MetricsOptions) Shutdown() error {
 	// Shutdown Prometheus HTTP server if it exists
 	ctx := context.Background()

@@ -1,15 +1,16 @@
 package startup_metrics
 
 import (
+	"net/http"
+	"strings"
+	"time"
+
 	"github.com/flachnetz/startup/v2/startup_logrus"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rcrowley/go-metrics"
 	"golang.org/x/net/context"
-	"net/http"
-	"strings"
-	"time"
 )
 
 type PrometheusConfig struct {
