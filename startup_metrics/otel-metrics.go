@@ -2,14 +2,12 @@ package startup_metrics
 
 import (
 	"context"
-	"net/http"
 	"sync"
 	"time"
 
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/flachnetz/startup/v2/startup_logrus"
 	"github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -21,18 +19,14 @@ import (
 
 type OTELMetricsOptions struct {
 	// Prometheus configuration
-	Prometheus struct {
-		Path string `long:"prometheus-path" default:"/metrics" description:"Path for Prometheus metrics endpoint"`
-		Port string `long:"prometheus-port" default:":9090" description:"Port for Prometheus metrics endpoint"`
-	}
+	PrometheusConfig PrometheusConfig
 
 	Inputs struct {
 		ServiceName string `long:"service-name" description:"Service name for metrics"`
 	}
 
-	once       sync.Once
-	mp         *sdkmetric.MeterProvider
-	httpServer *http.Server
+	once sync.Once
+	mp   *sdkmetric.MeterProvider
 }
 
 func (opts *OTELMetricsOptions) Initialize() {
@@ -43,7 +37,6 @@ func (opts *OTELMetricsOptions) Initialize() {
 
 		// Create readers slice for multiple exporters
 		var readers []sdkmetric.Option
-		logger := startup_logrus.LoggerOf(context.Background())
 
 		promExporter, err := prometheus.New()
 		startup_base.PanicOnError(err, "Failed to create Prometheus exporter")
@@ -59,20 +52,10 @@ func (opts *OTELMetricsOptions) Initialize() {
 		otel.SetMeterProvider(opts.mp)
 		opts.captureRuntimeMetrics()
 
-		go func() {
+		if opts.PrometheusConfig.Enabled {
 			// Start Prometheus HTTP server
-			mux := http.NewServeMux()
-			mux.Handle(opts.Prometheus.Path, promhttp.Handler())
-			opts.httpServer = &http.Server{
-				Addr:    opts.Prometheus.Port,
-				Handler: mux,
-			}
-
-			logger.Infof("Starting Prometheus metrics endpoint on %s%s", opts.Prometheus.Port, opts.Prometheus.Path)
-			if err := opts.httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-				logger.WithError(err).Error("Prometheus HTTP server failed")
-			}
-		}()
+			opts.PrometheusConfig.httpServer = startPrometheusMetrics(opts.PrometheusConfig)
+		}
 	})
 }
 
@@ -104,8 +87,8 @@ func (opts *OTELMetricsOptions) captureRuntimeMetrics() {
 func (opts *OTELMetricsOptions) Shutdown() error {
 	// Shutdown Prometheus HTTP server if it exists
 	ctx := context.Background()
-	if opts.httpServer != nil {
-		if err := opts.httpServer.Shutdown(ctx); err != nil {
+	if opts.PrometheusConfig.httpServer != nil {
+		if err := opts.PrometheusConfig.httpServer.Shutdown(ctx); err != nil {
 			startup_logrus.LoggerOf(ctx).WithError(err).Error("Failed to shutdown Prometheus HTTP server")
 		}
 	}
