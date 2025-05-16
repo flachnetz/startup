@@ -1,6 +1,8 @@
 package startup_metrics
 
 import (
+	"context"
+	"github.com/flachnetz/startup/v2/startup_logrus"
 	"net"
 	"os"
 	"strings"
@@ -30,11 +32,13 @@ type MetricsOptions struct {
 		StatsDAddress string        `long:"datadog-statsd-address" description:"Address of statsd,e.g. 127.0.0.1:8125"`
 	}
 
+	PrometheusConfig PrometheusConfig
+
 	Inputs struct {
 		// Prefix to apply to all metrics. This must not be empty.
 		MetricsPrefix string `validate:"required"`
 
-		// Disable capture of runtime metrics for some reasons
+		// Disable capture of runtime metrics for some reason
 		NoRuntimeMetrics bool
 	}
 
@@ -83,15 +87,11 @@ func (opts *MetricsOptions) Initialize() {
 		if opts.Datadog.ApiKey != "" && opts.Datadog.StatsDAddress != "" {
 			log.Warn("there are two datadog reports active now: statsd address has been configured and api key has been set")
 		}
+
+		if opts.PrometheusConfig.Enabled {
+			startPrometheusMetrics(opts.PrometheusConfig)
+		}
 	})
-}
-
-func captureRuntimeMetrics(registry metrics.Registry) {
-	log.Debug("Start capturing of golang runtime metrics")
-
-	// start capturing of metrics
-	metrics.RegisterRuntimeMemStats(registry)
-	go metrics.CaptureRuntimeMemStats(registry, 5*time.Second)
 }
 
 func (opts *MetricsOptions) setupDatadogMetricsReporter(registry metrics.Registry) error {
@@ -107,6 +107,17 @@ func (opts *MetricsOptions) setupDatadogMetricsReporter(registry metrics.Registr
 
 	return nil
 }
+func (opts *MetricsOptions) Shutdown() error {
+	// Shutdown Prometheus HTTP server if it exists
+	ctx := context.Background()
+	if opts.PrometheusConfig.httpServer != nil {
+		if err := opts.PrometheusConfig.httpServer.Shutdown(ctx); err != nil {
+			startup_logrus.LoggerOf(ctx).WithError(err).Error("Failed to shutdown Prometheus HTTP server")
+		}
+	}
+
+	return nil
+}
 
 func (opts *MetricsOptions) baseTags() ([]string, error) {
 	node, err := os.Hostname()
@@ -117,6 +128,14 @@ func (opts *MetricsOptions) baseTags() ([]string, error) {
 	tags := strings.FieldsFunc(opts.Datadog.Tags, isCommaOrSpace)
 	tags = append(tags, "node:"+node)
 	return tags, nil
+}
+
+func captureRuntimeMetrics(registry metrics.Registry) {
+	log.Debug("Start capturing of golang runtime metrics")
+
+	// start capturing of metrics
+	metrics.RegisterRuntimeMemStats(registry)
+	go metrics.CaptureRuntimeMemStats(registry, 5*time.Second)
 }
 
 func isCommaOrSpace(r rune) bool {
