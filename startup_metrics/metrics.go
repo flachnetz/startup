@@ -91,7 +91,7 @@ func (opts *MetricsOptions) Initialize() {
 			log.Warn("there are two datadog reports active now: statsd address has been configured and api key has been set")
 		}
 
-		if opts.PrometheusConfig.Enabled {
+		if !opts.PrometheusConfig.Disabled {
 			prometheus.MustRegister(&rcrowleyCollector{})
 			startPrometheusMetrics(opts.PrometheusConfig)
 		}

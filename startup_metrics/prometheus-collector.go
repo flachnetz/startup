@@ -14,9 +14,9 @@ import (
 )
 
 type PrometheusConfig struct {
-	Enabled bool   `long:"prometheus" description:"Enable Prometheus metrics"`
-	Path    string `long:"prometheus-path" default:"/metrics" description:"Path for Prometheus metrics endpoint"`
-	Port    string `long:"prometheus-port" default:":9090" description:"Port for Prometheus metrics endpoint"`
+	Disabled bool   `long:"prometheus-disabled" description:"Disable Prometheus metrics endpoint"`
+	Path     string `long:"prometheus-path" default:"/metrics" description:"Path for Prometheus metrics endpoint"`
+	Port     string `long:"prometheus-port" default:":9090" description:"Port for Prometheus metrics endpoint"`
 
 	httpServer *http.Server
 }
