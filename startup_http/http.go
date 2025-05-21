@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"io"
 	"log/slog"
 	"net/http"
@@ -15,6 +14,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/flachnetz/go-admin"
 	"github.com/flachnetz/startup/v2/startup_base"
@@ -72,7 +73,7 @@ func (opts HTTPOptions) Serve(config Config) {
 		admin.WithDefaults(),
 		admin.WithPProfHandlers(),
 		admin.WithHeapDump(),
-		//admin.WithMetrics(metrics.DefaultRegistry),
+		// admin.WithMetrics(metrics.DefaultRegistry),
 		WithPrometheusMetrics("/metrics"),
 		updateLogLevelHandler(),
 	}
