@@ -189,7 +189,7 @@ func WithPrometheusMetrics(s string) admin.RouteConfig {
 	return admin.Describe(
 		"Prometheus metrics",
 		admin.WithHandlerFunc("", s, func(w http.ResponseWriter, req *http.Request) {
-			w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+			w.Header().Set("Content-Type", "text/plain")
 			prometheusHandler := promhttp.Handler()
 			prometheusHandler.ServeHTTP(w, req)
 		}))
