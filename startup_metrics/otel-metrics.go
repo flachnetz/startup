@@ -52,7 +52,7 @@ func (opts *OTELMetricsOptions) Initialize() {
 		otel.SetMeterProvider(opts.mp)
 		opts.captureRuntimeMetrics()
 
-		if opts.PrometheusConfig.Enabled {
+		if !opts.PrometheusConfig.Disabled {
 			// Start Prometheus HTTP server
 			opts.PrometheusConfig.httpServer = startPrometheusMetrics(opts.PrometheusConfig)
 		}
