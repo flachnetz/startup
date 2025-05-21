@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"io"
 	"log/slog"
 	"net/http"
@@ -20,7 +21,6 @@ import (
 	"github.com/goji/httpauth"
 	"github.com/gorilla/handlers"
 	"github.com/julienschmidt/httprouter"
-	"github.com/rcrowley/go-metrics"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -72,7 +72,8 @@ func (opts HTTPOptions) Serve(config Config) {
 		admin.WithDefaults(),
 		admin.WithPProfHandlers(),
 		admin.WithHeapDump(),
-		admin.WithMetrics(metrics.DefaultRegistry),
+		//admin.WithMetrics(metrics.DefaultRegistry),
+		WithPrometheusMetrics("/metrics"),
 		updateLogLevelHandler(),
 	}
 
@@ -181,6 +182,16 @@ func (opts HTTPOptions) Serve(config Config) {
 	}
 
 	log.Info("Server shutdown completed.")
+}
+
+func WithPrometheusMetrics(s string) admin.RouteConfig {
+	return admin.Describe(
+		"Prometheus metrics",
+		admin.WithHandlerFunc("", s, func(w http.ResponseWriter, req *http.Request) {
+			w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+			prometheusHandler := promhttp.Handler()
+			prometheusHandler.ServeHTTP(w, req)
+		}))
 }
 
 func access(ctx context.Context, line string) {
