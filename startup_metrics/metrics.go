@@ -92,7 +92,9 @@ func (opts *MetricsOptions) Initialize() {
 		}
 
 		if !opts.PrometheusConfig.Disabled {
-			prometheus.MustRegister(&rcrowleyCollector{})
+			prometheus.MustRegister(&rcrowleyCollector{
+				appName: opts.Inputs.MetricsPrefix,
+			})
 			startPrometheusMetrics(opts.PrometheusConfig)
 		}
 	})
