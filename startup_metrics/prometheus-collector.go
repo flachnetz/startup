@@ -22,7 +22,9 @@ type PrometheusConfig struct {
 }
 
 // rcrowleyCollector implements prometheus.Collector
-type rcrowleyCollector struct{}
+type rcrowleyCollector struct {
+	appName string
+}
 
 func (c *rcrowleyCollector) Describe(ch chan<- *prometheus.Desc) {
 	// Intentionally left empty. Using DescribeByCollect is simpler for dynamic metric sets.
@@ -31,7 +33,7 @@ func (c *rcrowleyCollector) Describe(ch chan<- *prometheus.Desc) {
 func (c *rcrowleyCollector) Collect(ch chan<- prometheus.Metric) {
 	metricsRegistry := metrics.DefaultRegistry
 	metricsRegistry.Each(func(name string, i interface{}) {
-		baseName, labels := parseMetricNameAndLabels(name)
+		baseName, labels := parseMetricNameAndLabels(c.appName, name)
 
 		switch metric := i.(type) {
 		case metrics.Counter:
@@ -104,8 +106,14 @@ func sanitizeMetricName(name string) string {
 	return safe
 }
 
-func parseMetricNameAndLabels(name string) (string, map[string]string) {
+func parseMetricNameAndLabels(appName string, name string) (string, map[string]string) {
 	labels := make(map[string]string)
+
+	// strip appName prefix
+	if strings.HasPrefix(name, appName) {
+		name = strings.TrimPrefix(name, appName)
+		labels["app"] = appName
+	}
 
 	// Split on '[' and assume tags are like operatorId:123,operatorSiteId:456
 	if idx := strings.Index(name, "["); idx != -1 {
