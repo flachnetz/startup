@@ -2,6 +2,7 @@ package startup_logrus
 
 import (
 	"errors"
+
 	"github.com/sirupsen/logrus"
 )
 
