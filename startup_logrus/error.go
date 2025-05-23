@@ -22,7 +22,7 @@ func (e *FieldError) Unwrap() error {
 	return e.Err
 }
 
-func WithFields(err error, fields logrus.Fields) *FieldError {
+func ErrorWithFields(err error, fields logrus.Fields) *FieldError {
 	if err == nil {
 		return nil
 	}
