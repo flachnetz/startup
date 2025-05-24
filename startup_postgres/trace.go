@@ -18,7 +18,20 @@ var (
 	_ = (pgx.ConnectTracer)(tracerWrapper{})
 )
 
+// ctx key to disable tracing
+var (
+	// DisableTracingKey is the context key to disable tracing
+	DisableTracingKey = &struct{}{}
+)
+
+func NoTraceCtx(ctx context.Context) context.Context {
+	return context.WithValue(ctx, DisableTracingKey, true)
+}
+
 func (m tracerWrapper) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
+	if ctx.Value(DisableTracingKey) != nil {
+		return ctx
+	}
 	if m.logger != nil {
 		m.logger.WithFields(logrus.Fields{
 			"query": data.SQL,
@@ -34,6 +47,9 @@ func (m tracerWrapper) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data
 }
 
 func (m tracerWrapper) TraceQueryEnd(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryEndData) {
+	if ctx.Value(DisableTracingKey) != nil {
+		return
+	}
 	tracer := globalTracer.Load()
 	if tracer == nil {
 		return
@@ -43,6 +59,9 @@ func (m tracerWrapper) TraceQueryEnd(ctx context.Context, conn *pgx.Conn, data p
 }
 
 func (m tracerWrapper) TracePrepareStart(ctx context.Context, conn *pgx.Conn, data pgx.TracePrepareStartData) context.Context {
+	if ctx.Value(DisableTracingKey) != nil {
+		return ctx
+	}
 	if m.logger != nil {
 		m.logger.WithFields(logrus.Fields{
 			"name": data.Name,
@@ -58,6 +77,9 @@ func (m tracerWrapper) TracePrepareStart(ctx context.Context, conn *pgx.Conn, da
 }
 
 func (m tracerWrapper) TracePrepareEnd(ctx context.Context, conn *pgx.Conn, data pgx.TracePrepareEndData) {
+	if ctx.Value(DisableTracingKey) != nil {
+		return
+	}
 	tracer := globalTracer.Load()
 	if tracer == nil {
 		return
@@ -67,6 +89,9 @@ func (m tracerWrapper) TracePrepareEnd(ctx context.Context, conn *pgx.Conn, data
 }
 
 func (m tracerWrapper) TraceConnectStart(ctx context.Context, data pgx.TraceConnectStartData) context.Context {
+	if ctx.Value(DisableTracingKey) != nil {
+		return ctx
+	}
 	tracer := globalTracer.Load()
 	if tracer == nil {
 		return ctx
@@ -76,6 +101,9 @@ func (m tracerWrapper) TraceConnectStart(ctx context.Context, data pgx.TraceConn
 }
 
 func (m tracerWrapper) TraceConnectEnd(ctx context.Context, data pgx.TraceConnectEndData) {
+	if ctx.Value(DisableTracingKey) != nil {
+		return
+	}
 	tracer := globalTracer.Load()
 	if tracer == nil {
 		return
