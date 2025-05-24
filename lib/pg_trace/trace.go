@@ -1,4 +1,4 @@
-package pg
+package pg_trace
 
 import "context"
 
