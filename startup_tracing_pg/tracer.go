@@ -4,9 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"github.com/flachnetz/startup/v2/lib/pg_trace"
 	"regexp"
 	"strings"
+
+	"github.com/flachnetz/startup/v2/lib/pg_trace"
 
 	st "github.com/flachnetz/startup/v2/startup_tracing"
 	"github.com/hashicorp/golang-lru"
