@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/flachnetz/startup/v2/lib/pg"
 	"regexp"
 	"strings"
 
@@ -21,18 +22,8 @@ type tracer struct {
 	SkipFrameworkMethod SkipFunc
 }
 
-// ctx key to disable tracing
-var (
-	// DisableTracingKey is the context key to disable tracing
-	DisableTracingKey = &struct{}{}
-)
-
-func NoTraceCtx(ctx context.Context) context.Context {
-	return context.WithValue(ctx, DisableTracingKey, true)
-}
-
 func (t *tracer) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
-	if ctx.Value(DisableTracingKey) != nil {
+	if ctx.Value(pg.DisableTracingKey) != nil {
 		return ctx
 	}
 	cleanQuery := cleanQuery(data.SQL)
@@ -42,7 +33,7 @@ func (t *tracer) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data pgx.T
 }
 
 func (t *tracer) TraceQueryEnd(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryEndData) {
-	if ctx.Value(DisableTracingKey) != nil {
+	if ctx.Value(pg.DisableTracingKey) != nil {
 		return
 	}
 	span := t.spanOf(ctx)
@@ -55,7 +46,7 @@ func (t *tracer) TraceQueryEnd(ctx context.Context, conn *pgx.Conn, data pgx.Tra
 }
 
 func (t *tracer) TracePrepareStart(ctx context.Context, conn *pgx.Conn, data pgx.TracePrepareStartData) context.Context {
-	if ctx.Value(DisableTracingKey) != nil {
+	if ctx.Value(pg.DisableTracingKey) != nil {
 		return ctx
 	}
 	cleanQuery := cleanQuery(data.SQL)
@@ -66,14 +57,14 @@ func (t *tracer) TracePrepareStart(ctx context.Context, conn *pgx.Conn, data pgx
 }
 
 func (t *tracer) TracePrepareEnd(ctx context.Context, conn *pgx.Conn, data pgx.TracePrepareEndData) {
-	if ctx.Value(DisableTracingKey) != nil {
+	if ctx.Value(pg.DisableTracingKey) != nil {
 		return
 	}
 	t.spanOf(ctx).Finish()
 }
 
 func (t *tracer) TraceConnectStart(ctx context.Context, data pgx.TraceConnectStartData) context.Context {
-	if ctx.Value(DisableTracingKey) != nil {
+	if ctx.Value(pg.DisableTracingKey) != nil {
 		return ctx
 	}
 	_, ctx = t.startSpan(ctx, "CONNECT")
@@ -81,14 +72,14 @@ func (t *tracer) TraceConnectStart(ctx context.Context, data pgx.TraceConnectSta
 }
 
 func (t *tracer) TraceConnectEnd(ctx context.Context, data pgx.TraceConnectEndData) {
-	if ctx.Value(DisableTracingKey) != nil {
+	if ctx.Value(pg.DisableTracingKey) != nil {
 		return
 	}
 	t.spanOf(ctx).Finish()
 }
 
 func (t *tracer) TransactionStart(ctx context.Context) context.Context {
-	if ctx.Value(DisableTracingKey) != nil {
+	if ctx.Value(pg.DisableTracingKey) != nil {
 		return ctx
 	}
 	tag := findOutsideCaller(t.SkipFrameworkMethod)
@@ -101,14 +92,14 @@ func (t *tracer) TransactionStart(ctx context.Context) context.Context {
 }
 
 func (t *tracer) TransactionEnd(ctx context.Context) {
-	if ctx.Value(DisableTracingKey) != nil {
+	if ctx.Value(pg.DisableTracingKey) != nil {
 		return
 	}
 	t.spanOf(ctx).Finish()
 }
 
 func (t *tracer) AcquireConnectionStart(ctx context.Context) context.Context {
-	if ctx.Value(DisableTracingKey) != nil {
+	if ctx.Value(pg.DisableTracingKey) != nil {
 		return ctx
 	}
 	_, ctx = t.startSpan(ctx, "tx:acquire-connection")
@@ -116,14 +107,14 @@ func (t *tracer) AcquireConnectionStart(ctx context.Context) context.Context {
 }
 
 func (t *tracer) AcquireConnectionEnd(ctx context.Context) {
-	if ctx.Value(DisableTracingKey) != nil {
+	if ctx.Value(pg.DisableTracingKey) != nil {
 		return
 	}
 	t.spanOf(ctx).Finish()
 }
 
 func (t *tracer) startSpan(ctx context.Context, res string) (opentracing.Span, context.Context) {
-	if ctx.Value(DisableTracingKey) != nil {
+	if ctx.Value(pg.DisableTracingKey) != nil {
 		return nil, ctx
 	}
 	var parentContext opentracing.SpanContext
