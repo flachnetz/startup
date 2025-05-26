@@ -3,6 +3,7 @@ package startup_http
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,8 +16,6 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/pkg/errors"
 	"gopkg.in/go-playground/validator.v9"
-
-	"github.com/go-json-experiment/json"
 )
 
 type ResponseValue struct {
@@ -42,10 +41,13 @@ func WriteJSON(ctx context.Context, w http.ResponseWriter, status int, value int
 	}
 	w.WriteHeader(status)
 
-	err := json.MarshalWrite(w, value, json.FormatNilSliceAsNull(false), json.FormatNilMapAsNull(false))
+	body, err := json.Marshal(value)
 	if err != nil {
-		LoggerOf(ctx).Warnf("Failed to write json response: %s", err)
+		WriteError(ctx, w, http.StatusInternalServerError, err)
+		return
 	}
+
+	WriteBody(ctx, w, status, "application/json; charset=utf-8", body)
 }
 
 // WriteError formats an error value. The default implementation wraps the error text into
@@ -194,7 +196,7 @@ func ExtractAndCallWithBody(
 			}
 
 		} else {
-			if err := json.UnmarshalRead(r.Body, &body); err != nil {
+			if err := json.NewDecoder(r.Body).Decode(body); err != nil {
 				return nil, errors.WithMessage(err, "parsing request body as json")
 			}
 
