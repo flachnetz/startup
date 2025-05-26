@@ -9,7 +9,6 @@ require (
 	github.com/felixge/httpsnoop v1.0.4
 	github.com/flachnetz/go-admin v1.5.3
 	github.com/flachnetz/go-datadog v1.3.1
-	github.com/go-json-experiment/json v0.0.0-20250129011340-4e0381018ad6
 	github.com/goji/httpauth v0.0.0-20160601135302-2da839ab0f4d
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/gorilla/handlers v1.5.2
