@@ -142,7 +142,7 @@ func parseMetricNameAndLabels(appName string, name string) (string, map[string]s
 func startPrometheusMetrics(opts PrometheusConfig) *http.Server {
 	mux := http.NewServeMux()
 	mux.Handle(opts.Path, promhttp.Handler())
-	prometheusHttpServer := &http.Server{
+	opts.httpServer = &http.Server{
 		Addr:    opts.Port,
 		Handler: mux,
 	}
@@ -152,10 +152,10 @@ func startPrometheusMetrics(opts PrometheusConfig) *http.Server {
 
 		logger := startup_logrus.LoggerOf(context.Background())
 		logger.Infof("Starting Prometheus metrics endpoint on %s%s", opts.Port, opts.Path)
-		if err := prometheusHttpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+		if err := opts.httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			logger.WithError(err).Error("Prometheus HTTP server failed")
 		}
 	}()
 
-	return prometheusHttpServer
+	return opts.httpServer
 }

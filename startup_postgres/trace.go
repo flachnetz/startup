@@ -2,7 +2,6 @@ package startup_postgres
 
 import (
 	"context"
-
 	"github.com/flachnetz/startup/v2/lib/pg_trace"
 
 	"github.com/sirupsen/logrus"

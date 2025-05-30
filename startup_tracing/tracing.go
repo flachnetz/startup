@@ -57,7 +57,7 @@ func (opts *TracingOptions) Initialize() {
 		nativeTracer, err := zipkin.NewTracer(reporter,
 			zipkin.WithLocalEndpoint(endpoint),
 			zipkin.WithSharedSpans(false),
-			zipkin.WithTraceID128Bit(false))
+			zipkin.WithTraceID128Bit(true))
 
 		startup_base.PanicOnError(err, "Unable to create zipkin tracer")
 
