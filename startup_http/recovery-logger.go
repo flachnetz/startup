@@ -47,7 +47,7 @@ func (l *SlogRecoveryHandlerLogger) Println(v ...interface{}) {
 
 	// Log at Error level always.
 	l.logger.Error(
-		"PANIC RECOVERED",
+		"panic recovered",
 		attrs..., // Unpack the attributes slice
 	)
 }
