@@ -115,7 +115,8 @@ func (opts HTTPOptions) Serve(config Config) {
 	handler = mergeWithAdminHandler(adminHandler, handler)
 
 	// don't let a panic crash the server.
-	handler = handlers.RecoveryHandler(handlers.PrintRecoveryStack(true))(handler)
+	handler = handlers.RecoveryHandler(handlers.PrintRecoveryStack(true),
+		handlers.RecoveryLogger(NewSlogRecoveryHandlerLogger()))(handler)
 
 	if opts.AccessLog == "" {
 		// log all requests using slog logger
