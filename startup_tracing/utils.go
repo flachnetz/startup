@@ -89,7 +89,10 @@ func WithTags(ctx context.Context, tags opentracing.Tags) context.Context {
 
 // WithServiceOverride adds a `dd.service` tag to the context. See WithTags
 func WithServiceOverride(ctx context.Context, service string) context.Context {
-	return WithTags(ctx, opentracing.Tags{"dd.service": service})
+	return WithTags(ctx, opentracing.Tags{
+		"dd.service":   service,
+		"peer.service": service,
+	})
 }
 
 type tagsFromContext struct {

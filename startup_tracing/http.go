@@ -44,7 +44,9 @@ func Tracing(service string, op string) startup_http.HttpMiddleware {
 			if existingSpan := opentracing.SpanFromContext(ctx); existingSpan != nil {
 				// update existing span
 				existingSpan.SetOperationName(op)
-				existingSpan.SetTag("dd.service", service)
+
+				existingSpan.SetTag("peer.service", service) // grafana tempo
+				existingSpan.SetTag("dd.service", service)   // datadog
 
 				// continue
 				handler.ServeHTTP(w, req)
@@ -66,7 +68,8 @@ func Tracing(service string, op string) startup_http.HttpMiddleware {
 			defer serverSpan.Finish()
 
 			// use a clean url as resource
-			serverSpan.SetTag("dd.service", service)
+			serverSpan.SetTag("peer.service", service) // grafana tempo
+			serverSpan.SetTag("dd.service", service)   // datadog
 			ext.HTTPMethod.Set(serverSpan, req.Method)
 			ext.HTTPUrl.Set(serverSpan, cleanUrl(req.URL))
 
