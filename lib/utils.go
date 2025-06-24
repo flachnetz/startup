@@ -35,8 +35,3 @@ func IsStruct(v interface{}) bool {
 	_, isStruct := v.(struct{})
 	return isStruct
 }
-
-func IsInterface(v interface{}) bool {
-	_, isInterface := v.(interface{})
-	return isInterface
-}

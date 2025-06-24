@@ -12,6 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+//lint:ignore U1000
 func CustomErrorHandler[E ApiError](errorHandler ErrorHandler[E]) func(error, echo.Context) {
 	return func(err error, c echo.Context) {
 		errorHandler.HandleError(c.Request().Context(), c, err)
@@ -44,6 +45,7 @@ func (eh *ErrorHandler[E]) timeoutError(msg string) ApiError {
 	return ErrTimeout.WithDescription(msg)
 }
 
+//lint:ignore U1000
 func (eh *ErrorHandler[E]) unknownError(msg string) error {
 	if eh.UnknownError != nil {
 		return eh.UnknownError(msg)

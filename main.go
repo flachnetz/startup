@@ -38,7 +38,7 @@ func ParseCommandLine(opts interface{}) error {
 	return ParseCommandLineWithOptions(opts, flags.HelpFlag|flags.PassDoubleDash)
 }
 
-// Parses command line.
+// ParseCommandLineWithOptions Parses command line.
 func ParseCommandLineWithOptions(opts interface{}, options flags.Options) error {
 	if reflect.ValueOf(opts).Kind() != reflect.Ptr {
 		return errors.New("options parameter must be pointer")
@@ -83,7 +83,7 @@ func ParseCommandLineWithOptions(opts interface{}, options flags.Options) error 
 		// we remember the values we've seen so we can inject those into
 		// the Initializer() functions
 		seen[fieldValue.Type()] = fieldValue
-		seen[reflect.PtrTo(fieldValue.Type())] = fieldValue.Addr()
+		seen[reflect.PointerTo(fieldValue.Type())] = fieldValue.Addr()
 
 		if init := findInitializerMethod(fieldValue); init.IsValid() {
 			var inputValues []reflect.Value
