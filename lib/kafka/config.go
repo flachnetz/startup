@@ -7,6 +7,7 @@ import (
 	logrus "github.com/sirupsen/logrus"
 )
 
+//lint:ignore U1000 
 type logrusAdapter struct {
 	delegate *logrus.Entry
 }
