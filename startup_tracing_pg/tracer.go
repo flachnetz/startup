@@ -131,7 +131,10 @@ func (t *tracer) startSpan(ctx context.Context, res string) (opentracing.Span, c
 	)
 
 	span.SetTag("dd.service", t.ServiceName)
+	span.SetTag("peer.service", t.ServiceName)
+
 	span.SetTag("dd.resource", res)
+	span.SetTag("resource.name", res)
 
 	return span, opentracing.ContextWithSpan(ctx, span)
 }
