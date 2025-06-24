@@ -43,9 +43,10 @@ func init() {
 }
 
 type BaseOptions struct {
-	Logfile       string `long:"log-file" description:"Write logs to a different file. Defaults to stdout."`
-	ForceColor    bool   `long:"log-color" description:"Forces colored output even on non TTYs."`
-	JSONFormatter bool   `long:"log-json" description:"Log using the logrus json formatter."`
+	Logfile                string `long:"log-file" description:"Write logs to a different file. Defaults to stdout."`
+	ForceColor             bool   `long:"log-color" description:"Forces colored output even on non TTYs."`
+	JSONFormatter          bool   `long:"log-json" description:"Log using the logrus json formatter."`
+	JSONFormatterLogSource bool   `long:"log-json-source" description:"When doing json logging, log source code file and position as well."`
 
 	Verbose     bool   `long:"verbose" description:"Show verbose logging output."`
 	Version     bool   `long:"version" description:"Prints the build information about this application if available."`
@@ -69,7 +70,7 @@ func (opts *BaseOptions) Initialize() {
 	if writer != nil {
 		if opts.JSONFormatter {
 			handler = slog.NewJSONHandler(writer, &slog.HandlerOptions{
-				AddSource: true,
+				AddSource: opts.JSONFormatterLogSource,
 				Level:     &LogLevel,
 			})
 		} else {
