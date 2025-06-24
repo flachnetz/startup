@@ -120,7 +120,7 @@ func observeStats(db *sqlx.DB) {
 			metrics.GetOrRegisterGauge("db.pool.gauge.wait-duration", reg).Update(stats.WaitDuration.Milliseconds())
 
 			metrics.GetOrRegisterMeter("db.pool.meter.wait-count", reg).Mark(stats.WaitCount - prevStats.WaitCount)
-			metrics.GetOrRegisterTimer("db.pool.meter.wait-duration", reg).Update(stats.WaitDuration - stats.WaitDuration)
+			metrics.GetOrRegisterTimer("db.pool.meter.wait-duration", reg).Update(stats.WaitDuration - prevStats.WaitDuration)
 
 			metrics.GetOrRegisterGauge("db.pool.closed.lifetime", reg).Update(stats.MaxLifetimeClosed)
 			metrics.GetOrRegisterGauge("db.pool.closed.idletime", reg).Update(stats.MaxIdleTimeClosed)
@@ -159,6 +159,7 @@ func (opts *PostgresOptions) StartVacuumTask(db *sqlx.DB, table string, interval
 	return channelCloser(closeCh)
 }
 
+//lint:ignore U1000
 func (opts *PostgresOptions) mustConnect(connector driver.Connector) *sqlx.DB {
 	ctx, cancelTimeout := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelTimeout()

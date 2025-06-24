@@ -115,12 +115,8 @@ func parseMetricNameAndLabels(appName string, name string) (string, map[string]s
 		labels["app"] = appName
 	}
 	// strip leading and trailing dots
-	if strings.HasPrefix(name, ".") {
-		name = strings.TrimPrefix(name, ".")
-	}
-	if strings.HasSuffix(name, ".") {
-		name = strings.TrimSuffix(name, ".")
-	}
+	name = strings.TrimPrefix(name, ".")
+	name = strings.TrimSuffix(name, ".")
 
 	// Split on '[' and assume tags are like operatorId:123,operatorSiteId:456
 	if idx := strings.Index(name, "["); idx != -1 {
