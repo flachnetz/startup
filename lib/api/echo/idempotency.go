@@ -3,13 +3,14 @@ package echo
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
+	"time"
+
 	"github.com/flachnetz/startup/v2/lib/api/idempotency"
 	"github.com/flachnetz/startup/v2/lib/ql"
 	"github.com/flachnetz/startup/v2/startup_logrus"
 	"github.com/labstack/echo/v4"
 	"github.com/pkg/errors"
-	"net/http"
-	"time"
 )
 
 const IdempotencyKey = "Idempotency-Key"
@@ -69,7 +70,6 @@ func IdempotencyMiddlewareEcho(store idempotency.IdempotencyStore) echo.Middlewa
 			loggerOf = loggerOf.WithField("idempotency_key", idempotencyKey)
 
 			err := ql.InNewTransaction(ctx, store.DB(), func(ctx ql.TxContext) error {
-
 				reqRecord, err := store.Get(ctx, idempotencyKey)
 				if err != nil {
 					return errors.New("failed to retrieve idempotency record: " + err.Error())

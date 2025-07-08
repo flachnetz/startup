@@ -4,13 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
+	"time"
+
 	"github.com/flachnetz/startup/v2/lib/ql"
 	"github.com/flachnetz/startup/v2/startup_logrus"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/robfig/cron/v3"
-	"io"
-	"time"
 )
 
 type Status string
@@ -107,7 +108,6 @@ func (s *idempotencyStore) Get(ctx context.Context, key string) (*IdempotencyReq
 			SELECT * 
 			FROM idempotency_requests 
 			WHERE idempotency_key = $1 FOR UPDATE`, key)
-
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, nil
