@@ -3,6 +3,7 @@ package echo
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/flachnetz/startup/v2/lib/api"
 	"net/http"
 	"time"
 
@@ -64,7 +65,7 @@ func IdempotencyMiddlewareEcho(store idempotency.IdempotencyStore) echo.Middlewa
 			idempotencyKey := c.Request().Header.Get(IdempotencyKey)
 			loggerOf := startup_logrus.LoggerOf(ctx)
 			if idempotencyKey == "" {
-				return errors.Errorf("missing idempotency key in request header '%s'", IdempotencyKey)
+				return api.ErrBadRequest.WithDescription("missing idempotency key")
 			}
 			loggerOf = loggerOf.WithField("idempotency_key", idempotencyKey)
 
@@ -124,6 +125,7 @@ func IdempotencyMiddlewareEcho(store idempotency.IdempotencyStore) echo.Middlewa
 
 				headersBytes, err := json.Marshal(c.Response().Header())
 				if err != nil {
+					// Log the error but do not return it to avoid breaking the response flow
 					loggerOf.Errorf("Failed to marshal response headers: %v", err)
 				}
 
