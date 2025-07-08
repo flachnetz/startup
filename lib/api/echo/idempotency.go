@@ -77,7 +77,8 @@ func IdempotencyMiddlewareEcho(store idempotency.IdempotencyStore) echo.Middlewa
 
 				// Handle existing requests
 				if reqRecord != nil {
-					if reqRecord.Status == idempotency.Completed {
+					switch reqRecord.Status {
+					case idempotency.Completed:
 						loggerOf.Debugf("idempotency key '%s' already processed. Returning saved response", idempotencyKey)
 
 						var headers http.Header
@@ -91,16 +92,16 @@ func IdempotencyMiddlewareEcho(store idempotency.IdempotencyStore) echo.Middlewa
 						// Use Blob to write the raw body with the correct status code and content type
 						contentType := headers.Get("Content-Type")
 						return c.Blob(int(reqRecord.ResponseCode.Int64), contentType, reqRecord.ResponseBody)
-					}
 
-					if reqRecord.Status == idempotency.Pending {
+					case idempotency.Error:
+						loggerOf.Debugf("idempotency key '%s' resulted in an error, will retry business logic", idempotencyKey)
+					case idempotency.Pending:
 						// if it is still pending for more than 2 minutes, we can assume it is stuck
 						if time.Since(reqRecord.CreatedAt) > 2*time.Minute {
 							return errors.Errorf("idempotency key '%s' is stuck in pending state", idempotencyKey)
 						}
+						return errors.Errorf("idempotency key '%s' is still pending, please retry later", idempotencyKey)
 					}
-
-					return errors.Errorf("idempotency key '%s' is still pending, please retry later", idempotencyKey)
 				}
 
 				// Handle new requests: Create pending record
