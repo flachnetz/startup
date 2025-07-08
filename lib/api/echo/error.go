@@ -6,8 +6,6 @@ import (
 
 	"github.com/flachnetz/startup/v2/lib/api"
 
-	"github.com/labstack/echo/v4/middleware"
-
 	"github.com/flachnetz/startup/v2/startup_logrus"
 	"github.com/labstack/echo/v4"
 	"github.com/pkg/errors"
