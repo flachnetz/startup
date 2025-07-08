@@ -2,8 +2,9 @@ package echo
 
 import (
 	"context"
-	"github.com/flachnetz/startup/v2/lib/api"
 	"net/http"
+
+	"github.com/flachnetz/startup/v2/lib/api"
 
 	"github.com/labstack/echo/v4/middleware"
 
