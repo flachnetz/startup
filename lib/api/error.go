@@ -10,6 +10,7 @@ var (
 	ErrUnknown             = Error{ErrorCode: "UNKNOWN_ERROR", ErrorDescription: "error is unknown", HttpStatusCode: http.StatusInternalServerError}
 	ErrTimeout             = Error{ErrorCode: "TIMEOUT", ErrorDescription: "request timeout", HttpStatusCode: 499}
 	ErrInternalServerError = Error{ErrorCode: "INTERNAL_SERVER_ERROR", ErrorDescription: "internal server error", HttpStatusCode: http.StatusInternalServerError}
+	ErrBadRequest          = Error{ErrorCode: "BAD_REQUEST", ErrorDescription: "bad request", HttpStatusCode: http.StatusBadRequest}
 )
 
 type Error struct {
