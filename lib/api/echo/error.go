@@ -1,7 +1,8 @@
-package api
+package echo
 
 import (
 	"context"
+	"github.com/flachnetz/startup/v2/lib/api"
 	"net/http"
 
 	"github.com/labstack/echo/v4/middleware"
@@ -21,7 +22,7 @@ func CustomErrorHandler[E ApiError](errorHandler ErrorHandler[E]) func(error, ec
 
 type ApiError interface {
 	error
-	ToErrorResponse() ErrorResponse
+	ToErrorResponse() api.ErrorResponse
 }
 
 type ErrorHandler[E ApiError] struct {
@@ -35,14 +36,14 @@ func (eh *ErrorHandler[E]) toApiError(err error) ApiError {
 	if eh.ToApiError != nil {
 		return eh.ToApiError(err)
 	}
-	return ErrUnknown.WithDescription(err.Error())
+	return api.ErrUnknown.WithDescription(err.Error())
 }
 
 func (eh *ErrorHandler[E]) timeoutError(msg string) ApiError {
 	if eh.TimeoutError != nil {
 		return eh.TimeoutError(msg)
 	}
-	return ErrTimeout.WithDescription(msg)
+	return api.ErrTimeout.WithDescription(msg)
 }
 
 //lint:ignore U1000
@@ -50,7 +51,7 @@ func (eh *ErrorHandler[E]) unknownError(msg string) error {
 	if eh.UnknownError != nil {
 		return eh.UnknownError(msg)
 	}
-	return ErrUnknown
+	return api.ErrUnknown
 }
 
 func (eh *ErrorHandler[E]) httpStatusFrom(ctx context.Context, err error) int {
@@ -102,14 +103,5 @@ func LogHttpError(logger *logrus.Entry, path string, code int, err error) {
 		logger.Errorf("%s req=%s", err.Error(), path)
 	} else {
 		logger.Warnf("%s req=%s", err.Error(), path)
-	}
-}
-
-func BasicAuthValidator(basicAuthUser string, basicAuthPassword string) middleware.BasicAuthValidator {
-	return func(user string, password string, context echo.Context) (bool, error) {
-		if user == basicAuthUser && password == basicAuthPassword {
-			return true, nil
-		}
-		return false, nil
 	}
 }
