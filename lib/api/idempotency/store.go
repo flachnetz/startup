@@ -17,6 +17,7 @@ import (
 type Status string
 
 const (
+	Error     Status = "error"
 	Pending   Status = "pending"
 	Completed Status = "completed"
 )
@@ -35,7 +36,7 @@ CREATE TABLE IF NOT EXISTS idempotency_requests (
     idempotency_key TEXT PRIMARY KEY,
     
     -- The status of the request processing
-    status TEXT NOT NULL CHECK (status IN ('pending', 'completed')),
+    status TEXT NOT NULL CHECK (status IN ('pending', 'completed', 'error')),
     
     -- The response data to be returned on subsequent requests
     response_code INT,
@@ -122,11 +123,26 @@ func (s *idempotencyStore) Get(ctx context.Context, key string) (*IdempotencyReq
 
 // Create saves a new idempotency request in the 'pending' state.
 // This should be called within the transaction started by `Get`.
+// If the key already exists, it updates the status to 'pending' but only if the state
+// is error.
 func (s *idempotencyStore) Create(ctx context.Context, key string) error {
 	return ql.InExistingTransaction(ctx, func(ctx ql.TxContext) error {
-		return ql.Exec(ctx, `
-		INSERT INTO idempotency_requests (idempotency_key, status) 
-		VALUES ($1, 'pending')`, key)
+		return ql.Exec(ctx, `		
+		INSERT INTO idempotency_requests (idempotency_key, status)
+		VALUES ($1, 'pending')
+		ON CONFLICT (idempotency_key) DO UPDATE SET status = 'pending', updated_at = NOW()
+		WHERE idempotency_requests.status = 'error'`, key)
+	})
+}
+
+// Error updates the status of an idempotency request to 'error'.
+func (s *idempotencyStore) Error(ctx context.Context, key string, code int, headers, body []byte) error {
+	return ql.InExistingTransaction(ctx, func(ctx ql.TxContext) error {
+		return ql.Exec(ctx, `	
+		UPDATE idempotency_requests 
+		SET status = 'error', response_code = $2, response_headers = $3, response_body = $4, updated_at = NOW()
+		WHERE idempotency_key = $1
+    `, key, code, headers, body)
 	})
 }
 
