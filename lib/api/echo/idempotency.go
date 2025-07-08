@@ -126,7 +126,7 @@ func IdempotencyMiddlewareEcho(store idempotency.IdempotencyStore) echo.Middlewa
 					loggerOf.Errorf("Failed to marshal response headers: %v", err)
 				}
 
-				if handlerErr != nil {
+				if handlerErr != nil || interceptor.statusCode >= 400 {
 					err = store.Error(ctx, idempotencyKey, interceptor.statusCode, headersBytes, interceptor.body.Bytes())
 					return handlerErr
 				}
