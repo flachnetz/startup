@@ -64,8 +64,7 @@ func IdempotencyMiddlewareEcho(store idempotency.IdempotencyStore) echo.Middlewa
 			idempotencyKey := c.Request().Header.Get(IdempotencyKey)
 			loggerOf := startup_logrus.LoggerOf(ctx)
 			if idempotencyKey == "" {
-				loggerOf.Warnf("No idempotency key provided in request header. Skipping idempotency check.")
-				return next(c)
+				return errors.Errorf("missing idempotency key in request header '%s'", IdempotencyKey)
 			}
 			loggerOf = loggerOf.WithField("idempotency_key", idempotencyKey)
 
