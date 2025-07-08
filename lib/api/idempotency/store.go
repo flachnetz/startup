@@ -27,6 +27,7 @@ type IdempotencyStore interface {
 	Get(ctx context.Context, key string) (*IdempotencyRequest, error)
 	Create(ctx context.Context, key string) error
 	Update(ctx context.Context, key string, code int, headers, body []byte) error
+	Error(ctx context.Context, key string, code int, headers, body []byte) error
 	Cleanup(ctx context.Context) error
 	DB() *sqlx.DB
 }

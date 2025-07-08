@@ -121,13 +121,14 @@ func IdempotencyMiddlewareEcho(store idempotency.IdempotencyStore) echo.Middlewa
 				handlerErr := next(c)
 				c.Response().Writer = originalWriter
 
-				if handlerErr != nil {
-					return handlerErr
-				}
-
 				headersBytes, err := json.Marshal(c.Response().Header())
 				if err != nil {
 					loggerOf.Errorf("Failed to marshal response headers: %v", err)
+				}
+
+				if handlerErr != nil {
+					err = store.Error(ctx, idempotencyKey, interceptor.statusCode, headersBytes, interceptor.body.Bytes())
+					return handlerErr
 				}
 
 				err = store.Update(ctx, idempotencyKey, interceptor.statusCode, headersBytes, interceptor.body.Bytes())
