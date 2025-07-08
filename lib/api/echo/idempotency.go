@@ -118,7 +118,8 @@ func IdempotencyMiddlewareEcho(store idempotency.IdempotencyStore) echo.Middlewa
 					header:         make(http.Header),
 				}
 				c.Response().Writer = interceptor
-
+				req := c.Request().Clone(ctx)
+				c.SetRequest(req)
 				handlerErr := next(c)
 				c.Response().Writer = originalWriter
 
