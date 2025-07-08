@@ -90,6 +90,9 @@ func IdempotencyMiddlewareEcho(store idempotency.IdempotencyStore) echo.Middlewa
 								}
 							}
 						}
+						// add idempotency key to response headers
+						c.Response().Header().Set(IdempotencyKey, idempotencyKey)
+
 						// Use Blob to write the raw body with the correct status code and content type
 						contentType := headers.Get("Content-Type")
 						return c.Blob(int(reqRecord.ResponseCode.Int64), contentType, reqRecord.ResponseBody)
