@@ -135,6 +135,9 @@ func IdempotencyMiddlewareEcho(store idempotency.IdempotencyStore) echo.Middlewa
 
 				if handlerErr != nil || interceptor.statusCode >= 400 {
 					err = store.Error(ctx, idempotencyKey, interceptor.statusCode, headersBytes, interceptor.body.Bytes())
+					if err != nil {
+						loggerOf.Errorf("Failed to store idempotency error for key '%s': %q", idempotencyKey, err)
+					}
 					return handlerErr
 				}
 
