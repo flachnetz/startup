@@ -5,6 +5,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/flachnetz/startup/v2/startup_http"
+	"github.com/gorilla/handlers"
+
 	"github.com/flachnetz/startup/v2/startup_logrus"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -137,7 +140,17 @@ func parseMetricNameAndLabels(appName string, name string) (string, map[string]s
 
 func startPrometheusMetrics(opts PrometheusConfig) *http.Server {
 	mux := http.NewServeMux()
-	mux.Handle(opts.Path, promhttp.Handler())
+	logger := startup_logrus.LoggerOf(context.Background())
+
+	handler := promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{
+		ErrorLog: logger,
+	})
+
+	// don't let a panic crash the server.
+	handler = handlers.RecoveryHandler(handlers.PrintRecoveryStack(true),
+		handlers.RecoveryLogger(startup_http.NewSlogRecoveryHandlerLogger()))(handler)
+	mux.Handle(opts.Path, handler)
+
 	opts.httpServer = &http.Server{
 		Addr:    opts.Port,
 		Handler: mux,
@@ -145,8 +158,6 @@ func startPrometheusMetrics(opts PrometheusConfig) *http.Server {
 
 	go func() {
 		// Start Prometheus HTTP server
-
-		logger := startup_logrus.LoggerOf(context.Background())
 		logger.Infof("Starting Prometheus metrics endpoint on %s%s", opts.Port, opts.Path)
 		if err := opts.httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			logger.WithError(err).Error("Prometheus HTTP server failed")
