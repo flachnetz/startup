@@ -3,7 +3,7 @@ module github.com/flachnetz/startup/v2
 require (
 	github.com/DataDog/datadog-go/v5 v5.6.0
 	github.com/Landoop/schema-registry v0.0.0-20190327143759-50a5701c1891
-	github.com/Unleash/unleash-client-go/v4 v4.2.0
+	github.com/Unleash/unleash-go-sdk/v5 v5.0.3
 	github.com/benbjohnson/clock v1.3.5
 	github.com/confluentinc/confluent-kafka-go/v2 v2.8.0
 	github.com/felixge/httpsnoop v1.0.4
