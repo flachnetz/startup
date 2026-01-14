@@ -1,7 +1,7 @@
 package unleash
 
 import (
-	"github.com/Unleash/unleash-client-go/v4"
+	"github.com/Unleash/unleash-go-sdk/v5"
 	logrus "github.com/sirupsen/logrus"
 )
 
