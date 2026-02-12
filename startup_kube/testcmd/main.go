@@ -32,7 +32,7 @@ func main() {
 
 	fmt.Println("Write configmap now")
 	err := startup_kube.WriteConfigMap(context.TODO(), client, "startup-lib", "zig", "test", map[string]any{
-		"foo": "bar4",
+		"foo": "bar6",
 	})
 
 	startup_base.FatalOnError(err, "Write configmap")

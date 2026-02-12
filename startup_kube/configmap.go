@@ -7,11 +7,15 @@ import (
 	"maps"
 
 	"github.com/flachnetz/startup/v2/lib"
+	"github.com/flachnetz/startup/v2/startup_logrus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
+	apiWatch "k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/watch"
 )
 
 // ConfigMapValues contain strings and []byte values.
@@ -35,16 +39,7 @@ type ConfigMapUpdate func(ConfigMapValues) error
 //
 // ObserveConfigMap will block forever, or until an error occurs.
 func ObserveConfigMap(ctx context.Context, cs *kubernetes.Clientset, namespace, name string, callback ConfigMapUpdate) error {
-	listOptions := metav1.ListOptions{
-		FieldSelector: "metadata.name=" + name,
-	}
-
-	watcher, err := cs.CoreV1().ConfigMaps(namespace).Watch(ctx, listOptions)
-	if err != nil {
-		return fmt.Errorf("watch configmap: %w", err)
-	}
-
-	defer watcher.Stop()
+	log := startup_logrus.LoggerOf(ctx)
 
 	var previousValue ConfigMapValues
 
@@ -57,16 +52,51 @@ func ObserveConfigMap(ctx context.Context, cs *kubernetes.Clientset, namespace, 
 		return callback(values)
 	}
 
-	for event := range watcher.ResultChan() {
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", name)
+
+	// get initial version of the resource list so we can use it as a start when watching
+	// for updates
+	list, err := cs.CoreV1().ConfigMaps(namespace).List(ctx, metav1.ListOptions{
+		FieldSelector: fieldSelector.String(),
+	})
+	if err != nil {
+		return fmt.Errorf("initial list: %w", err)
+	}
+
+	if len(list.Items) > 0 {
+		// emit initial state
+		err := emitIfChanged(configmapToValues(&list.Items[0]))
+		if err != nil {
+			return fmt.Errorf("initial callback: %w", err)
+		}
+	}
+
+	// create a new watcher for lists of configmaps filtered by name
+	listWatcher := cache.NewListWatchFromClient(cs.CoreV1().RESTClient(), "configmaps", namespace, fieldSelector)
+	retryWatcher, err := watch.NewRetryWatcherWithContext(ctx, list.ResourceVersion, listWatcher)
+	if err != nil {
+		return fmt.Errorf("create watcher: %w", err)
+	}
+
+	defer retryWatcher.Stop()
+
+	for event := range retryWatcher.ResultChan() {
+		log.Debugf("Got event: %q", event.Type)
+
+		if event.Type == apiWatch.Error {
+			log.Warnf("Ignoring error while observing %q.%q: %s", namespace, name, event.Object)
+			continue
+		}
+
 		cm, ok := event.Object.(*v1.ConfigMap)
 		if !ok {
 			continue
 		}
 
 		switch event.Type {
-		case watch.Added, watch.Modified:
+		case apiWatch.Added, apiWatch.Modified:
 			err = emitIfChanged(configmapToValues(cm))
-		case watch.Deleted:
+		case apiWatch.Deleted:
 			err = emitIfChanged(nil)
 		}
 
@@ -86,7 +116,7 @@ func WriteConfigMap(ctx context.Context, cs *kubernetes.Clientset, writer, names
 
 	payload, err := json.Marshal(cm)
 	if err != nil {
-		return fmt.Errorf("serialize configmap to json: %s", err)
+		return fmt.Errorf("serialize configmap to json: %w", err)
 	}
 
 	_, err = cs.CoreV1().ConfigMaps(namespace).Patch(
