@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"maps"
+	"reflect"
 
 	"github.com/flachnetz/startup/v2/lib"
 	"github.com/flachnetz/startup/v2/startup_logrus"
@@ -44,7 +44,7 @@ func ObserveConfigMap(ctx context.Context, cs *kubernetes.Clientset, namespace, 
 	var previousValue ConfigMapValues
 
 	emitIfChanged := func(values ConfigMapValues) error {
-		if maps.Equal(values, previousValue) {
+		if reflect.DeepEqual(values, previousValue) {
 			return nil
 		}
 
@@ -111,7 +111,7 @@ func ObserveConfigMap(ctx context.Context, cs *kubernetes.Clientset, namespace, 
 func WriteConfigMap(ctx context.Context, cs *kubernetes.Clientset, writer, namespace, name string, data ConfigMapValues) error {
 	cm, err := valuesToConfigMap(name, namespace, data)
 	if err != nil {
-		return fmt.Errorf("serialize configmap: %s", err)
+		return fmt.Errorf("serialize configmap: %w", err)
 	}
 
 	payload, err := json.Marshal(cm)
@@ -172,7 +172,7 @@ func configmapToValues(cm *v1.ConfigMap) ConfigMapValues {
 		return nil
 	}
 
-	result := make(ConfigMapValues)
+	result := make(ConfigMapValues, len(cm.Data)+len(cm.BinaryData))
 
 	for key, value := range cm.Data {
 		result[key] = value
