@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"reflect"
 
 	"github.com/flachnetz/startup/v2/lib"
-	"github.com/flachnetz/startup/v2/startup_logrus"
+	sl "github.com/flachnetz/startup/v2/startup_logging"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -39,7 +40,7 @@ type ConfigMapUpdate func(ConfigMapValues) error
 //
 // ObserveConfigMap will block forever, or until an error occurs.
 func ObserveConfigMap(ctx context.Context, cs *kubernetes.Clientset, namespace, name string, callback ConfigMapUpdate) error {
-	log := startup_logrus.LoggerOf(ctx)
+	log := sl.LoggerOf(ctx)
 
 	var previousValue ConfigMapValues
 
@@ -81,10 +82,10 @@ func ObserveConfigMap(ctx context.Context, cs *kubernetes.Clientset, namespace, 
 	defer retryWatcher.Stop()
 
 	for event := range retryWatcher.ResultChan() {
-		log.Debugf("Got event: %q", event.Type)
+		log.Debug("Got event", slog.String("type", string(event.Type)))
 
 		if event.Type == apiWatch.Error {
-			log.Warnf("Ignoring error while observing %q.%q: %s", namespace, name, event.Object)
+			log.Warn("Ignoring error while observing configmap", slog.String("namespace", namespace), slog.String("name", name), slog.Any("object", event.Object))
 			continue
 		}
 
