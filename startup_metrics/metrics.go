@@ -9,11 +9,11 @@ import (
 	"time"
 	"unicode"
 
+	"log/slog"
+
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/flachnetz/startup/v2/startup_logrus"
-
-	logrus "github.com/sirupsen/logrus"
+	sl "github.com/flachnetz/startup/v2/startup_logging"
 
 	"github.com/DataDog/datadog-go/v5/statsd"
 
@@ -23,7 +23,7 @@ import (
 	"github.com/rcrowley/go-metrics"
 )
 
-var log = logrus.WithField("prefix", "main")
+var log = slog.With(slog.String("prefix", "main"))
 
 type MetricsPrefix string
 
@@ -53,7 +53,7 @@ func (opts *MetricsOptions) Initialize() {
 		registry := metrics.DefaultRegistry
 
 		if prefix := strings.TrimSuffix(opts.Inputs.MetricsPrefix, "."); prefix != "" {
-			log.Debugf("Prefixing all metrics with '%s'", prefix)
+			log.Debug("Prefixing all metrics with prefix", slog.String("prefix", prefix))
 			registry = prefixRegistry(registry, prefix+".")
 			metrics.DefaultRegistry = registry
 
@@ -81,7 +81,7 @@ func (opts *MetricsOptions) Initialize() {
 			c, err := statsd.New(opts.Datadog.StatsDAddress, statsd.WithTags(tags))
 			startup_base.PanicOnError(err, "cannot create statsd client")
 
-			log.Infof("Activating statsd for metrics: '%s' (%+v)", opts.Datadog.StatsDAddress, udpAddr)
+			log.Info("Activating statsd for metrics", slog.String("address", opts.Datadog.StatsDAddress), slog.Any("udpAddr", udpAddr))
 			r, err := datadog.NewReporter(registry, c, opts.Datadog.Interval)
 			startup_base.PanicOnError(err, "cannot start datadog statsd metrics reporter")
 			go r.Flush()
@@ -106,7 +106,7 @@ func (opts *MetricsOptions) setupDatadogMetricsReporter(registry metrics.Registr
 		return err
 	}
 
-	log.Infof("Starting datadog metrics reporting with tags: %s", strings.Join(tags, ", "))
+	log.Info("Starting datadog metrics reporting", slog.String("tags", strings.Join(tags, ", ")))
 	client := datadog.New("", opts.Datadog.ApiKey)
 	reporter := datadog.Reporter(client, registry, tags)
 	go reporter.Start(opts.Datadog.Interval)
@@ -119,7 +119,7 @@ func (opts *MetricsOptions) Shutdown() error {
 	ctx := context.Background()
 	if opts.PrometheusConfig.httpServer != nil {
 		if err := opts.PrometheusConfig.httpServer.Shutdown(ctx); err != nil {
-			startup_logrus.LoggerOf(ctx).WithError(err).Error("Failed to shutdown Prometheus HTTP server")
+			sl.LoggerOf(ctx).ErrorContext(ctx, "Failed to shutdown Prometheus HTTP server", sl.Error(err))
 		}
 	}
 
