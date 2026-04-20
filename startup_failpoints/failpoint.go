@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	logrus "github.com/sirupsen/logrus"
+	"log/slog"
 
 	"golang.org/x/exp/slices"
 
@@ -66,7 +66,7 @@ type FailPointRequest struct {
 }
 
 type FailPointService struct {
-	logger             *logrus.Entry
+	logger             *slog.Logger
 	devMode            bool
 	failPointsLock     sync.RWMutex
 	failPoints         []FailPoint
@@ -76,7 +76,7 @@ type FailPointService struct {
 
 func NewFailPointService(fps []FailPoint, codeLocations []FailPointLocation, devMode bool) *FailPointService {
 	f := &FailPointService{
-		logger:             logrus.WithField("prefix", "failpoints"),
+		logger:             slog.With(slog.String("prefix", "failpoints")),
 		devMode:            devMode,
 		failPointsLock:     sync.RWMutex{},
 		failPoints:         []FailPoint{},
@@ -139,7 +139,7 @@ func (f *FailPointService) ReturnErrorIfFailPointActive(ctx context.Context, loc
 		if exists && fp.IsActive {
 			// if filterTags are set, we only return an error if the failpoint has one of the filter tags
 			if len(fp.FilterTags) > 0 {
-				f.logger.Debugf("checking whether failpoint '%s' has one of the filter tags '%s'", location, strings.Join(filterTags, ","))
+				f.logger.Debug("checking whether failpoint has one of the filter tags", slog.String("location", string(location)), slog.String("filterTags", strings.Join(filterTags, ",")))
 				// no match, return no error
 				if !containsOneOf(fp, filterTags) {
 					return nil
@@ -199,7 +199,7 @@ func (f *FailPointService) UpdateFailPoint(req FailPointRequest) error {
 			fp.FilterTags[i] = strings.ToLower(strings.TrimSpace(part))
 		}
 	}
-	f.logger.Infof("set failpoint location '%s' with error '%s' to state active:%v", req.CodeLocationPointName, req.FailPointErrorName, req.Active)
+	f.logger.Info("set failpoint location", slog.String("location", string(req.CodeLocationPointName)), slog.String("error", req.FailPointErrorName), slog.Bool("active", req.Active))
 	return nil
 }
 
