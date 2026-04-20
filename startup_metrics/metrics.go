@@ -2,25 +2,21 @@ package startup_metrics
 
 import (
 	"context"
-	"net"
-	"os"
-	"strings"
 	"sync"
 	"time"
-	"unicode"
 
 	"log/slog"
 
-	"github.com/prometheus/client_golang/prometheus"
-
-	sl "github.com/flachnetz/startup/v2/startup_logging"
-
-	"github.com/DataDog/datadog-go/v5/statsd"
-
-	"github.com/flachnetz/go-datadog"
 	"github.com/flachnetz/startup/v2/startup_base"
+	sl "github.com/flachnetz/startup/v2/startup_logging"
 	"github.com/pkg/errors"
-	"github.com/rcrowley/go-metrics"
+	"go.opentelemetry.io/contrib/instrumentation/runtime"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/prometheus"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/resource"
+	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 )
 
 var log = slog.With(slog.String("prefix", "main"))
@@ -28,147 +24,84 @@ var log = slog.With(slog.String("prefix", "main"))
 type MetricsPrefix string
 
 type MetricsOptions struct {
-	Datadog struct {
-		ApiKey        string        `long:"datadog-apikey" description:"Datadog app key to enable datadog metrics reporting."`
-		Tags          string        `long:"datadog-tags" description:"Extra datadog tags to add to every metric. Comma or space separated list of key:value pairs."`
-		Interval      time.Duration `long:"datadog-report-interval" default:"60s" description:"Data collection and reporting interval."`
-		StatsDAddress string        `long:"datadog-statsd-address" description:"Address of statsd,e.g. 127.0.0.1:8125"`
-	}
-
 	PrometheusConfig PrometheusConfig
 
 	Inputs struct {
 		// Prefix to apply to all metrics. This must not be empty.
 		MetricsPrefix string `validate:"required"`
-
-		// Disable capture of runtime metrics for some reason
-		NoRuntimeMetrics bool
 	}
 
 	once sync.Once
+	mp   *sdkmetric.MeterProvider
 }
 
 func (opts *MetricsOptions) Initialize() {
 	opts.once.Do(func() {
-		registry := metrics.DefaultRegistry
-
-		if prefix := strings.TrimSuffix(opts.Inputs.MetricsPrefix, "."); prefix != "" {
-			log.Debug("Prefixing all metrics with prefix", slog.String("prefix", prefix))
-			registry = prefixRegistry(registry, prefix+".")
-			metrics.DefaultRegistry = registry
-
-		} else {
+		prefix := opts.Inputs.MetricsPrefix
+		if prefix == "" {
 			startup_base.Panicf("Metrics prefix must be set")
 			return
 		}
 
-		if !opts.Inputs.NoRuntimeMetrics {
-			captureRuntimeMetrics(registry)
-		}
+		log.Debug("Initializing metrics with OTel", slog.String("prefix", prefix))
 
-		if opts.Datadog.ApiKey != "" {
-			err := opts.setupDatadogMetricsReporter(registry)
-			startup_base.PanicOnError(err, "Cannot start datadog metrics reporter")
-		}
+		res, err := opts.createResource(prefix)
+		startup_base.PanicOnError(err, "Failed to create OTel resource")
 
-		if opts.Datadog.StatsDAddress != "" {
-			tags, err := opts.baseTags()
-			startup_base.PanicOnError(err, "cannot create base datadog tags")
+		promExporter, err := prometheus.New()
+		startup_base.PanicOnError(err, "Failed to create Prometheus exporter")
 
-			udpAddr, err := net.ResolveUDPAddr("udp", opts.Datadog.StatsDAddress)
-			startup_base.PanicOnError(err, "cannot resolve %q", opts.Datadog.StatsDAddress)
+		opts.mp = sdkmetric.NewMeterProvider(
+			sdkmetric.WithResource(res),
+			sdkmetric.WithReader(promExporter),
+		)
 
-			c, err := statsd.New(opts.Datadog.StatsDAddress, statsd.WithTags(tags))
-			startup_base.PanicOnError(err, "cannot create statsd client")
+		otel.SetMeterProvider(opts.mp)
 
-			log.Info("Activating statsd for metrics", slog.String("address", opts.Datadog.StatsDAddress), slog.Any("udpAddr", udpAddr))
-			r, err := datadog.NewReporter(registry, c, opts.Datadog.Interval)
-			startup_base.PanicOnError(err, "cannot start datadog statsd metrics reporter")
-			go r.Flush()
-		}
-
-		if opts.Datadog.ApiKey != "" && opts.Datadog.StatsDAddress != "" {
-			log.Warn("there are two datadog reports active now: statsd address has been configured and api key has been set")
-		}
+		opts.captureRuntimeMetrics()
 
 		if !opts.PrometheusConfig.Disabled {
-			prometheus.MustRegister(&rcrowleyCollector{
-				appName: opts.Inputs.MetricsPrefix,
-			})
-			startPrometheusMetrics(opts.PrometheusConfig)
+			opts.PrometheusConfig.httpServer = startPrometheusMetrics(opts.PrometheusConfig)
 		}
 	})
 }
 
-func (opts *MetricsOptions) setupDatadogMetricsReporter(registry metrics.Registry) error {
-	tags, err := opts.baseTags()
-	if err != nil {
-		return err
+func (opts *MetricsOptions) createResource(serviceName string) (*resource.Resource, error) {
+	if serviceName == "" {
+		return nil, errors.New("service name must be set")
 	}
 
-	log.Info("Starting datadog metrics reporting", slog.String("tags", strings.Join(tags, ", ")))
-	client := datadog.New("", opts.Datadog.ApiKey)
-	reporter := datadog.Reporter(client, registry, tags)
-	go reporter.Start(opts.Datadog.Interval)
+	attributes := []attribute.KeyValue{
+		semconv.ServiceName(serviceName),
+	}
 
-	return nil
+	return resource.New(context.Background(),
+		resource.WithAttributes(attributes...),
+		resource.WithFromEnv(),
+		resource.WithHost(),
+		resource.WithContainer(),
+		resource.WithOS(),
+	)
+}
+
+func (opts *MetricsOptions) captureRuntimeMetrics() {
+	log.Debug("Start capturing of golang runtime metrics")
+	err := runtime.Start(runtime.WithMinimumReadMemStatsInterval(5 * time.Second))
+	startup_base.PanicOnError(err, "Failed to start runtime metrics collection")
 }
 
 func (opts *MetricsOptions) Shutdown() error {
-	// Shutdown Prometheus HTTP server if it exists
 	ctx := context.Background()
+
 	if opts.PrometheusConfig.httpServer != nil {
 		if err := opts.PrometheusConfig.httpServer.Shutdown(ctx); err != nil {
 			sl.LoggerOf(ctx).ErrorContext(ctx, "Failed to shutdown Prometheus HTTP server", sl.Error(err))
 		}
 	}
 
+	if opts.mp != nil {
+		return opts.mp.Shutdown(ctx)
+	}
+
 	return nil
-}
-
-func (opts *MetricsOptions) baseTags() ([]string, error) {
-	node, err := os.Hostname()
-	if err != nil {
-		return nil, errors.WithMessage(err, "get hostname of machine")
-	}
-
-	tags := strings.FieldsFunc(opts.Datadog.Tags, isCommaOrSpace)
-	tags = append(tags, "node:"+node)
-	return tags, nil
-}
-
-func captureRuntimeMetrics(registry metrics.Registry) {
-	log.Debug("Start capturing of golang runtime metrics")
-
-	// start capturing of metrics
-	metrics.RegisterRuntimeMemStats(registry)
-	go metrics.CaptureRuntimeMemStats(registry, 5*time.Second)
-}
-
-func isCommaOrSpace(r rune) bool {
-	return r == ',' || unicode.IsSpace(r)
-}
-
-func prefixRegistry(r metrics.Registry, prefix string) metrics.Registry {
-	// remove the "." at the end
-	prefix = strings.TrimRight(prefix, ".")
-
-	// get a copy of all metrics
-	backup := make(map[string]interface{})
-	r.Each(func(name string, metric interface{}) {
-		backup[name] = metric
-	})
-
-	// We must not unregister everything from this metrics, as this would
-	// stop the Meters from updating.
-	// r.UnregisterAll()
-
-	// insert them all into the prefixed registry
-	prefixed := metrics.NewPrefixedRegistry(prefix + ".")
-	for name, metric := range backup {
-		err := prefixed.Register(name, metric)
-		startup_base.PanicOnError(err, "init prefixed registry")
-	}
-
-	return prefixed
 }

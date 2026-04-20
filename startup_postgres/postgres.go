@@ -10,9 +10,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rcrowley/go-metrics"
-
 	"log/slog"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
 
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/jackc/pgx/v5"
@@ -96,7 +97,7 @@ func (opts *PostgresOptions) Connection() *sqlx.DB {
 			}
 		}
 
-		go observeStats(db)
+		observeStats(db)
 
 		opts.connection = db
 	})
@@ -105,32 +106,38 @@ func (opts *PostgresOptions) Connection() *sqlx.DB {
 }
 
 func observeStats(db *sqlx.DB) {
-	go func() {
-		prevStats := db.Stats()
+	m := otel.Meter("db.pool")
 
-		for {
-			time.Sleep(1 * time.Second)
+	idle, _ := m.Int64ObservableGauge("db.pool.idle")
+	inuse, _ := m.Int64ObservableGauge("db.pool.inuse")
+	open, _ := m.Int64ObservableGauge("db.pool.open")
 
+	waitCount, _ := m.Int64ObservableCounter("db.pool.wait_count")
+	waitDuration, _ := m.Int64ObservableGauge("db.pool.wait_duration_ms")
+
+	closedLifetime, _ := m.Int64ObservableCounter("db.pool.closed.lifetime")
+	closedIdletime, _ := m.Int64ObservableCounter("db.pool.closed.idletime")
+	closedIdle, _ := m.Int64ObservableCounter("db.pool.closed.idle")
+
+	_, _ = m.RegisterCallback(
+		func(_ context.Context, o metric.Observer) error {
 			stats := db.Stats()
 
-			reg := metrics.DefaultRegistry
-			metrics.GetOrRegisterGauge("db.pool.idle", reg).Update(int64(stats.Idle))
-			metrics.GetOrRegisterGauge("db.pool.inuse", reg).Update(int64(stats.InUse))
-			metrics.GetOrRegisterGauge("db.pool.open", reg).Update(int64(stats.OpenConnections))
+			o.ObserveInt64(idle, int64(stats.Idle))
+			o.ObserveInt64(inuse, int64(stats.InUse))
+			o.ObserveInt64(open, int64(stats.OpenConnections))
 
-			metrics.GetOrRegisterGauge("db.pool.gauge.wait-count", reg).Update(stats.WaitCount)
-			metrics.GetOrRegisterGauge("db.pool.gauge.wait-duration", reg).Update(stats.WaitDuration.Milliseconds())
+			o.ObserveInt64(waitCount, stats.WaitCount)
+			o.ObserveInt64(waitDuration, stats.WaitDuration.Milliseconds())
 
-			metrics.GetOrRegisterMeter("db.pool.meter.wait-count", reg).Mark(stats.WaitCount - prevStats.WaitCount)
-			metrics.GetOrRegisterTimer("db.pool.meter.wait-duration", reg).Update(stats.WaitDuration - prevStats.WaitDuration)
+			o.ObserveInt64(closedLifetime, stats.MaxLifetimeClosed)
+			o.ObserveInt64(closedIdletime, stats.MaxIdleTimeClosed)
+			o.ObserveInt64(closedIdle, stats.MaxIdleClosed)
 
-			metrics.GetOrRegisterGauge("db.pool.closed.lifetime", reg).Update(stats.MaxLifetimeClosed)
-			metrics.GetOrRegisterGauge("db.pool.closed.idletime", reg).Update(stats.MaxIdleTimeClosed)
-			metrics.GetOrRegisterGauge("db.pool.closed.idle", reg).Update(stats.MaxIdleClosed)
-
-			prevStats = stats
-		}
-	}()
+			return nil
+		},
+		idle, inuse, open, waitCount, waitDuration, closedLifetime, closedIdletime, closedIdle,
+	)
 }
 
 func (opts *PostgresOptions) StartVacuumTask(db *sqlx.DB, table string, interval time.Duration, clock clock.Clock) io.Closer {
