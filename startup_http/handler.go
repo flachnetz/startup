@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"strconv"
 
-	. "github.com/flachnetz/startup/v2/startup_logrus"
+	sl "github.com/flachnetz/startup/v2/startup_logging"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/pkg/errors"
@@ -44,7 +44,7 @@ func WriteJSON(ctx context.Context, w http.ResponseWriter, status int, value int
 
 	err := json.MarshalWrite(w, value, json.FormatNilSliceAsNull(false), json.FormatNilMapAsNull(false))
 	if err != nil {
-		LoggerOf(ctx).Warnf("Failed to write json response: %s", err)
+		sl.LoggerOf(ctx).WarnContext(ctx, "Failed to write json response", sl.Error(err))
 	}
 }
 
@@ -53,7 +53,7 @@ func WriteJSON(ctx context.Context, w http.ResponseWriter, status int, value int
 //
 // You can set this variable to do your own custom error mapping.
 var WriteError = func(ctx context.Context, writer http.ResponseWriter, statusCode int, err error) {
-	LoggerOf(ctx).Warnf("Writing response error: %s", err)
+	sl.LoggerOf(ctx).WarnContext(ctx, "Writing response error", sl.Error(err))
 
 	if statusCode == 0 {
 		statusCode = MapErrorToStatusCode(err)
@@ -103,7 +103,7 @@ func WriteBody(ctx context.Context, writer http.ResponseWriter, statusCode int, 
 	_, err := writer.Write(content)
 	if err != nil {
 		// We failed to write our response. The client probably disconnected
-		LoggerOf(ctx).Warnf("Failed to write response body: %s", err)
+		sl.LoggerOf(ctx).WarnContext(ctx, "Failed to write response body", sl.Error(err))
 	}
 }
 

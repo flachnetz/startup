@@ -1,9 +1,8 @@
 package startup_schema
 
 import (
+	"log/slog"
 	"sync"
-
-	logrus "github.com/sirupsen/logrus"
 
 	confluent "github.com/Landoop/schema-registry"
 	"github.com/flachnetz/startup/v2"
@@ -12,7 +11,7 @@ import (
 	"github.com/flachnetz/startup/v2/startup_consul"
 )
 
-var log = logrus.WithField("prefix", "schema-registry")
+var log = slog.With(slog.String("prefix", "schema-registry"))
 
 // Deprecated:
 // Stop using this and use the more recent startup_event thingy.
@@ -29,7 +28,7 @@ func (opts *SchemaRegistryOptions) SchemaRegistry() schema.Registry {
 
 func (opts *SchemaRegistryOptions) Initialize(consul *startup_consul.ConsulOptions) {
 	opts.registryOnce.Do(func() {
-		log.Infof("Using schema registry backend: %s", opts.SchemaBackend)
+		log.Info("Using schema registry backend", slog.String("backend", opts.SchemaBackend))
 
 		switch opts.SchemaBackend {
 		case "noop":

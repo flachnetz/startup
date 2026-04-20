@@ -22,7 +22,6 @@ import (
 	"github.com/goji/httpauth"
 	"github.com/gorilla/handlers"
 	"github.com/julienschmidt/httprouter"
-	log "github.com/sirupsen/logrus"
 )
 
 type Config struct {
@@ -171,11 +170,13 @@ func (opts HTTPOptions) Serve(config Config) {
 
 	var err error
 	if opts.TLSCertFile == "" && opts.TLSKeyFile == "" {
-		log.Infof("Start http server on %s", server.Addr)
+		slog.Info("Start http server", slog.String("address", server.Addr))
 		err = server.ListenAndServe()
 	} else {
-		log.Infof("Start https server on %s with certificate %s and key %s",
-			opts.Address, opts.TLSCertFile, opts.TLSKeyFile)
+		slog.Info("Start https server",
+			slog.String("address", opts.Address),
+			slog.String("cert", opts.TLSCertFile),
+			slog.String("key", opts.TLSKeyFile))
 
 		err = server.ListenAndServeTLS(opts.TLSCertFile, opts.TLSKeyFile)
 	}
@@ -189,7 +190,7 @@ func (opts HTTPOptions) Serve(config Config) {
 		return
 	}
 
-	log.Info("Server shutdown completed.")
+	slog.Info("Server shutdown completed.")
 }
 
 func WithPrometheusMetrics(s string) admin.RouteConfig {
@@ -218,11 +219,11 @@ func RegisterSignalHandlerForServer(server *http.Server) <-chan struct{} {
 		// wait for signal
 		<-signalCh
 
-		log.WithField("prefix", "httpd").Info("Signal received, shutting down")
+		slog.Info("Signal received, shutting down", slog.String("prefix", "httpd"))
 
 		err := server.Shutdown(context.Background())
 		if err != nil {
-			log.WithField("prefix", "httpd").Warnf("Server shutdown")
+			slog.Warn("Server shutdown", slog.String("prefix", "httpd"))
 		}
 
 		close(waitCh)
@@ -234,7 +235,7 @@ func RegisterSignalHandlerForServer(server *http.Server) <-chan struct{} {
 func tryRegisterAdminHandlerRedirect(router *httprouter.Router) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Debugf("Admin handler redirect from / to /admin not possible")
+			slog.Debug("Admin handler redirect from / to /admin not possible")
 		}
 	}()
 
