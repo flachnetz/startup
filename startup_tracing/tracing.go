@@ -1,11 +1,10 @@
 package startup_tracing
 
 import (
-	log2 "log"
+	stdlog "log"
+	"log/slog"
 	"strings"
 	"sync"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/opentracing/opentracing-go"
@@ -14,7 +13,7 @@ import (
 	zipkinhttp "github.com/openzipkin/zipkin-go/reporter/http"
 )
 
-var log = logrus.WithField("prefix", "zipkin")
+var log = slog.With(slog.String("prefix", "zipkin"))
 
 type TracingOptions struct {
 	Zipkin string `long:"zipkin" validate:"omitempty,url" description:"Zipkin server base url, an URL like http://host:9411/"`
@@ -37,13 +36,13 @@ func (opts *TracingOptions) Initialize() {
 	}
 
 	opts.once.Do(func() {
-		log.Infof("Sending zipkin traces to %s", opts.Zipkin)
+		log.Info("Sending zipkin traces", slog.String("zipkin", opts.Zipkin))
 
 		if strings.Contains(opts.Zipkin, "/v1/spans") {
-			log.Warnf("Using zipkin v2 span reporting but a v1 span url was given.")
+			log.Warn("Using zipkin v2 span reporting but a v1 span url was given.")
 		}
 
-		logAdapter := log2.New(log.WriterLevel(logrus.InfoLevel), "", 0)
+		logAdapter := stdlog.New(slogWriter{log}, "", 0)
 
 		url := strings.ReplaceAll(opts.Zipkin, "/v1/spans", "/v2/spans")
 		reporter := zipkinhttp.NewReporter(url,
@@ -66,4 +65,13 @@ func (opts *TracingOptions) Initialize() {
 		// explicitly set our tracer to be the default tracer.
 		opentracing.InitGlobalTracer(tracer)
 	})
+}
+
+type slogWriter struct {
+	logger *slog.Logger
+}
+
+func (w slogWriter) Write(p []byte) (int, error) {
+	w.logger.Info(strings.TrimRight(string(p), "\n"))
+	return len(p), nil
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
@@ -17,7 +18,7 @@ import (
 	"github.com/flachnetz/startup/v2/lib"
 
 	"github.com/flachnetz/startup/v2/startup_http"
-	. "github.com/flachnetz/startup/v2/startup_logrus"
+	sl "github.com/flachnetz/startup/v2/startup_logging"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 )
@@ -59,8 +60,7 @@ func Tracing(service string, op string) startup_http.HttpMiddleware {
 
 			if err != nil && errors.Is(err, opentracing.ErrSpanContextNotFound) {
 				// ignore errors but show a small warning.
-				log := LoggerOf(ctx)
-				log.Warnf("Could not extract tracer from http headers: %s", err)
+				sl.LoggerOf(ctx).WarnContext(ctx, "Could not extract tracer from http headers", sl.Error(err))
 			}
 
 			// start a new server side trace
@@ -333,7 +333,7 @@ type autoCloseSpan struct {
 
 func finalizeAutoCloseSpan(span *autoCloseSpan) {
 	if span.closed.CompareAndSwap(false, true) {
-		log.Warnf("unclosed http.Client span detected for %q", span.key)
+		slog.Warn("unclosed http.Client span detected", slog.String("key", span.key))
 		span.Span.SetTag("error", true)
 		span.Span.SetTag("error_message", "reader was not closed")
 		span.Span.Finish()

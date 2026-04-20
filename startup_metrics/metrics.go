@@ -76,7 +76,7 @@ func (opts *MetricsOptions) Initialize() {
 			startup_base.PanicOnError(err, "cannot create base datadog tags")
 
 			udpAddr, err := net.ResolveUDPAddr("udp", opts.Datadog.StatsDAddress)
-			startup_base.PanicOnError(err, "cannot resolve "+opts.Datadog.StatsDAddress)
+			startup_base.PanicOnError(err, "cannot resolve %q", opts.Datadog.StatsDAddress)
 
 			c, err := statsd.New(opts.Datadog.StatsDAddress, statsd.WithTags(tags))
 			startup_base.PanicOnError(err, "cannot create statsd client")
