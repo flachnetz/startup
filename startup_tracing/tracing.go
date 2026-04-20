@@ -1,22 +1,23 @@
 package startup_tracing
 
 import (
-	stdlog "log"
+	"context"
 	"log/slog"
-	"strings"
 	"sync"
 
 	"github.com/flachnetz/startup/v2/startup_base"
-	"github.com/opentracing/opentracing-go"
-	zipkinot "github.com/openzipkin-contrib/zipkin-go-opentracing"
-	"github.com/openzipkin/zipkin-go"
-	zipkinhttp "github.com/openzipkin/zipkin-go/reporter/http"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
-var log = slog.With(slog.String("prefix", "zipkin"))
+var log = slog.With(slog.String("prefix", "tracing"))
 
 type TracingOptions struct {
-	Zipkin string `long:"zipkin" validate:"omitempty,url" description:"Zipkin server base url, an URL like http://host:9411/"`
+	HttpEndpoint string `long:"otlp-trace-endpoint-http" validate:"omitempty" description:"OTLP HTTP endpoint for traces, e.g. localhost:4318"`
 
 	Inputs struct {
 		// The service name of your application
@@ -27,7 +28,7 @@ type TracingOptions struct {
 }
 
 func (opts *TracingOptions) IsActive() bool {
-	return opts.Zipkin != ""
+	return opts.HttpEndpoint != ""
 }
 
 func (opts *TracingOptions) Initialize() {
@@ -36,34 +37,36 @@ func (opts *TracingOptions) Initialize() {
 	}
 
 	opts.once.Do(func() {
-		log.Info("Sending zipkin traces", slog.String("zipkin", opts.Zipkin))
+		ctx := context.Background()
 
-		if strings.Contains(opts.Zipkin, "/v1/spans") {
-			log.Warn("Using zipkin v2 span reporting but a v1 span url was given.")
+		res, err := resource.New(ctx,
+			resource.WithAttributes(
+				semconv.ServiceName(opts.Inputs.ServiceName),
+			),
+		)
+		startup_base.PanicOnError(err, "Unable to create otel resource")
+
+		var exporter sdktrace.SpanExporter
+
+		if opts.HttpEndpoint != "" {
+			log.Info("Sending traces via OTLP HTTP", slog.String("endpoint", opts.HttpEndpoint))
+			exporter, err = otlptracehttp.New(ctx,
+				otlptracehttp.WithEndpoint(opts.HttpEndpoint),
+				otlptracehttp.WithInsecure(),
+			)
+			startup_base.PanicOnError(err, "Unable to create OTLP HTTP trace exporter")
 		}
 
-		logAdapter := stdlog.New(slogWriter{log}, "", 0)
-
-		url := strings.ReplaceAll(opts.Zipkin, "/v1/spans", "/v2/spans")
-		reporter := zipkinhttp.NewReporter(url,
-			zipkinhttp.Logger(logAdapter),
-			zipkinhttp.Serializer(spanSerializer{}),
+		tp := sdktrace.NewTracerProvider(
+			sdktrace.WithBatcher(exporter),
+			sdktrace.WithResource(res),
 		)
 
-		endpoint, err := zipkin.NewEndpoint(opts.Inputs.ServiceName, "")
-		startup_base.PanicOnError(err, "Unable to create zipkin endpoint")
-
-		nativeTracer, err := zipkin.NewTracer(reporter,
-			zipkin.WithLocalEndpoint(endpoint),
-			zipkin.WithSharedSpans(false),
-			zipkin.WithTraceID128Bit(true))
-
-		startup_base.PanicOnError(err, "Unable to create zipkin tracer")
-
-		tracer := zipkinot.Wrap(nativeTracer)
-
-		// explicitly set our tracer to be the default tracer.
-		opentracing.InitGlobalTracer(tracer)
+		otel.SetTracerProvider(tp)
+		otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+			propagation.TraceContext{},
+			propagation.Baggage{},
+		))
 	})
 }
 
@@ -72,6 +75,6 @@ type slogWriter struct {
 }
 
 func (w slogWriter) Write(p []byte) (int, error) {
-	w.logger.Info(strings.TrimRight(string(p), "\n"))
+	w.logger.Info(string(p))
 	return len(p), nil
 }
