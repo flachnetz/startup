@@ -12,7 +12,7 @@ import (
 
 	"github.com/rcrowley/go-metrics"
 
-	"github.com/sirupsen/logrus"
+	"log/slog"
 
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/jackc/pgx/v5"
@@ -48,15 +48,17 @@ func (opts *PostgresOptions) Connection() *sqlx.DB {
 		ctx, cancelTimeout := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancelTimeout()
 
-		logger := logrus.WithField("prefix", "postgres")
+		logger := slog.With(slog.String("prefix", "postgres"))
 
 		conf, err := pgx.ParseConfig(opts.URL)
 		startup_base.PanicOnError(err, "Failed to parse database connection")
 
 		if err == nil {
-			logger.Infof(
-				"Connecting to postgres database at %s@%s:%d/%s",
-				conf.User, conf.Host, conf.Port, conf.Database,
+			logger.Info("Connecting to postgres database",
+				slog.String("user", conf.User),
+				slog.String("host", conf.Host),
+				slog.Int("port", int(conf.Port)),
+				slog.String("database", conf.Database),
 			)
 		}
 
@@ -79,13 +81,13 @@ func (opts *PostgresOptions) Connection() *sqlx.DB {
 
 		// create schema if needed
 		if schema := conf.RuntimeParams["search_path"]; schema != "" {
-			logger.Infof("Ensure default schema %q exists", schema)
+			logger.Info("Ensure default schema exists", slog.String("schema", schema))
 			_, err := db.Exec(`CREATE SCHEMA IF NOT EXISTS ` + quoteIdentifier(schema))
 			startup_base.PanicOnError(err, "Failed to create schema %q in database", schema)
 		}
 
 		if opts.Inputs.Initializer != nil {
-			logger.Infof("Running database initializer")
+			logger.Info("Running database initializer")
 
 			if err := opts.Inputs.Initializer(db); err != nil {
 				// close database on error
@@ -139,7 +141,7 @@ func (opts *PostgresOptions) StartVacuumTask(db *sqlx.DB, table string, interval
 	closeCh := make(chan bool)
 
 	go func() {
-		l := logrus.WithField("prefix", "vacuum")
+		l := slog.With(slog.String("prefix", "vacuum"))
 
 		for {
 			select {
@@ -147,10 +149,10 @@ func (opts *PostgresOptions) StartVacuumTask(db *sqlx.DB, table string, interval
 				return
 
 			case <-clock.After(interval):
-				l.Infof("Running periodic vacuum on table %s now", table)
+				l.Info("Running periodic vacuum on table now", slog.String("table", table))
 
 				if _, err := db.Exec(fmt.Sprintf(`VACUUM "%s"`, table)); err != nil {
-					l.Warnf("Maintenance task failed: %s", err)
+					l.Warn("Maintenance task failed", slog.String("error", err.Error()))
 				}
 			}
 		}
