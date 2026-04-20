@@ -35,14 +35,14 @@ func (eh *ErrorHandler[E]) toApiError(err error) ApiError {
 	if eh.ToApiError != nil {
 		return eh.ToApiError(err)
 	}
-	return api.ErrUnknown.WithDescription(err.Error())
+	return api.ErrUnknown.WithDescription("%s", err.Error())
 }
 
 func (eh *ErrorHandler[E]) timeoutError(msg string) ApiError {
 	if eh.TimeoutError != nil {
 		return eh.TimeoutError(msg)
 	}
-	return api.ErrTimeout.WithDescription(msg)
+	return api.ErrTimeout.WithDescription("%s", msg)
 }
 
 //lint:ignore U1000
