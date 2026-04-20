@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/flachnetz/startup/v2/lib"
@@ -34,7 +35,7 @@ func WriteToOutbox(ctx context.Context, tx sqlx.ExecerContext, metadata EventMet
 				INSERT INTO public.kafka_outbox (kafka_topic, kafka_key, kafka_value, kafka_header_keys, kafka_header_values)
 				VALUES ($1, $2, $3, $4, $5)
 				RETURNING id)
-		
+
 		SELECT pg_notify('kafka-message', id::text)
 		FROM ids;
 	`
@@ -53,7 +54,7 @@ func CreateOutbox(ctx context.Context, db *sql.DB) error {
 			id                  bigserial NOT NULL PRIMARY KEY,
 			create_time         timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP ,
 			leader_id           UUID NULL DEFAULT NULL,
-			
+
 			kafka_topic         text NOT NULL,
 			kafka_key           text NOT NULL,
 			kafka_value         BYTEA NOT NULL,
@@ -64,7 +65,7 @@ func CreateOutbox(ctx context.Context, db *sql.DB) error {
 
 	if _, err := tx.ExecContext(ctx, createTable); err != nil {
 		if err := tx.Rollback(); err != nil {
-			log.Warnf("Failed to rollback create outbox table transaction: %s", err)
+			log.Warn("Failed to rollback create outbox table transaction", slog.String("error", err.Error()))
 		}
 
 		return errors.WithMessage(err, "create table")

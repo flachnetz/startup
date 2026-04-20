@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"reflect"
 	"strings"
 	"sync"
@@ -78,7 +79,7 @@ func (ev *eventSender) SendAsync(ctx context.Context, event Event) {
 	select {
 	case ev.AsyncBufferCh <- event:
 	default:
-		log.Warnf("Async event queue is full, discarding event %s", eventToString(event))
+		log.Warn("Async event queue is full, discarding event", slog.String("event", eventToString(event)))
 	}
 }
 
@@ -110,7 +111,7 @@ func (ev *eventSender) launchAsyncTasks() {
 		defer func() {
 			if ev.KafkaSender != nil {
 				if count := ev.KafkaSender.Flush(5_000); count > 0 {
-					log.Warnf("Flush says there are still %d queued messages to be send.", count)
+					log.Warn("Flush says there are still queued messages to be send.", slog.Int("count", count))
 				}
 			}
 		}()
@@ -126,7 +127,7 @@ func (ev *eventSender) launchAsyncTasks() {
 				switch ev := e.(type) {
 				case *kafka.Message:
 					if ev.TopicPartition.Error != nil {
-						log.Warnf("Delivery to '%v' failed: %s", ev.TopicPartition, ev.TopicPartition.Error)
+						log.Warn("Delivery failed", slog.Any("topicPartition", ev.TopicPartition), slog.String("error", ev.TopicPartition.Error.Error()))
 					}
 				}
 			}
@@ -137,11 +138,11 @@ func (ev *eventSender) launchAsyncTasks() {
 func (ev *eventSender) doSendAsync(event Event) {
 	// ignore error as we're in the process of sending an async
 	if err := ev.writeToFile(event); err != nil {
-		log.Warnf("Failed to write async event to file: %s", err)
+		log.Warn("Failed to write async event to file", slog.String("error", err.Error()))
 	}
 
 	if err := ev.sendToKafka(event); err != nil {
-		log.Warnf("Failed to send async event to kafka: %s", err)
+		log.Warn("Failed to send async event to kafka", slog.String("error", err.Error()))
 	}
 }
 
