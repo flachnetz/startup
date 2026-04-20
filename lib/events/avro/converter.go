@@ -38,11 +38,6 @@ func (c *Converter) Parse(data []byte) (map[string]interface{}, *EventSource, er
 		return nil, nil, errors.New("events in avro container format not supported")
 	}
 
-	if len(data) > 32 && c.hexadecimalCharsOnly(data[0:32]) {
-		// consul hash format: looks like we need to got the hash of the schema.
-		return c.decode(string(data[:32]), data[32:])
-	}
-
 	if len(data) >= 5 && data[0] == 0 {
 		// confluent format: convert 4 byte integer to schema key string
 		schemaId := binary.BigEndian.Uint32(data[1:5])
