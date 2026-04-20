@@ -32,30 +32,3 @@ func (opts *PostgresTracingOptions) Initialize(tops *startup_tracing.TracingOpti
 		}
 	})
 }
-
-//func (opts *PostgresTracingOptions) installTransactionTracingHook(serviceName string) {
-//	withTransactionContext := pt.WithTransactionContext
-//
-//	skipFunction := opts.Inputs.SkipFrameworkMethod
-//	if skipFunction == nil {
-//		skipFunction = func(name string) bool {
-//			return false
-//		}
-//	}
-//
-//	pt.WithTransactionContext = func(ctx context.Context, db pt.TxStarter, operation pt.TransactionCommitFn) (err error) {
-//		tag := findOutsideCaller(skipFunction)
-//
-//		if tag == "" {
-//			tag = "transaction"
-//		}
-//
-//		_, err = startup_tracing.Trace(ctx, tag, func(ctx context.Context, span opentracing.Span) (any, error) {
-//			span.SetTag("dd.service", serviceName)
-//			span.SetTag("dd.resource", "tx:"+tag)
-//			return nil, withTransactionContext(ctx, db, operation)
-//		})
-//
-//		return err
-//	}
-//}
