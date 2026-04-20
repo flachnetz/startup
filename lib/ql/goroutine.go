@@ -9,7 +9,9 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/flachnetz/startup/v2/startup_logrus"
+	"log/slog"
+
+	sl "github.com/flachnetz/startup/v2/startup_logging"
 )
 
 var goroutineIdCache sync.Map
@@ -23,7 +25,7 @@ func reentrantWarn(ctx context.Context) func() {
 		n := runtime.Stack(buf, false)
 
 		trace := string(buf[:n])
-		startup_logrus.LoggerOf(ctx).Warnf("Transaction in goroutine %d already exists:\n%s", gid, trace)
+		sl.LoggerOf(ctx).WarnContext(ctx, "Transaction in goroutine already exists", slog.Uint64("goroutineId", gid), slog.String("trace", trace))
 	}
 
 	return func() {

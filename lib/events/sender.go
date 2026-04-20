@@ -5,7 +5,7 @@ import (
 	"io"
 	"time"
 
-	logrus "github.com/sirupsen/logrus"
+	"log/slog"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -18,7 +18,7 @@ func FromEventTimestamp(timestamp int64) time.Time {
 	return time.Unix(0, timestamp*int64(time.Millisecond))
 }
 
-var log = logrus.WithField("prefix", "events")
+var log = slog.With(slog.String("prefix", "events"))
 
 type Event interface {
 	// Schema returns the avro schema of this event

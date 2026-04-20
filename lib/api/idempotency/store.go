@@ -7,8 +7,11 @@ import (
 	"io"
 	"time"
 
+	"log/slog"
+
 	"github.com/flachnetz/startup/v2/lib/ql"
-	"github.com/flachnetz/startup/v2/startup_logrus"
+
+	sl "github.com/flachnetz/startup/v2/startup_logging"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/robfig/cron/v3"
@@ -35,10 +38,10 @@ type IdempotencyStore interface {
 const schema = `
 CREATE TABLE IF NOT EXISTS idempotency_requests (
     idempotency_key TEXT PRIMARY KEY,
-    
+
     -- The status of the request processing
     status TEXT NOT NULL CHECK (status IN ('pending', 'completed', 'error')),
-    
+
     -- The response data to be returned on subsequent requests
     response_code INT,
     response_headers BYTEA,
@@ -80,7 +83,7 @@ func NewIdempotencyStore(db *sqlx.DB, cleanUpThresholdInDays int) (IdempotencySt
 		ctx := context.Background()
 		err := i.Cleanup(ctx)
 		if err != nil {
-			startup_logrus.LoggerOf(ctx).WithError(err).Error("Failed to clean up old idempotency records")
+			sl.LoggerOf(ctx).Error("Failed to clean up old idempotency records", sl.Error(err))
 		}
 	})
 	if err != nil {
@@ -107,8 +110,8 @@ func (s *idempotencyStore) DB() *sqlx.DB {
 func (s *idempotencyStore) Get(ctx context.Context, key string) (*IdempotencyRequest, error) {
 	req, err := ql.InExistingTransactionWithResult(ctx, func(ctx ql.TxContext) (*IdempotencyRequest, error) {
 		req, err := ql.Get[IdempotencyRequest](ctx, `
-			SELECT * 
-			FROM idempotency_requests 
+			SELECT *
+			FROM idempotency_requests
 			WHERE idempotency_key = $1 FOR UPDATE`, key)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -128,7 +131,7 @@ func (s *idempotencyStore) Get(ctx context.Context, key string) (*IdempotencyReq
 // is error.
 func (s *idempotencyStore) Create(ctx context.Context, key string) error {
 	return ql.InExistingTransaction(ctx, func(ctx ql.TxContext) error {
-		return ql.Exec(ctx, `		
+		return ql.Exec(ctx, `
 		INSERT INTO idempotency_requests (idempotency_key, status)
 		VALUES ($1, 'pending')
 		ON CONFLICT (idempotency_key) DO UPDATE SET status = 'pending', updated_at = NOW()
@@ -139,8 +142,8 @@ func (s *idempotencyStore) Create(ctx context.Context, key string) error {
 // Error updates the status of an idempotency request to 'error'.
 func (s *idempotencyStore) Error(ctx context.Context, key string, code int, headers, body []byte) error {
 	return ql.InExistingTransaction(ctx, func(ctx ql.TxContext) error {
-		return ql.Exec(ctx, `	
-		UPDATE idempotency_requests 
+		return ql.Exec(ctx, `
+		UPDATE idempotency_requests
 		SET status = 'error', response_code = $2, response_headers = $3, response_body = $4, updated_at = NOW()
 		WHERE idempotency_key = $1
     `, key, code, headers, body)
@@ -151,8 +154,8 @@ func (s *idempotencyStore) Error(ctx context.Context, key string, code int, head
 // This should be called within the transaction started by `Get`.
 func (s *idempotencyStore) Update(ctx context.Context, key string, code int, headers, body []byte) error {
 	return ql.InExistingTransaction(ctx, func(ctx ql.TxContext) error {
-		return ql.Exec(ctx, `	
-		UPDATE idempotency_requests 
+		return ql.Exec(ctx, `
+		UPDATE idempotency_requests
 		SET status = 'completed', response_code = $2, response_headers = $3, response_body = $4, updated_at = NOW()
 		WHERE idempotency_key = $1
     `, key, code, headers, body)
@@ -161,11 +164,11 @@ func (s *idempotencyStore) Update(ctx context.Context, key string, code int, hea
 
 // Cleanup removes old, completed idempotency records from the store.
 func (s *idempotencyStore) Cleanup(ctx context.Context) error {
-	startup_logrus.LoggerOf(ctx).Infof("Cleaning up old idempotency records older than %d days", s.cleanUpThresholdInDays)
+	sl.LoggerOf(ctx).InfoContext(ctx, "Cleaning up old idempotency records", slog.Int("thresholdDays", s.cleanUpThresholdInDays))
 	threshold := time.Now().Add(-24 * time.Hour * time.Duration(s.cleanUpThresholdInDays))
 	return ql.InAnyTransaction(ctx, s.db, func(ctx ql.TxContext) error {
 		return ql.Exec(ctx, `
-		DELETE FROM idempotency_requests 
+		DELETE FROM idempotency_requests
 		WHERE status = 'completed' AND updated_at < $1
 	`, threshold)
 	})

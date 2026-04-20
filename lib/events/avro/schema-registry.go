@@ -1,11 +1,10 @@
 package avro
 
 import (
+	"log/slog"
 	"regexp"
 	"strconv"
 	"sync"
-
-	logrus "github.com/sirupsen/logrus"
 
 	schemaregistry "github.com/Landoop/schema-registry"
 	"github.com/linkedin/goavro/v2"
@@ -26,7 +25,7 @@ func (r *SchemaRegistry) Get(key string) (*goavro.Codec, error) {
 		return codec.(*goavro.Codec), nil
 	}
 
-	logrus.WithField("prefix", "schema").Infof("Lookup schema for key='%s'", key)
+	slog.Info("Lookup schema", slog.String("prefix", "schema"), slog.String("key", key))
 
 	var avroSchema string
 

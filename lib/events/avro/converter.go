@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pkg/errors"
+	"log/slog"
 
-	"github.com/sirupsen/logrus"
+	"github.com/pkg/errors"
 )
 
 type EventSource struct {
@@ -18,7 +18,7 @@ type EventSource struct {
 }
 
 type Converter struct {
-	log      *logrus.Entry
+	log      *slog.Logger
 	registry *SchemaRegistry
 	options  ConverterOptions
 }
@@ -29,7 +29,7 @@ type ConverterOptions struct {
 }
 
 func NewConverter(registry *SchemaRegistry, options ConverterOptions) *Converter {
-	return &Converter{log: logrus.WithField("prefix", "avro-converter"), registry: registry, options: options}
+	return &Converter{log: slog.With(slog.String("prefix", "avro-converter")), registry: registry, options: options}
 }
 
 func (c *Converter) Parse(data []byte) (map[string]interface{}, *EventSource, error) {

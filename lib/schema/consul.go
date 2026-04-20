@@ -1,20 +1,21 @@
 package schema
 
 import (
+	"log/slog"
+
 	consul "github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
-	logrus "github.com/sirupsen/logrus"
 )
 
 type consulSchemaRegistry struct {
 	consul *consul.Client
-	log    *logrus.Entry
+	log    *slog.Logger
 }
 
 func NewConsulSchemaRegistry(client *consul.Client) Registry {
 	return &consulSchemaRegistry{
 		consul: client,
-		log:    logrus.WithField("prefix", "schema-registry"),
+		log:    slog.With(slog.String("prefix", "schema-registry")),
 	}
 }
 
@@ -42,7 +43,7 @@ func (r *consulSchemaRegistry) Set(schemaString string) (string, error) {
 	}
 
 	if kv == nil {
-		r.log.Debugf("Writing schema '%s' to consul", hash)
+		r.log.Debug("Writing schema to consul", slog.String("hash", hash))
 
 		// the kv entry does not exist, create it now.
 		kv = &consul.KVPair{Key: key, Value: []byte(schemaString)}

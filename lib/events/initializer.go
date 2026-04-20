@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"log/slog"
 	"reflect"
 
 	confluent "github.com/Landoop/schema-registry"
@@ -55,7 +56,7 @@ func (esi *eventSenderInitializer) Initialize() (EventSender, error) {
 	// and remove it from this initializer
 	esi.eventSender = nil
 
-	log.Infof("Event sender initialized")
+	log.Info("Event sender initialized")
 
 	return eventSender, nil
 }
@@ -70,7 +71,7 @@ func (esi *eventSenderInitializer) registerSchemaCache() (map[reflect.Type]uint3
 		return nil, nil
 	}
 
-	log.Infof("Registering event schemas in confluent registry")
+	log.Info("Registering event schemas in confluent registry")
 
 	schemaIdCache := map[reflect.Type]uint32{}
 
@@ -129,20 +130,20 @@ func (esi *eventSenderInitializer) createKafkaTopics() error {
 		topicSeen[topic.Name] = true
 	}
 
-	log.Infof("Creating %d kafka topics", len(topics))
+	log.Info("Creating kafka topics", slog.Int("count", len(topics)))
 	results, err := adminClient.CreateTopics(context.Background(), topicSpecifications)
 
 	// check results first
 	for _, result := range results {
 		switch result.Error.Code() {
 		case rdkafka.ErrNoError:
-			log.Infof("Kafka topic '%s' create", result.Topic)
+			log.Info("Kafka topic created", slog.String("topic", result.Topic))
 
 		case rdkafka.ErrTopicAlreadyExists:
-			log.Infof("Kafka topic '%s' already exists", result.Topic)
+			log.Info("Kafka topic already exists", slog.String("topic", result.Topic))
 
 		default:
-			log.Warnf("Failed to create topic '%s': %s", result.Topic, result.Error)
+			log.Warn("Failed to create topic", slog.String("topic", result.Topic), slog.String("error", result.Error.String()))
 
 			if err == nil {
 				err = errors.New("one or more topics could not be created")
