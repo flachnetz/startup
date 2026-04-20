@@ -9,12 +9,9 @@ import (
 	schemaregistry "github.com/Landoop/schema-registry"
 	"github.com/linkedin/goavro/v2"
 	"github.com/pkg/errors"
-
-	"github.com/flachnetz/startup/v2/lib/schema"
 )
 
 type SchemaRegistry struct {
-	Consul          schema.Registry
 	ConfluentClient *schemaregistry.Client
 
 	cache sync.Map
@@ -29,16 +26,7 @@ func (r *SchemaRegistry) Get(key string) (*goavro.Codec, error) {
 
 	var avroSchema string
 
-	// try consul if key length is okay
-	if r.Consul != nil && len(key) == 32 {
-		var err error
-
-		avroSchema, err = r.Consul.Get(key)
-		if err != nil {
-			return nil, errors.WithMessage(err, "lookup in consul")
-		}
-
-	} else if r.ConfluentClient != nil && regexp.MustCompile(`^[0-9]+`).MatchString(key) {
+	if regexp.MustCompile(`^[0-9]+`).MatchString(key) {
 		// try confluent registry next
 		schemaId, err := strconv.Atoi(key)
 		if err != nil {
