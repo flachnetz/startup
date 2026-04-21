@@ -10,9 +10,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rcrowley/go-metrics"
+	"log/slog"
 
-	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
 
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/jackc/pgx/v5"
@@ -48,15 +49,17 @@ func (opts *PostgresOptions) Connection() *sqlx.DB {
 		ctx, cancelTimeout := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancelTimeout()
 
-		logger := logrus.WithField("prefix", "postgres")
+		logger := slog.With(slog.String("prefix", "postgres"))
 
 		conf, err := pgx.ParseConfig(opts.URL)
 		startup_base.PanicOnError(err, "Failed to parse database connection")
 
 		if err == nil {
-			logger.Infof(
-				"Connecting to postgres database at %s@%s:%d/%s",
-				conf.User, conf.Host, conf.Port, conf.Database,
+			logger.Info("Connecting to postgres database",
+				slog.String("user", conf.User),
+				slog.String("host", conf.Host),
+				slog.Int("port", int(conf.Port)),
+				slog.String("database", conf.Database),
 			)
 		}
 
@@ -79,13 +82,13 @@ func (opts *PostgresOptions) Connection() *sqlx.DB {
 
 		// create schema if needed
 		if schema := conf.RuntimeParams["search_path"]; schema != "" {
-			logger.Infof("Ensure default schema %q exists", schema)
+			logger.Info("Ensure default schema exists", slog.String("schema", schema))
 			_, err := db.Exec(`CREATE SCHEMA IF NOT EXISTS ` + quoteIdentifier(schema))
 			startup_base.PanicOnError(err, "Failed to create schema %q in database", schema)
 		}
 
 		if opts.Inputs.Initializer != nil {
-			logger.Infof("Running database initializer")
+			logger.Info("Running database initializer")
 
 			if err := opts.Inputs.Initializer(db); err != nil {
 				// close database on error
@@ -94,7 +97,7 @@ func (opts *PostgresOptions) Connection() *sqlx.DB {
 			}
 		}
 
-		go observeStats(db)
+		observeStats(db)
 
 		opts.connection = db
 	})
@@ -103,32 +106,38 @@ func (opts *PostgresOptions) Connection() *sqlx.DB {
 }
 
 func observeStats(db *sqlx.DB) {
-	go func() {
-		prevStats := db.Stats()
+	m := otel.Meter("db.pool")
 
-		for {
-			time.Sleep(1 * time.Second)
+	idle, _ := m.Int64ObservableGauge("db.pool.idle")
+	inuse, _ := m.Int64ObservableGauge("db.pool.inuse")
+	open, _ := m.Int64ObservableGauge("db.pool.open")
 
+	waitCount, _ := m.Int64ObservableCounter("db.pool.wait_count")
+	waitDuration, _ := m.Int64ObservableGauge("db.pool.wait_duration_ms")
+
+	closedLifetime, _ := m.Int64ObservableCounter("db.pool.closed.lifetime")
+	closedIdletime, _ := m.Int64ObservableCounter("db.pool.closed.idletime")
+	closedIdle, _ := m.Int64ObservableCounter("db.pool.closed.idle")
+
+	_, _ = m.RegisterCallback(
+		func(_ context.Context, o metric.Observer) error {
 			stats := db.Stats()
 
-			reg := metrics.DefaultRegistry
-			metrics.GetOrRegisterGauge("db.pool.idle", reg).Update(int64(stats.Idle))
-			metrics.GetOrRegisterGauge("db.pool.inuse", reg).Update(int64(stats.InUse))
-			metrics.GetOrRegisterGauge("db.pool.open", reg).Update(int64(stats.OpenConnections))
+			o.ObserveInt64(idle, int64(stats.Idle))
+			o.ObserveInt64(inuse, int64(stats.InUse))
+			o.ObserveInt64(open, int64(stats.OpenConnections))
 
-			metrics.GetOrRegisterGauge("db.pool.gauge.wait-count", reg).Update(stats.WaitCount)
-			metrics.GetOrRegisterGauge("db.pool.gauge.wait-duration", reg).Update(stats.WaitDuration.Milliseconds())
+			o.ObserveInt64(waitCount, stats.WaitCount)
+			o.ObserveInt64(waitDuration, stats.WaitDuration.Milliseconds())
 
-			metrics.GetOrRegisterMeter("db.pool.meter.wait-count", reg).Mark(stats.WaitCount - prevStats.WaitCount)
-			metrics.GetOrRegisterTimer("db.pool.meter.wait-duration", reg).Update(stats.WaitDuration - prevStats.WaitDuration)
+			o.ObserveInt64(closedLifetime, stats.MaxLifetimeClosed)
+			o.ObserveInt64(closedIdletime, stats.MaxIdleTimeClosed)
+			o.ObserveInt64(closedIdle, stats.MaxIdleClosed)
 
-			metrics.GetOrRegisterGauge("db.pool.closed.lifetime", reg).Update(stats.MaxLifetimeClosed)
-			metrics.GetOrRegisterGauge("db.pool.closed.idletime", reg).Update(stats.MaxIdleTimeClosed)
-			metrics.GetOrRegisterGauge("db.pool.closed.idle", reg).Update(stats.MaxIdleClosed)
-
-			prevStats = stats
-		}
-	}()
+			return nil
+		},
+		idle, inuse, open, waitCount, waitDuration, closedLifetime, closedIdletime, closedIdle,
+	)
 }
 
 func (opts *PostgresOptions) StartVacuumTask(db *sqlx.DB, table string, interval time.Duration, clock clock.Clock) io.Closer {
@@ -139,7 +148,7 @@ func (opts *PostgresOptions) StartVacuumTask(db *sqlx.DB, table string, interval
 	closeCh := make(chan bool)
 
 	go func() {
-		l := logrus.WithField("prefix", "vacuum")
+		l := slog.With(slog.String("prefix", "vacuum"))
 
 		for {
 			select {
@@ -147,10 +156,10 @@ func (opts *PostgresOptions) StartVacuumTask(db *sqlx.DB, table string, interval
 				return
 
 			case <-clock.After(interval):
-				l.Infof("Running periodic vacuum on table %s now", table)
+				l.Info("Running periodic vacuum on table now", slog.String("table", table))
 
 				if _, err := db.Exec(fmt.Sprintf(`VACUUM "%s"`, table)); err != nil {
-					l.Warnf("Maintenance task failed: %s", err)
+					l.Warn("Maintenance task failed", slog.String("error", err.Error()))
 				}
 			}
 		}

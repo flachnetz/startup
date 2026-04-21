@@ -1,11 +1,10 @@
 package startup_kafka
 
 import (
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"go.uber.org/atomic"
@@ -17,7 +16,7 @@ import (
 var topics = []string{"my_fancy"}
 
 type Consumer struct {
-	log *logrus.Entry
+	log *slog.Logger
 
 	consumer      *kafka.Consumer
 	avroConverter *avro.Converter
@@ -36,7 +35,7 @@ type ConsumerOptions struct {
 }
 
 func NewConsumer(options ConsumerOptions) *Consumer {
-	logger := logrus.WithField("prefix", "kafka-consumer")
+	logger := slog.With(slog.String("prefix", "kafka-consumer"))
 
 	c := &Consumer{
 		log:           logger,
@@ -62,7 +61,7 @@ func NewConsumer(options ConsumerOptions) *Consumer {
 
 func (c *Consumer) Close() error {
 	if c.running.Load() {
-		c.log.Infof("Closing")
+		c.log.Info("Closing")
 
 		c.kafkaDone <- true
 		c.wg.Wait()
@@ -95,7 +94,7 @@ func (c *Consumer) Run() {
 			// commit whatever we've read
 			_, err = c.consumer.Commit()
 			if err != nil {
-				c.log.Errorf("failed to commit kafka message, will try again later: %s", err)
+				c.log.Error("failed to commit kafka message, will try again later", slog.String("error", err.Error()))
 			}
 
 			return nil
@@ -105,7 +104,7 @@ func (c *Consumer) Run() {
 			select {
 			case <-ticker.C:
 				if err := doStuffAndCommit(nil); err != nil {
-					c.log.Errorf("ticker failed to merge in kafka message, stopping here, will try again during next startup: %s", err)
+					c.log.Error("ticker failed to merge in kafka message, stopping here, will try again during next startup", slog.String("error", err.Error()))
 					return
 				}
 			case <-c.kafkaDone:
@@ -116,12 +115,12 @@ func (c *Consumer) Run() {
 				if err == nil {
 					m, _, err := c.avroConverter.Parse(msg.Value)
 					if err != nil {
-						c.log.Errorf("failed to strip schema hash from kafka message %s", err)
+						c.log.Error("failed to strip schema hash from kafka message", slog.String("error", err.Error()))
 						continue
 					}
 
 					if err := doStuffAndCommit(m); err != nil {
-						c.log.Errorf("failed to merge in kafka message, stopping here, will try again during next startup: %s", err)
+						c.log.Error("failed to merge in kafka message, stopping here, will try again during next startup", slog.String("error", err.Error()))
 						return
 					}
 					ticker.Reset(5 * time.Second)
@@ -129,7 +128,7 @@ func (c *Consumer) Run() {
 				} else {
 					if err.(kafka.Error).Code() != kafka.ErrTimedOut {
 						// The client will automatically try to recover from all errors.
-						c.log.Errorf("Consumer error: %v (%v)", err, msg)
+						c.log.Error("Consumer error", slog.Any("error", err), slog.Any("message", msg))
 					}
 				}
 

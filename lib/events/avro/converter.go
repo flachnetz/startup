@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pkg/errors"
+	"log/slog"
 
-	"github.com/sirupsen/logrus"
+	"github.com/pkg/errors"
 )
 
 type EventSource struct {
@@ -18,7 +18,7 @@ type EventSource struct {
 }
 
 type Converter struct {
-	log      *logrus.Entry
+	log      *slog.Logger
 	registry *SchemaRegistry
 	options  ConverterOptions
 }
@@ -29,18 +29,13 @@ type ConverterOptions struct {
 }
 
 func NewConverter(registry *SchemaRegistry, options ConverterOptions) *Converter {
-	return &Converter{log: logrus.WithField("prefix", "avro-converter"), registry: registry, options: options}
+	return &Converter{log: slog.With(slog.String("prefix", "avro-converter")), registry: registry, options: options}
 }
 
 func (c *Converter) Parse(data []byte) (map[string]interface{}, *EventSource, error) {
 	if bytes.HasPrefix(data, []byte("Obj\x01")) {
 		// This isn't used anymore, i think.
 		return nil, nil, errors.New("events in avro container format not supported")
-	}
-
-	if len(data) > 32 && c.hexadecimalCharsOnly(data[0:32]) {
-		// consul hash format: looks like we need to got the hash of the schema.
-		return c.decode(string(data[:32]), data[32:])
 	}
 
 	if len(data) >= 5 && data[0] == 0 {

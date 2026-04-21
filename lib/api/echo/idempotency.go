@@ -3,6 +3,7 @@ package echo
 import (
 	"bytes"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -10,7 +11,7 @@ import (
 
 	"github.com/flachnetz/startup/v2/lib/api/idempotency"
 	"github.com/flachnetz/startup/v2/lib/ql"
-	"github.com/flachnetz/startup/v2/startup_logrus"
+	sl "github.com/flachnetz/startup/v2/startup_logging"
 	"github.com/labstack/echo/v4"
 	"github.com/pkg/errors"
 )
@@ -64,11 +65,11 @@ func IdempotencyMiddlewareEcho(store idempotency.IdempotencyStore) echo.Middlewa
 			ctx := c.Request().Context()
 
 			idempotencyKey := c.Request().Header.Get(IdempotencyKey)
-			loggerOf := startup_logrus.LoggerOf(ctx)
+			loggerOf := sl.LoggerOf(ctx)
 			if idempotencyKey == "" {
 				return api.ErrBadRequest.WithDescription("missing idempotency key")
 			}
-			loggerOf = loggerOf.WithField("idempotency_key", idempotencyKey)
+			loggerOf = loggerOf.With(slog.String("idempotency_key", idempotencyKey))
 
 			err := ql.InNewTransaction(ctx, store.DB(), func(ctx ql.TxContext) error {
 				reqRecord, err := store.Get(ctx, idempotencyKey)
@@ -80,7 +81,7 @@ func IdempotencyMiddlewareEcho(store idempotency.IdempotencyStore) echo.Middlewa
 				if reqRecord != nil {
 					switch reqRecord.Status {
 					case idempotency.Completed:
-						loggerOf.Debugf("idempotency key '%s' already processed. Returning saved response", idempotencyKey)
+						loggerOf.DebugContext(ctx, "idempotency key already processed. Returning saved response", slog.String("idempotency_key", idempotencyKey))
 
 						var headers http.Header
 						if err := json.Unmarshal(reqRecord.ResponseHeaders, &headers); err == nil {
@@ -98,7 +99,7 @@ func IdempotencyMiddlewareEcho(store idempotency.IdempotencyStore) echo.Middlewa
 						return c.Blob(int(reqRecord.ResponseCode.Int64), contentType, reqRecord.ResponseBody)
 
 					case idempotency.Error:
-						loggerOf.Debugf("idempotency key '%s' resulted in an error, will retry business logic", idempotencyKey)
+						loggerOf.DebugContext(ctx, "idempotency key resulted in an error, will retry business logic", slog.String("idempotency_key", idempotencyKey))
 					case idempotency.Pending:
 						// if it is still pending for more than 2 minutes, we can assume it is stuck
 						if time.Since(reqRecord.CreatedAt) > 2*time.Minute {
@@ -130,13 +131,13 @@ func IdempotencyMiddlewareEcho(store idempotency.IdempotencyStore) echo.Middlewa
 				headersBytes, err := json.Marshal(c.Response().Header())
 				if err != nil {
 					// Log the error but do not return it to avoid breaking the response flow
-					loggerOf.Errorf("Failed to marshal response headers: %v", err)
+					loggerOf.ErrorContext(ctx, "Failed to marshal response headers", sl.Error(err))
 				}
 
 				if handlerErr != nil || interceptor.statusCode >= 400 {
 					err = store.Error(ctx, idempotencyKey, interceptor.statusCode, headersBytes, interceptor.body.Bytes())
 					if err != nil {
-						loggerOf.Errorf("Failed to store idempotency error for key '%s': %q", idempotencyKey, err)
+						loggerOf.ErrorContext(ctx, "Failed to store idempotency error", slog.String("idempotency_key", idempotencyKey), sl.Error(err))
 					}
 					return handlerErr
 				}
@@ -144,7 +145,7 @@ func IdempotencyMiddlewareEcho(store idempotency.IdempotencyStore) echo.Middlewa
 				err = store.Update(ctx, idempotencyKey, interceptor.statusCode, headersBytes, interceptor.body.Bytes())
 				if err != nil {
 					// Log the error but do not return it to avoid breaking the response flow
-					loggerOf.Errorf("Failed to update idempotency record for key '%s': %q", idempotencyKey, err)
+					loggerOf.ErrorContext(ctx, "Failed to update idempotency record", slog.String("idempotency_key", idempotencyKey), sl.Error(err))
 				}
 				return nil
 			})

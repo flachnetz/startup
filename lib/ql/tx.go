@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 
-	sl "github.com/flachnetz/startup/v2/startup_logrus"
+	sl "github.com/flachnetz/startup/v2/startup_logging"
 	pt "github.com/flachnetz/startup/v2/startup_postgres"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -87,7 +87,7 @@ func InNewTransactionWithResult[R any](ctx context.Context, db TxStarter, fun fu
 			if err := tx.Rollback(); err != nil {
 				// If the rollback failed, there isnt much we can do except logging
 				// the issue.
-				sl.LoggerOf(ctx).Warnf("Rollback during panic failed: %s", err)
+				sl.LoggerOf(ctx).WarnContext(ctx, "Rollback during panic failed", sl.Error(err))
 			}
 		}
 	}()

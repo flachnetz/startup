@@ -2,14 +2,14 @@ package echo
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 
 	"github.com/flachnetz/startup/v2/lib/api"
 
-	"github.com/flachnetz/startup/v2/startup_logrus"
+	sl "github.com/flachnetz/startup/v2/startup_logging"
 	"github.com/labstack/echo/v4"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 //lint:ignore U1000
@@ -35,14 +35,14 @@ func (eh *ErrorHandler[E]) toApiError(err error) ApiError {
 	if eh.ToApiError != nil {
 		return eh.ToApiError(err)
 	}
-	return api.ErrUnknown.WithDescription(err.Error())
+	return api.ErrUnknown.WithDescription("%s", err.Error())
 }
 
 func (eh *ErrorHandler[E]) timeoutError(msg string) ApiError {
 	if eh.TimeoutError != nil {
 		return eh.TimeoutError(msg)
 	}
-	return api.ErrTimeout.WithDescription(msg)
+	return api.ErrTimeout.WithDescription("%s", msg)
 }
 
 //lint:ignore U1000
@@ -66,41 +66,37 @@ func (eh *ErrorHandler[E]) httpStatusFrom(ctx context.Context, err error) int {
 }
 
 func (eh *ErrorHandler[E]) HandleError(ctx context.Context, c echo.Context, err error) {
-	logger := startup_logrus.LoggerOf(ctx)
-	var fieldErr *startup_logrus.FieldError
-	if errors.As(err, &fieldErr) {
-		logger = logger.WithFields(fieldErr.Fields)
-	}
+	logger := sl.LoggerOf(ctx)
 	apiError := eh.toApiError(err)
 	httpStatusFrom := eh.httpStatusFrom(ctx, err)
 	if httpStatusFrom == 499 {
 		apiError = eh.timeoutError(apiError.Error())
 	}
 
-	LogHttpError(logger, c.Path(), httpStatusFrom, apiError)
+	LogHttpError(ctx, logger, c.Path(), httpStatusFrom, apiError)
 	if c.Response().Committed {
-		logger.Warn("response already committed")
+		logger.WarnContext(ctx, "response already committed")
 		return
 	}
 	switch c.Request().Method {
 	case http.MethodHead, http.MethodOptions:
 		cErr := c.NoContent(httpStatusFrom)
 		if cErr != nil {
-			logger.Error(cErr)
+			logger.ErrorContext(ctx, "failed to send no-content response", sl.Error(cErr))
 		}
 	default:
 		jErr := c.JSON(httpStatusFrom, apiError.ToErrorResponse())
 		if jErr != nil {
-			logger.Error(jErr)
+			logger.ErrorContext(ctx, "failed to send JSON response", sl.Error(jErr))
 		}
 	}
 }
 
 // LogHttpError logs errors with a different log level depending on the http status code.
-func LogHttpError(logger *logrus.Entry, path string, code int, err error) {
+func LogHttpError(ctx context.Context, logger *slog.Logger, path string, code int, err error) {
 	if code/100 == 5 {
-		logger.Errorf("%s req=%s", err.Error(), path)
+		logger.ErrorContext(ctx, err.Error(), slog.String("req", path))
 	} else {
-		logger.Warnf("%s req=%s", err.Error(), path)
+		logger.WarnContext(ctx, err.Error(), slog.String("req", path))
 	}
 }

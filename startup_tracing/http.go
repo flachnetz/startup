@@ -1,10 +1,12 @@
 package startup_tracing
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
@@ -15,11 +17,13 @@ import (
 	"sync/atomic"
 
 	"github.com/flachnetz/startup/v2/lib"
-
 	"github.com/flachnetz/startup/v2/startup_http"
-	. "github.com/flachnetz/startup/v2/startup_logrus"
-	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/ext"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -29,62 +33,45 @@ var (
 )
 
 // Tracing returns a middleware that adds tracing to an http handler.
-// This will create a new and empty local storage for the current go routine
-// to propagate the tracing context.
-//
-// You can use the tracing middleware multiple time. Using it a second time
-// will not start a new trace but will update 'service' and 'operation'.
 func Tracing(service string, op string) startup_http.HttpMiddleware {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			ctx := req.Context()
+			tracer := otel.Tracer(service)
 
-			// Check if we already have a span. This happens when the user is
-			// chaining multiple tracing middleware
-			if existingSpan := opentracing.SpanFromContext(ctx); existingSpan != nil {
-				// update existing span
-				existingSpan.SetOperationName(op)
+			// Extract propagated context from incoming request headers
+			ctx := otel.GetTextMapPropagator().Extract(req.Context(), propagation.HeaderCarrier(req.Header))
 
-				existingSpan.SetTag("peer.service", service) // grafana tempo
-				existingSpan.SetTag("dd.service", service)   // datadog
-
-				// continue
-				handler.ServeHTTP(w, req)
+			// Check if we already have a valid span (chained middleware)
+			if existingSpan := trace.SpanFromContext(ctx); existingSpan.SpanContext().IsValid() {
+				existingSpan.SetAttributes(
+					attribute.String("peer.service", service),
+				)
+				// We can't rename an OTel span after creation easily,
+				// but we update attributes. Continue with existing span.
+				handler.ServeHTTP(w, req.WithContext(ctx))
 				return
 			}
 
-			// extract a span from the incoming request
-			wireContext, err := opentracing.GlobalTracer().Extract(
-				opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(req.Header))
-
-			if err != nil && errors.Is(err, opentracing.ErrSpanContextNotFound) {
-				// ignore errors but show a small warning.
-				log := LoggerOf(ctx)
-				log.Warnf("Could not extract tracer from http headers: %s", err)
-			}
-
-			// start a new server side trace
-			serverSpan := opentracing.StartSpan(op, ext.RPCServerOption(wireContext))
-			defer serverSpan.Finish()
-
-			// use a clean url as resource
-			serverSpan.SetTag("peer.service", service) // grafana tempo
-			serverSpan.SetTag("dd.service", service)   // datadog
-			ext.HTTPMethod.Set(serverSpan, req.Method)
-			ext.HTTPUrl.Set(serverSpan, cleanUrl(req.URL))
+			ctx, serverSpan := tracer.Start(ctx, op,
+				trace.WithSpanKind(trace.SpanKindServer),
+				trace.WithAttributes(
+					attribute.String("peer.service", service),
+					semconv.HTTPRequestMethodKey.String(req.Method),
+					attribute.String("http.url", cleanUrl(req.URL)),
+				),
+			)
+			defer serverSpan.End()
 
 			// record the status code of the response
 			rl := statusWriter(w)
 
 			defer func() {
-				ext.HTTPStatusCode.Set(serverSpan, uint16(rl.status))
-				if rl.status == http.StatusNotFound {
-					ext.Error.Set(serverSpan, false)
+				serverSpan.SetAttributes(attribute.Int("http.status_code", rl.status))
+				if rl.status >= 500 {
+					serverSpan.SetStatus(codes.Error, http.StatusText(rl.status))
 				}
 			}()
 
-			// put the span into the context
-			ctx = opentracing.ContextWithSpan(ctx, serverSpan)
 			handler.ServeHTTP(rl, req.WithContext(ctx))
 		})
 	}
@@ -110,7 +97,7 @@ func cleanUrl(u *url.URL) string {
 }
 
 // WithSpanPropagation returns a new http.Client that has automatic propagation
-// of zipkin trace ids enabled, as well as automatic tracing of http client operations (dns, connect, tls-handshake)
+// of trace context enabled.
 func WithSpanPropagation(client *http.Client) *http.Client {
 	transport := client.Transport
 	if transport == nil {
@@ -132,72 +119,66 @@ type tracingRoundTripper struct {
 }
 
 func (rt tracingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	parentSpan := opentracing.SpanFromContext(req.Context())
-	if parentSpan == nil {
+	ctx := req.Context()
+	parentSpan := trace.SpanFromContext(ctx)
+	if !parentSpan.SpanContext().IsValid() {
 		return rt.delegate.RoundTrip(req)
 	}
 
-	// create a new span for this operation
-	span := opentracing.GlobalTracer().StartSpan("http-client",
-		ext.SpanKindRPCClient,
-		opentracing.ChildOf(parentSpan.Context()),
-		TagsFromContext(req.Context()),
+	tracer := otel.Tracer("")
+	ctx, span := tracer.Start(ctx, "http-client",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			semconv.HTTPRequestMethodKey.String(req.Method),
+			attribute.String("http.url", cleanUrl(req.URL)),
+		),
+		trace.WithAttributes(TagsFromContext(ctx)...),
 	)
 
-	ext.HTTPMethod.Set(span, req.Method)
-	ext.HTTPUrl.Set(span, cleanUrl(req.URL))
-
-	// create a copy of the original request and inject the http tracing
-	httpTraceContext := httptrace.WithClientTrace(req.Context(), newClientTrace(span.Context(), TagsFromContext(req.Context())))
+	// create a copy of the original request and inject trace context
+	httpTraceContext := httptrace.WithClientTrace(ctx, newClientTrace(ctx))
 	reqCopy := req.Clone(httpTraceContext)
 
-	// inject the spans information into the request so that the
-	// other party can pick it up and continue the request.
-	_ = span.Tracer().Inject(span.Context(),
-		opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(reqCopy.Header))
+	// inject the trace context into the request headers
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(reqCopy.Header))
 
 	// do the actual request
 	resp, err := rt.delegate.RoundTrip(reqCopy)
 	if err != nil {
-		// in case of non-http errors, jump out directly
-		span.SetTag("error", true)
-		span.SetTag("error_message", err.Error())
-		span.Finish()
-
+		span.SetStatus(codes.Error, err.Error())
+		span.SetAttributes(attribute.Bool("error", true), attribute.String("error_message", err.Error()))
+		span.End()
 		return nil, err
 	}
 
-	// set status code on successful round trip
-	ext.HTTPStatusCode.Set(span, uint16(resp.StatusCode))
+	span.SetAttributes(attribute.Int("http.status_code", resp.StatusCode))
 
-	// instrument the response body so we can track
-	// the actual "end" of the request and finish our span
+	// instrument the response body
 	resp.Body = bodyGuard(reqCopy, span, resp.Body)
 
 	return resp, nil
 }
 
-func bodyGuard(req *http.Request, span opentracing.Span, body io.ReadCloser) io.ReadCloser {
+func bodyGuard(req *http.Request, span trace.Span, body io.ReadCloser) io.ReadCloser {
 	key := req.Method + " " + req.URL.String()
 	guard := &readCloserWithTrace{reader: body, span: &autoCloseSpan{Span: span, key: key}}
 	runtime.SetFinalizer(guard.span, finalizeAutoCloseSpan)
 	return guard
 }
 
-func newClientTrace(parentContext opentracing.SpanContext, startOptions opentracing.StartSpanOption) *httptrace.ClientTrace {
+func newClientTrace(ctx context.Context) *httptrace.ClientTrace {
 	var ct httptrace.ClientTrace
 
-	configureDnsHooks(&ct, parentContext, startOptions)
-	configureConnectHooks(&ct, parentContext, startOptions)
-	configureTlsHooks(&ct, parentContext, startOptions)
+	configureDnsHooks(&ct, ctx)
+	configureConnectHooks(&ct, ctx)
+	configureTlsHooks(&ct, ctx)
 
 	return &ct
 }
 
-func configureDnsHooks(ct *httptrace.ClientTrace, parentContext opentracing.SpanContext, startOptions opentracing.StartSpanOption) {
+func configureDnsHooks(ct *httptrace.ClientTrace, parentCtx context.Context) {
 	var mu sync.Mutex
-
-	var dnsSpan opentracing.Span
+	var dnsSpan trace.Span
 
 	ct.DNSStart = func(info httptrace.DNSStartInfo) {
 		defer locked(&mu)()
@@ -206,11 +187,9 @@ func configureDnsHooks(ct *httptrace.ClientTrace, parentContext opentracing.Span
 			finishSpan(dnsSpan, errors.New("interrupted"))
 		}
 
-		dnsSpan = opentracing.GlobalTracer().StartSpan("http-client:dns",
-			ext.SpanKindRPCClient,
-			opentracing.ChildOf(parentContext),
-			startOptions,
-			opentracing.Tag{Key: "host", Value: info.Host},
+		_, dnsSpan = otel.Tracer("").Start(parentCtx, "http-client:dns",
+			trace.WithSpanKind(trace.SpanKindClient),
+			trace.WithAttributes(attribute.String("host", info.Host)),
 		)
 	}
 
@@ -224,9 +203,9 @@ func configureDnsHooks(ct *httptrace.ClientTrace, parentContext opentracing.Span
 	}
 }
 
-func configureConnectHooks(ct *httptrace.ClientTrace, parentContext opentracing.SpanContext, startOptions opentracing.StartSpanOption) {
+func configureConnectHooks(ct *httptrace.ClientTrace, parentCtx context.Context) {
 	var mu sync.Mutex
-	connSpans := map[string]opentracing.Span{}
+	connSpans := map[string]trace.Span{}
 
 	ct.ConnectStart = func(network, addr string) {
 		defer locked(&mu)()
@@ -236,12 +215,12 @@ func configureConnectHooks(ct *httptrace.ClientTrace, parentContext opentracing.
 			finishSpan(span, errors.New("interrupted"))
 		}
 
-		connSpans[key] = opentracing.GlobalTracer().StartSpan("http-client:connect",
-			ext.SpanKindRPCClient,
-			opentracing.ChildOf(parentContext),
-			startOptions,
-			opentracing.Tag{Key: "network", Value: network},
-			opentracing.Tag{Key: "addr", Value: addr},
+		_, connSpans[key] = otel.Tracer("").Start(parentCtx, "http-client:connect",
+			trace.WithSpanKind(trace.SpanKindClient),
+			trace.WithAttributes(
+				attribute.String("network", network),
+				attribute.String("addr", addr),
+			),
 		)
 	}
 
@@ -256,22 +235,19 @@ func configureConnectHooks(ct *httptrace.ClientTrace, parentContext opentracing.
 	}
 }
 
-func configureTlsHooks(ct *httptrace.ClientTrace, parentContext opentracing.SpanContext, startOptions opentracing.StartSpanOption) {
+func configureTlsHooks(ct *httptrace.ClientTrace, parentCtx context.Context) {
 	var mu sync.Mutex
-	var tlsSpan opentracing.Span
+	var tlsSpan trace.Span
 
 	ct.TLSHandshakeStart = func() {
 		defer locked(&mu)()
 
 		if tlsSpan != nil {
 			finishSpan(tlsSpan, errors.New("interrupted"))
-			tlsSpan.Finish()
 		}
 
-		tlsSpan = opentracing.GlobalTracer().StartSpan("http-client:tls-handshake",
-			ext.SpanKindRPCClient,
-			opentracing.ChildOf(parentContext),
-			startOptions,
+		_, tlsSpan = otel.Tracer("").Start(parentCtx, "http-client:tls-handshake",
+			trace.WithSpanKind(trace.SpanKindClient),
 		)
 	}
 
@@ -290,13 +266,12 @@ func locked(m *sync.Mutex) func() {
 	return m.Unlock
 }
 
-func finishSpan(span opentracing.Span, err error) {
+func finishSpan(span trace.Span, err error) {
 	if err != nil {
-		span.SetTag("error", true)
-		span.SetTag("error_message", err.Error())
+		span.SetStatus(codes.Error, err.Error())
+		span.SetAttributes(attribute.Bool("error", true), attribute.String("error_message", err.Error()))
 	}
-
-	span.Finish()
+	span.End()
 }
 
 type readCloserWithTrace struct {
@@ -308,55 +283,49 @@ func (r *readCloserWithTrace) Read(p []byte) (int, error) {
 	n, err := r.reader.Read(p)
 	if err != nil {
 		if err != io.EOF {
-			r.span.SetTag("error", true)
-			r.span.SetTag("error_message", fmt.Sprintf("error in read: %s", err))
+			r.span.SetStatus(codes.Error, fmt.Sprintf("error in read: %s", err))
+			r.span.SetAttributes(attribute.Bool("error", true), attribute.String("error_message", fmt.Sprintf("error in read: %s", err)))
 		}
-
-		r.span.Finish()
+		r.span.End()
 	}
-
 	return n, err
 }
 
 func (r *readCloserWithTrace) Close() error {
-	r.span.Finish()
+	r.span.End()
 	runtime.KeepAlive(r.span)
-
 	return r.reader.Close()
 }
 
 type autoCloseSpan struct {
-	opentracing.Span
+	trace.Span
 	key    string
 	closed atomic.Bool
 }
 
 func finalizeAutoCloseSpan(span *autoCloseSpan) {
 	if span.closed.CompareAndSwap(false, true) {
-		log.Warnf("unclosed http.Client span detected for %q", span.key)
-		span.Span.SetTag("error", true)
-		span.Span.SetTag("error_message", "reader was not closed")
-		span.Span.Finish()
+		slog.Warn("unclosed http.Client span detected", slog.String("key", span.key))
+		span.SetStatus(codes.Error, "reader was not closed")
+		span.SetAttributes(attribute.Bool("error", true), attribute.String("error_message", "reader was not closed"))
+		span.Span.End()
 	}
 }
 
-func (s *autoCloseSpan) Finish() {
+func (s *autoCloseSpan) End(options ...trace.SpanEndOption) {
 	if s.closed.CompareAndSwap(false, true) {
-		s.Span.Finish()
+		s.Span.End(options...)
 	}
 }
 
-func (s *autoCloseSpan) FinishWithOptions(opts opentracing.FinishOptions) {
-	if s.closed.CompareAndSwap(false, true) {
-		s.closed.Store(true)
-		s.Span.FinishWithOptions(opts)
-	}
-}
-
-func (s *autoCloseSpan) SetTag(key string, value interface{}) opentracing.Span {
+func (s *autoCloseSpan) SetAttributes(kv ...attribute.KeyValue) {
 	if !s.closed.Load() {
-		return s.Span.SetTag(key, value)
+		s.Span.SetAttributes(kv...)
 	}
+}
 
-	return s
+func (s *autoCloseSpan) SetStatus(code codes.Code, description string) {
+	if !s.closed.Load() {
+		s.Span.SetStatus(code, description)
+	}
 }

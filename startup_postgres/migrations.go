@@ -1,14 +1,13 @@
 package startup_postgres
 
 import (
+	"log/slog"
 	"os"
-
-	logrus "github.com/sirupsen/logrus"
 
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"github.com/rubenv/sql-migrate"
+	migrate "github.com/rubenv/sql-migrate"
 )
 
 // Migration Runs a migration with the sql files from the given directory.
@@ -28,8 +27,10 @@ func Migration(table, directory string) Initializer {
 			return errors.WithMessage(err, "applying database migration")
 		}
 
-		logrus.WithField("prefix", "database").
-			Infof("%d migrations executed", n)
+		slog.Info("Migrations executed",
+			slog.String("prefix", "database"),
+			slog.Int("count", n),
+		)
 
 		return nil
 	}

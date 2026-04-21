@@ -1,4 +1,4 @@
-package startup_logrus
+package sl
 
 import (
 	"context"
