@@ -7,14 +7,15 @@ import (
 	"os"
 	"reflect"
 
+	"log/slog"
+
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"gopkg.in/go-playground/validator.v9"
 )
 
-var log = logrus.WithField("prefix", "startup")
+var log = slog.With(slog.String("prefix", "startup"))
 
 func MustParseCommandLine(opts interface{}) {
 	MustParseCommandLineWithOptions(opts, flags.HelpFlag|flags.PassDoubleDash)
@@ -53,7 +54,7 @@ func ParseCommandLineWithOptions(opts interface{}, options flags.Options) error 
 	}
 
 	if len(args) > 0 && (options&flags.IgnoreUnknown) != flags.None {
-		log.Warnf("Found the following ignored arguments: %+v", args)
+		log.Warn("Found ignored arguments", slog.Any("args", args))
 	}
 
 	// validate all input values after argument parsing
@@ -100,7 +101,7 @@ func ParseCommandLineWithOptions(opts interface{}, options flags.Options) error 
 			}
 
 			if _, ok := fieldValue.Interface().(startup_base.BaseOptions); !ok {
-				log.Infof("Calling %s.Initialize()", fieldValue.Type().String())
+				log.Info("Calling Initialize()", slog.String("type", fieldValue.Type().String()))
 			}
 
 			init.Call(inputValues)

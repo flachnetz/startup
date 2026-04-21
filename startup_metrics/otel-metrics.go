@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/flachnetz/startup/v2/startup_base"
-	"github.com/flachnetz/startup/v2/startup_logrus"
+	sl "github.com/flachnetz/startup/v2/startup_logging"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
@@ -89,7 +89,7 @@ func (opts *OTELMetricsOptions) Shutdown() error {
 	ctx := context.Background()
 	if opts.PrometheusConfig.httpServer != nil {
 		if err := opts.PrometheusConfig.httpServer.Shutdown(ctx); err != nil {
-			startup_logrus.LoggerOf(ctx).WithError(err).Error("Failed to shutdown Prometheus HTTP server")
+			sl.LoggerOf(ctx).Error("Failed to shutdown Prometheus HTTP server", sl.Error(err))
 		}
 	}
 

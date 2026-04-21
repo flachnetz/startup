@@ -2,24 +2,23 @@ package kafka
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
-
-	logrus "github.com/sirupsen/logrus"
 )
 
 //lint:ignore U1000
-type logrusAdapter struct {
-	delegate *logrus.Entry
+type slogAdapter struct {
+	delegate *slog.Logger
 }
 
-func (l logrusAdapter) Print(v ...interface{}) {
-	l.delegate.Println(strings.TrimSpace(fmt.Sprint(v...)))
+func (l slogAdapter) Print(v ...interface{}) {
+	l.delegate.Info(strings.TrimSpace(fmt.Sprint(v...)))
 }
 
-func (l logrusAdapter) Printf(format string, v ...interface{}) {
-	l.delegate.Println(strings.TrimSpace(fmt.Sprintf(format, v...)))
+func (l slogAdapter) Printf(format string, v ...interface{}) {
+	l.delegate.Info(strings.TrimSpace(fmt.Sprintf(format, v...)))
 }
 
-func (l logrusAdapter) Println(v ...interface{}) {
-	l.delegate.Println(strings.TrimSpace(fmt.Sprint(v...)))
+func (l slogAdapter) Println(v ...interface{}) {
+	l.delegate.Info(strings.TrimSpace(fmt.Sprint(v...)))
 }

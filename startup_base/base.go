@@ -11,7 +11,7 @@ import (
 
 	"github.com/flachnetz/startup/v2/lib/clock"
 	"github.com/flachnetz/startup/v2/startup_base/tint"
-	sl "github.com/flachnetz/startup/v2/startup_logrus"
+	sl "github.com/flachnetz/startup/v2/startup_logging"
 	"github.com/mattn/go-isatty"
 )
 

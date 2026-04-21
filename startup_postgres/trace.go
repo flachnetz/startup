@@ -2,16 +2,15 @@ package startup_postgres
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/flachnetz/startup/v2/lib/pg_trace"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/jackc/pgx/v5"
 )
 
 type tracerWrapper struct {
-	logger *logrus.Entry
+	logger *slog.Logger
 }
 
 var (
@@ -25,10 +24,10 @@ func (m tracerWrapper) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data
 		return ctx
 	}
 	if m.logger != nil {
-		m.logger.WithFields(logrus.Fields{
-			"query": data.SQL,
-			"args":  data.Args,
-		}).Debug("Query start")
+		m.logger.DebugContext(ctx, "Query start",
+			slog.String("query", data.SQL),
+			slog.Any("args", data.Args),
+		)
 	}
 	tracer := globalTracer.Load()
 	if tracer == nil {
@@ -55,10 +54,10 @@ func (m tracerWrapper) TracePrepareStart(ctx context.Context, conn *pgx.Conn, da
 		return ctx
 	}
 	if m.logger != nil {
-		m.logger.WithFields(logrus.Fields{
-			"name": data.Name,
-			"sql":  data.SQL,
-		}).Debug("Prepare start")
+		m.logger.DebugContext(ctx, "Prepare start",
+			slog.String("name", data.Name),
+			slog.String("sql", data.SQL),
+		)
 	}
 	tracer := globalTracer.Load()
 	if tracer == nil {

@@ -3,16 +3,18 @@ package startup_base
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 
-	"github.com/sirupsen/logrus"
+	sl "github.com/flachnetz/startup/v2/startup_logging"
 )
 
-var log = logrus.WithField("prefix", "startup-base")
+var log = slog.With(slog.String("prefix", "startup-base"))
 
 func FatalOnError(err error, reason string, args ...interface{}) {
 	if err != nil {
-		log.Fatalf("%s: %s", fmt.Sprintf(reason, args...), err)
+		log.Error("%s: %s", fmt.Sprintf(reason, args...), err)
+		os.Exit(1)
 		return
 	}
 }
@@ -52,6 +54,6 @@ func PanicOnError(err error, msg string, args ...interface{}) {
 
 func Close(closer io.Closer, onErrorMessage string) {
 	if err := closer.Close(); err != nil {
-		log.WithError(err).Warn(onErrorMessage)
+		log.Warn(onErrorMessage, sl.Error(err))
 	}
 }

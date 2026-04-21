@@ -8,12 +8,12 @@ import (
 	"strings"
 
 	"github.com/flachnetz/startup/v2/lib/pg_trace"
-
-	st "github.com/flachnetz/startup/v2/startup_tracing"
-	"github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/jackc/pgx/v5"
-	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/ext"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var reSpace = regexp.MustCompile(`\s+`)
@@ -28,8 +28,8 @@ func (t *tracer) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data pgx.T
 		return ctx
 	}
 	cleanQuery := cleanQuery(data.SQL)
-	span, ctx := t.startSpan(ctx, cleanQuery)
-	span.SetTag("sql.query", cleanQuery)
+	ctx, span := t.startSpan(ctx, cleanQuery)
+	span.SetAttributes(attribute.String("sql.query", cleanQuery))
 	return ctx
 }
 
@@ -37,13 +37,14 @@ func (t *tracer) TraceQueryEnd(ctx context.Context, conn *pgx.Conn, data pgx.Tra
 	if ctx.Value(pg_trace.DisableTracingKey) != nil {
 		return
 	}
-	span := t.spanOf(ctx)
+	span := trace.SpanFromContext(ctx)
 
 	if data.Err != nil && !errors.Is(data.Err, sql.ErrNoRows) {
-		span.SetTag("error", data.Err.Error())
+		span.SetStatus(codes.Error, data.Err.Error())
+		span.SetAttributes(attribute.String("error", data.Err.Error()))
 	}
 
-	span.Finish()
+	span.End()
 }
 
 func (t *tracer) TracePrepareStart(ctx context.Context, conn *pgx.Conn, data pgx.TracePrepareStartData) context.Context {
@@ -51,9 +52,11 @@ func (t *tracer) TracePrepareStart(ctx context.Context, conn *pgx.Conn, data pgx
 		return ctx
 	}
 	cleanQuery := cleanQuery(data.SQL)
-	span, ctx := t.startSpan(ctx, cleanQuery)
-	span.SetTag("sql.query", cleanQuery)
-	span.SetTag("sql.prepare", true)
+	ctx, span := t.startSpan(ctx, cleanQuery)
+	span.SetAttributes(
+		attribute.String("sql.query", cleanQuery),
+		attribute.Bool("sql.prepare", true),
+	)
 	return ctx
 }
 
@@ -61,14 +64,14 @@ func (t *tracer) TracePrepareEnd(ctx context.Context, conn *pgx.Conn, data pgx.T
 	if ctx.Value(pg_trace.DisableTracingKey) != nil {
 		return
 	}
-	t.spanOf(ctx).Finish()
+	trace.SpanFromContext(ctx).End()
 }
 
 func (t *tracer) TraceConnectStart(ctx context.Context, data pgx.TraceConnectStartData) context.Context {
 	if ctx.Value(pg_trace.DisableTracingKey) != nil {
 		return ctx
 	}
-	_, ctx = t.startSpan(ctx, "CONNECT")
+	ctx, _ = t.startSpan(ctx, "CONNECT")
 	return ctx
 }
 
@@ -76,7 +79,7 @@ func (t *tracer) TraceConnectEnd(ctx context.Context, data pgx.TraceConnectEndDa
 	if ctx.Value(pg_trace.DisableTracingKey) != nil {
 		return
 	}
-	t.spanOf(ctx).Finish()
+	trace.SpanFromContext(ctx).End()
 }
 
 func (t *tracer) TransactionStart(ctx context.Context) context.Context {
@@ -88,7 +91,7 @@ func (t *tracer) TransactionStart(ctx context.Context) context.Context {
 		tag = "transaction"
 	}
 
-	_, ctx = t.startSpan(ctx, "tx:"+tag)
+	ctx, _ = t.startSpan(ctx, "tx:"+tag)
 	return ctx
 }
 
@@ -96,14 +99,14 @@ func (t *tracer) TransactionEnd(ctx context.Context) {
 	if ctx.Value(pg_trace.DisableTracingKey) != nil {
 		return
 	}
-	t.spanOf(ctx).Finish()
+	trace.SpanFromContext(ctx).End()
 }
 
 func (t *tracer) AcquireConnectionStart(ctx context.Context) context.Context {
 	if ctx.Value(pg_trace.DisableTracingKey) != nil {
 		return ctx
 	}
-	_, ctx = t.startSpan(ctx, "tx:acquire-connection")
+	ctx, _ = t.startSpan(ctx, "tx:acquire-connection")
 	return ctx
 }
 
@@ -111,36 +114,25 @@ func (t *tracer) AcquireConnectionEnd(ctx context.Context) {
 	if ctx.Value(pg_trace.DisableTracingKey) != nil {
 		return
 	}
-	t.spanOf(ctx).Finish()
+	trace.SpanFromContext(ctx).End()
 }
 
-func (t *tracer) startSpan(ctx context.Context, res string) (opentracing.Span, context.Context) {
+func (t *tracer) startSpan(ctx context.Context, res string) (context.Context, trace.Span) {
 	if ctx.Value(pg_trace.DisableTracingKey) != nil {
-		return nil, ctx
-	}
-	var parentContext opentracing.SpanContext
-
-	parentSpan := st.CurrentSpanFromContext(ctx)
-	if parentSpan != nil {
-		parentContext = parentSpan.Context()
+		return ctx, trace.SpanFromContext(ctx)
 	}
 
-	span := opentracing.GlobalTracer().StartSpan(t.ServiceName,
-		ext.SpanKindRPCClient,
-		opentracing.ChildOf(parentContext),
+	ctx, span := otel.Tracer("").Start(ctx, t.ServiceName,
+		trace.WithSpanKind(trace.SpanKindClient),
 	)
 
-	span.SetTag("dd.service", t.ServiceName)
-	span.SetTag("peer.service", t.ServiceName)
+	span.SetAttributes(
+		attribute.String("peer.service", t.ServiceName),
+		attribute.String("dd.resource", res),
+		attribute.String("resource.name", res),
+	)
 
-	span.SetTag("dd.resource", res)
-	span.SetTag("resource.name", res)
-
-	return span, opentracing.ContextWithSpan(ctx, span)
-}
-
-func (t *tracer) spanOf(ctx context.Context) opentracing.Span {
-	return st.CurrentSpanFromContext(ctx)
+	return ctx, span
 }
 
 var cleanQueryCache *lru.Cache
