@@ -222,7 +222,7 @@ func (ev *eventSender) encodeAvro(event Event) (*EventMetadata, []byte, error) {
 
 	schemaId, ok := ev.SchemaIdCache[meta.Type]
 	if !ok {
-		return nil, nil, fmt.Errorf("no schema found for '%s'", meta.Type)
+		return nil, nil, fmt.Errorf("no schema found for %q", meta.Type)
 	}
 
 	avro, err := ev.eventToConfluentAvro(schemaId, event)

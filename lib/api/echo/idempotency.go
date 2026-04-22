@@ -103,15 +103,15 @@ func IdempotencyMiddlewareEcho(store idempotency.IdempotencyStore) echo.Middlewa
 					case idempotency.Pending:
 						// if it is still pending for more than 2 minutes, we can assume it is stuck
 						if time.Since(reqRecord.CreatedAt) > 2*time.Minute {
-							return fmt.Errorf("idempotency key '%s' is stuck in pending state", idempotencyKey)
+							return fmt.Errorf("idempotency key %q is stuck in pending state", idempotencyKey)
 						}
-						return fmt.Errorf("idempotency key '%s' is still pending, please retry later", idempotencyKey)
+						return fmt.Errorf("idempotency key %q is still pending, please retry later", idempotencyKey)
 					}
 				}
 
 				// Handle new requests: Create pending record
 				if err := store.Create(ctx, idempotencyKey); err != nil {
-					return fmt.Errorf("failed to create idempotency record for key '%s': %q", idempotencyKey, err)
+					return fmt.Errorf("failed to create idempotency record for key %q: %w", idempotencyKey, err)
 				}
 
 				// Call the actual handler and capture the response

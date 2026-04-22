@@ -41,7 +41,7 @@ func (r *SchemaRegistry) Get(key string) (*goavro.Codec, error) {
 
 	} else {
 		// still no schema? thats too bad
-		return nil, fmt.Errorf("no schema found for key '%s'", key)
+		return nil, fmt.Errorf("no schema found for key %q", key)
 	}
 
 	codec, err := goavro.NewCodec(avroSchema)

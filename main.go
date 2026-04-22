@@ -104,7 +104,7 @@ func ParseCommandLineWithOptions(opts any, options flags.Options) error {
 			for in := range initType.Ins() {
 				inputValue := seen[in]
 				if !inputValue.IsValid() {
-					startup_base.Panicf("Can not find value of type %s to inject into %s",
+					startup_base.Panicf("Can not find value of type %q to inject into %s",
 						in.String(), fieldValue.Type())
 				}
 

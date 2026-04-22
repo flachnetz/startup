@@ -83,7 +83,7 @@ func (esi *eventSenderInitializer) registerSchemaCache() (map[reflect.Type]uint3
 		// register the schema with confluent
 		schemaId, err := esi.ConfluentClient.RegisterNewSchema(nameOf(event), event.Schema())
 		if err != nil {
-			return nil, fmt.Errorf("register schema for event type '%s': %w", eventType, err)
+			return nil, fmt.Errorf("register schema for event type %q: %w", eventType, err)
 		}
 
 		// and cache the schema id for serializing later

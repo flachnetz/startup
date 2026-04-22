@@ -44,7 +44,7 @@ func (c *Converter) Parse(data []byte) (map[string]any, *EventSource, error) {
 		return c.decode(strconv.Itoa(int(schemaId)), data[5:])
 	}
 
-	return nil, nil, fmt.Errorf("parse event %s", string(data))
+	return nil, nil, fmt.Errorf("parse event %q", string(data))
 }
 
 /**
