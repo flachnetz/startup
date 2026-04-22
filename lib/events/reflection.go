@@ -39,7 +39,7 @@ func derefEventType(eventType reflect.Type) reflect.Type {
 
 	if !reflect.PointerTo(eventType).Implements(eventInterfaceType) {
 		panic(
-			fmt.Sprintf("Pointer to type '%s' does not implement 'Event' interface", eventType),
+			fmt.Sprintf("Pointer to type %q does not implement 'Event' interface", eventType),
 		)
 	}
 

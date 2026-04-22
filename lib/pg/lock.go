@@ -13,7 +13,7 @@ func LockWithTransaction(ctx ql.TxContext, key string) error {
 		return fmt.Errorf("lock key: %w", err)
 	}
 	if err := ql.Exec(ctx, "SELECT PG_ADVISORY_XACT_LOCK($1)", lock); err != nil {
-		return fmt.Errorf("getting advisory lock %s: %w", key, err)
+		return fmt.Errorf("getting advisory lock %q: %w", key, err)
 	}
 
 	return nil
@@ -29,7 +29,7 @@ func TryLockWithTransaction(ctx ql.TxContext, key string) (bool, error) {
 
 	success, err := ql.Get[bool](ctx, "SELECT PG_TRY_ADVISORY_XACT_LOCK($1)", lock)
 	if err != nil {
-		return false, fmt.Errorf("getting advisory lock %s: %w", key, err)
+		return false, fmt.Errorf("getting advisory lock %q: %w", key, err)
 	}
 
 	return *success, nil
