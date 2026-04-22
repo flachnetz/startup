@@ -103,10 +103,8 @@ func (ev *eventSender) Close() error {
 }
 
 func (ev *eventSender) launchAsyncTasks() {
-	ev.wg.Add(1)
 
-	go func() {
-		defer ev.wg.Done()
+	ev.wg.Go(func() {
 
 		defer func() {
 			if ev.KafkaSender != nil {
@@ -119,7 +117,7 @@ func (ev *eventSender) launchAsyncTasks() {
 		for event := range ev.AsyncBufferCh {
 			ev.doSendAsync(event)
 		}
-	}()
+	})
 
 	if ev.KafkaSender != nil {
 		go func() {

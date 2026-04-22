@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"reflect"
 
-	"github.com/flachnetz/startup/v2/lib"
 	sl "github.com/flachnetz/startup/v2/startup_logging"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -130,7 +129,7 @@ func WriteConfigMap(ctx context.Context, cs *kubernetes.Clientset, writer, names
 			// valid in go 1.26
 			// Force:        new(true)
 
-			Force: lib.PtrOf(true),
+			Force: new(true),
 		},
 	)
 

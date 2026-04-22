@@ -15,7 +15,7 @@ func nameOf(event Event) string {
 
 	// get the event class
 	eventType := reflect.ValueOf(event).Type()
-	for eventType.Kind() == reflect.Ptr || eventType.Kind() == reflect.Interface {
+	for eventType.Kind() == reflect.Pointer || eventType.Kind() == reflect.Interface {
 		eventType = eventType.Elem()
 	}
 
@@ -28,12 +28,12 @@ func nameOf(event Event) string {
 	return "GoAvroEvent"
 }
 
-var eventInterfaceType = reflect.TypeOf((*Event)(nil)).Elem()
+var eventInterfaceType = reflect.TypeFor[Event]()
 
 // derefEventType ensures that the given event type is dereferenced until
 // it points directly to an event struct
 func derefEventType(eventType reflect.Type) reflect.Type {
-	for eventType.Kind() == reflect.Ptr {
+	for eventType.Kind() == reflect.Pointer {
 		eventType = eventType.Elem()
 	}
 

@@ -41,7 +41,7 @@ func ParseCommandLine(opts any) error {
 
 // ParseCommandLineWithOptions Parses command line.
 func ParseCommandLineWithOptions(opts any, options flags.Options) error {
-	if reflect.ValueOf(opts).Kind() != reflect.Ptr {
+	if reflect.ValueOf(opts).Kind() != reflect.Pointer {
 		return errors.New("options parameter must be pointer")
 	}
 
@@ -75,8 +75,7 @@ func ParseCommandLineWithOptions(opts any, options flags.Options) error {
 
 	// now do the initialization for all fields
 	value := reflect.ValueOf(opts).Elem()
-	for idx := 0; idx < value.NumField(); idx++ {
-		fieldValue := value.Field(idx)
+	for _, fieldValue := range value.Fields() {
 		if fieldValue.Kind() != reflect.Struct {
 			continue
 		}
@@ -90,11 +89,11 @@ func ParseCommandLineWithOptions(opts any, options flags.Options) error {
 			var inputValues []reflect.Value
 
 			initType := init.Type()
-			for idx := 0; idx < initType.NumIn(); idx++ {
-				inputValue := seen[initType.In(idx)]
+			for in := range initType.Ins() {
+				inputValue := seen[in]
 				if !inputValue.IsValid() {
 					startup_base.Panicf("Can not find value of type %s to inject into %s",
-						initType.In(idx).String(), fieldValue.Type())
+						in.String(), fieldValue.Type())
 				}
 
 				inputValues = append(inputValues, inputValue)
