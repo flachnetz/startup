@@ -45,6 +45,10 @@ func ParseCommandLineWithOptions(opts any, options flags.Options) error {
 		return errors.New("options parameter must be pointer")
 	}
 
+	if options&flags.IgnoreUnknown != 0 {
+		log.Warn("flags.IgnoreUnknown is set, unknown options are ignored.")
+	}
+
 	parser := flags.NewParser(opts, options)
 	parser.NamespaceDelimiter = "-"
 
