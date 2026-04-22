@@ -56,6 +56,6 @@ type slogErrorLogger struct {
 	logger *slog.Logger
 }
 
-func (l *slogErrorLogger) Println(v ...interface{}) {
+func (l *slogErrorLogger) Println(v ...any) {
 	l.logger.Error(strings.TrimSpace(fmt.Sprint(v...)))
 }

@@ -11,7 +11,7 @@ import (
 
 var log = slog.With(slog.String("prefix", "startup-base"))
 
-func FatalOnError(err error, reason string, args ...interface{}) {
+func FatalOnError(err error, reason string, args ...any) {
 	if err != nil {
 		log.Error("%s: %s", fmt.Sprintf(reason, args...), err)
 		os.Exit(1)
@@ -38,15 +38,15 @@ func OpenWriter(name string) (*os.File, error) {
 
 type StartupError error
 
-func Errorf(msg string, args ...interface{}) error {
+func Errorf(msg string, args ...any) error {
 	return StartupError(fmt.Errorf(msg, args...))
 }
 
-func Panicf(msg string, args ...interface{}) {
+func Panicf(msg string, args ...any) {
 	panic(Errorf(msg, args...))
 }
 
-func PanicOnError(err error, msg string, args ...interface{}) {
+func PanicOnError(err error, msg string, args ...any) {
 	if err != nil {
 		panic(Errorf("%s: %s", err, fmt.Sprintf(msg, args...)))
 	}

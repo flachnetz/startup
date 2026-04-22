@@ -15,7 +15,7 @@ type Unleash struct {
 	ApiToken string      `long:"unleash-api-token" default:"default:production.unleash-insecure-api-token" description:"Unleash API token"`
 }
 
-func InitUnleash(appName string, unleashUrl *url.URL, token string, listener interface{}) {
+func InitUnleash(appName string, unleashUrl *url.URL, token string, listener any) {
 	err := unleash.Initialize(
 		unleash.WithListener(listener),
 		unleash.WithAppName(appName),

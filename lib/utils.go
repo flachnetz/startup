@@ -31,7 +31,7 @@ func NoCancelContext(lookupContext context.Context) context.Context {
 	return context.WithoutCancel(lookupContext)
 }
 
-func IsStruct(v interface{}) bool {
+func IsStruct(v any) bool {
 	_, isStruct := v.(struct{})
 	return isStruct
 }

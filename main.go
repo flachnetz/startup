@@ -17,11 +17,11 @@ import (
 
 var log = slog.With(slog.String("prefix", "startup"))
 
-func MustParseCommandLine(opts interface{}) {
+func MustParseCommandLine(opts any) {
 	MustParseCommandLineWithOptions(opts, flags.HelpFlag|flags.PassDoubleDash)
 }
 
-func MustParseCommandLineWithOptions(opts interface{}, options flags.Options) {
+func MustParseCommandLineWithOptions(opts any, options flags.Options) {
 	if err := ParseCommandLineWithOptions(opts, options); err != nil {
 		cause := errors.Cause(err)
 
@@ -35,12 +35,12 @@ func MustParseCommandLineWithOptions(opts interface{}, options flags.Options) {
 	}
 }
 
-func ParseCommandLine(opts interface{}) error {
+func ParseCommandLine(opts any) error {
 	return ParseCommandLineWithOptions(opts, flags.HelpFlag|flags.PassDoubleDash)
 }
 
 // ParseCommandLineWithOptions Parses command line.
-func ParseCommandLineWithOptions(opts interface{}, options flags.Options) error {
+func ParseCommandLineWithOptions(opts any, options flags.Options) error {
 	if reflect.ValueOf(opts).Kind() != reflect.Ptr {
 		return errors.New("options parameter must be pointer")
 	}
