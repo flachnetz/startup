@@ -80,7 +80,7 @@ func ParseCommandLineWithOptions(opts any, options flags.Options) error {
 	})
 
 	if err := v.Struct(opts); err != nil {
-		return errors.WithMessage(err, "validate options struct")
+		return fmt.Errorf("validate options struct: %w", err)
 	}
 
 	seen := make(map[reflect.Type]reflect.Value)

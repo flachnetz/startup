@@ -5,9 +5,10 @@ import (
 	"sync"
 	"time"
 
+	"errors"
+
 	"github.com/flachnetz/startup/v2/startup_base"
 	sl "github.com/flachnetz/startup/v2/startup_logging"
-	"github.com/pkg/errors"
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"

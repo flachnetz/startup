@@ -2,12 +2,13 @@ package events
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"reflect"
 
 	confluent "github.com/Landoop/schema-registry"
 	rdkafka "github.com/confluentinc/confluent-kafka-go/v2/kafka"
-	"github.com/pkg/errors"
 )
 
 type EventSenderInitializer interface {
@@ -40,13 +41,13 @@ func (esi *eventSenderInitializer) Initialize() (EventSender, error) {
 	// create kafka topics if the event sender has a kafka sender
 	if esi.eventSender.KafkaSender != nil {
 		if err := esi.createKafkaTopics(); err != nil {
-			return nil, errors.WithMessage(err, "create kafka topics")
+			return nil, fmt.Errorf("create kafka topics: %w", err)
 		}
 	}
 
 	schemaIdCache, err := esi.registerSchemaCache()
 	if err != nil {
-		return nil, errors.WithMessage(err, "register confluent schemas")
+		return nil, fmt.Errorf("register confluent schemas: %w", err)
 	}
 
 	// mark the event sender as initialized
@@ -63,7 +64,7 @@ func (esi *eventSenderInitializer) Initialize() (EventSender, error) {
 
 func (esi *eventSenderInitializer) registerSchemaCache() (map[reflect.Type]uint32, error) {
 	if esi.eventSender.KafkaSender != nil && esi.ConfluentClient == nil {
-		return nil, errors.Errorf("confluent url must be defined if kafka is enabled")
+		return nil, fmt.Errorf("confluent url must be defined if kafka is enabled")
 	}
 
 	if esi.ConfluentClient == nil {
@@ -82,7 +83,7 @@ func (esi *eventSenderInitializer) registerSchemaCache() (map[reflect.Type]uint3
 		// register the schema with confluent
 		schemaId, err := esi.ConfluentClient.RegisterNewSchema(nameOf(event), event.Schema())
 		if err != nil {
-			return nil, errors.WithMessagef(err, "register schema for event type '%s'", eventType)
+			return nil, fmt.Errorf("register schema for event type '%s': %w", eventType, err)
 		}
 
 		// and cache the schema id for serializing later
@@ -100,7 +101,7 @@ func (esi *eventSenderInitializer) createKafkaTopics() error {
 
 	adminClient, err := rdkafka.NewAdminClientFromProducer(esi.eventSender.KafkaSender)
 	if err != nil {
-		return errors.WithMessage(err, "admin client")
+		return fmt.Errorf("admin client: %w", err)
 	}
 
 	defer func() { go adminClient.Close() }()
@@ -153,7 +154,7 @@ func (esi *eventSenderInitializer) createKafkaTopics() error {
 
 	// and then fail if we have any kind of error
 	if err != nil {
-		return errors.WithMessage(err, "topic creation")
+		return fmt.Errorf("topic creation: %w", err)
 	}
 
 	return nil
