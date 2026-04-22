@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/pkg/errors"
 )
 
 func WriteToOutbox(ctx context.Context, tx sqlx.ExecerContext, metadata EventMetadata, payload []byte) error {
@@ -39,13 +38,16 @@ func WriteToOutbox(ctx context.Context, tx sqlx.ExecerContext, metadata EventMet
 		FROM ids;
 	`
 	_, err := tx.ExecContext(ctx, stmt, topic, key, payload, headerKeys, headerValues)
-	return errors.WithMessage(err, "write event into database")
+	if err != nil {
+		return fmt.Errorf("write event into database: %w", err)
+	}
+	return nil
 }
 
 func CreateOutbox(ctx context.Context, db *sql.DB) error {
 	tx, err := db.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
-		return errors.WithMessage(err, "begin transaction")
+		return fmt.Errorf("begin transaction: %w", err)
 	}
 
 	createTable := `
@@ -67,11 +69,11 @@ func CreateOutbox(ctx context.Context, db *sql.DB) error {
 			log.Warn("Failed to rollback create outbox table transaction", slog.String("error", err.Error()))
 		}
 
-		return errors.WithMessage(err, "create table")
+		return fmt.Errorf("create table: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
-		return errors.WithMessage(err, "commit")
+		return fmt.Errorf("commit: %w", err)
 	}
 
 	return nil

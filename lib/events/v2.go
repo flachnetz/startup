@@ -12,10 +12,11 @@ import (
 	"sync"
 	"time"
 
+	"fmt"
+
 	confluent "github.com/Landoop/schema-registry"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/jmoiron/sqlx"
-	"github.com/pkg/errors"
 )
 
 type eventSender struct {
@@ -54,7 +55,7 @@ func NewInitializer(
 	// normalize event topics to fix any issues with pointer/non pointer types
 	eventTopicsNormalized, err := eventTopics.Normalized()
 	if err != nil {
-		return nil, errors.WithMessage(err, "normalize event topics")
+		return nil, fmt.Errorf("normalize event topics: %w", err)
 	}
 
 	eventSender := &eventSender{
@@ -90,7 +91,7 @@ func (ev *eventSender) SendAsyncCh() chan<- Event {
 func (ev *eventSender) SendInTx(ctx context.Context, tx sqlx.ExecerContext, event Event) error {
 	meta, avro, err := ev.encodeAvro(event)
 	if err != nil {
-		return errors.WithMessage(err, "encode event")
+		return fmt.Errorf("encode event: %w", err)
 	}
 
 	return WriteToOutbox(ctx, tx, *meta, avro)
@@ -151,17 +152,17 @@ func (ev *eventSender) writeToFile(event Event) error {
 
 	buf, err := json.Marshal(event)
 	if err != nil {
-		return errors.WithMessage(err, "marshal json")
+		return fmt.Errorf("marshal json: %w", err)
 	}
 
 	_, err = ev.FileSender.Write(bytes.TrimSpace(buf))
 	if err != nil {
-		return errors.WithMessage(err, "write to file")
+		return fmt.Errorf("write to file: %w", err)
 	}
 
 	_, err = ev.FileSender.Write([]byte("\n"))
 	if err != nil {
-		return errors.WithMessage(err, "write to file")
+		return fmt.Errorf("write to file: %w", err)
 	}
 
 	return nil
@@ -174,7 +175,7 @@ func (ev *eventSender) sendToKafka(event Event) error {
 
 	meta, avro, err := ev.encodeAvro(event)
 	if err != nil {
-		return errors.WithMessage(err, "encode event")
+		return fmt.Errorf("encode event: %w", err)
 	}
 
 	message := &kafka.Message{
@@ -207,7 +208,7 @@ func (ev *eventSender) sendToKafka(event Event) error {
 			}
 		}
 
-		return errors.WithMessage(err, "kafka produce")
+		return fmt.Errorf("kafka produce: %w", err)
 	}
 
 	return nil
@@ -216,17 +217,17 @@ func (ev *eventSender) sendToKafka(event Event) error {
 func (ev *eventSender) encodeAvro(event Event) (*EventMetadata, []byte, error) {
 	meta, err := ev.EventTypes.MetadataOf(event)
 	if err != nil {
-		return nil, nil, errors.WithMessage(err, "lookup event metadata")
+		return nil, nil, fmt.Errorf("lookup event metadata: %w", err)
 	}
 
 	schemaId, ok := ev.SchemaIdCache[meta.Type]
 	if !ok {
-		return nil, nil, errors.Errorf("no schema found for '%s'", meta.Type)
+		return nil, nil, fmt.Errorf("no schema found for '%s'", meta.Type)
 	}
 
 	avro, err := ev.eventToConfluentAvro(schemaId, event)
 	if err != nil {
-		return nil, nil, errors.WithMessage(err, "serialize to avro")
+		return nil, nil, fmt.Errorf("serialize to avro: %w", err)
 	}
 
 	return meta, avro, nil
@@ -246,7 +247,7 @@ func (ev *eventSender) eventToConfluentAvro(schemaId uint32, event Event) ([]byt
 
 	// serialize the event
 	if err := event.Serialize(&buffer); err != nil {
-		return nil, errors.WithMessage(err, "encode avro event")
+		return nil, fmt.Errorf("encode avro event: %w", err)
 	}
 
 	return buffer.Bytes(), nil

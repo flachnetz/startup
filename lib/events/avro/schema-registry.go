@@ -6,9 +6,10 @@ import (
 	"strconv"
 	"sync"
 
+	"fmt"
+
 	schemaregistry "github.com/Landoop/schema-registry"
 	"github.com/linkedin/goavro/v2"
-	"github.com/pkg/errors"
 )
 
 type SchemaRegistry struct {
@@ -30,22 +31,22 @@ func (r *SchemaRegistry) Get(key string) (*goavro.Codec, error) {
 		// try confluent registry next
 		schemaId, err := strconv.Atoi(key)
 		if err != nil {
-			return nil, errors.WithMessage(err, "parse schema id as integer")
+			return nil, fmt.Errorf("parse schema id as integer: %w", err)
 		}
 
 		avroSchema, err = r.ConfluentClient.GetSchemaByID(schemaId)
 		if err != nil {
-			return nil, errors.WithMessagef(err, "lookup schema in confluent %d", schemaId)
+			return nil, fmt.Errorf("lookup schema in confluent %d: %w", schemaId, err)
 		}
 
 	} else {
 		// still no schema? thats too bad
-		return nil, errors.Errorf("no schema found for key '%s'", key)
+		return nil, fmt.Errorf("no schema found for key '%s'", key)
 	}
 
 	codec, err := goavro.NewCodec(avroSchema)
 	if err != nil {
-		return nil, errors.WithMessage(err, "parse schema to codec")
+		return nil, fmt.Errorf("parse schema to codec: %w", err)
 	}
 
 	r.cache.Store(key, codec)

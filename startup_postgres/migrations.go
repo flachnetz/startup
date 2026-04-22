@@ -4,9 +4,10 @@ import (
 	"log/slog"
 	"os"
 
+	"fmt"
+
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/jmoiron/sqlx"
-	"github.com/pkg/errors"
 	migrate "github.com/rubenv/sql-migrate"
 )
 
@@ -24,7 +25,7 @@ func Migration(table, directory string) Initializer {
 		migrations := &migrate.FileMigrationSource{Dir: directory}
 		n, err := migrate.Exec(db.DB, "postgres", migrations, migrate.Up)
 		if err != nil {
-			return errors.WithMessage(err, "applying database migration")
+			return fmt.Errorf("applying database migration: %w", err)
 		}
 
 		slog.Info("Migrations executed",

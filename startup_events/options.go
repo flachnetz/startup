@@ -9,10 +9,12 @@ import (
 	"time"
 	"unicode"
 
+	"fmt"
+
 	confluent "github.com/Landoop/schema-registry"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+
 	"github.com/flachnetz/startup/v2/startup_tracing"
-	"github.com/pkg/errors"
 
 	"github.com/flachnetz/startup/v2/lib/events"
 	"github.com/flachnetz/startup/v2/startup_base"
@@ -60,12 +62,12 @@ func (opts *EventOptions) EventSender(clientId string) events.EventSender {
 func initializeEventSender(opts *EventOptions, clientId string) (events.EventSender, error) {
 	confluentClient, err := confluentClient(opts.ConfluentURL)
 	if err != nil {
-		return nil, errors.WithMessage(err, "confluent registry client")
+		return nil, fmt.Errorf("confluent registry client: %w", err)
 	}
 
 	kafkaSender, err := kafkaSender(opts, clientId)
 	if err != nil {
-		return nil, errors.WithMessage(err, "kafka client")
+		return nil, fmt.Errorf("kafka client: %w", err)
 	}
 
 	fileSender, err := fileSender(opts.WriteToFile)
@@ -74,7 +76,7 @@ func initializeEventSender(opts *EventOptions, clientId string) (events.EventSen
 			kafkaSender.Close()
 		}
 
-		return nil, errors.WithMessage(err, "file sender")
+		return nil, fmt.Errorf("file sender: %w", err)
 	}
 
 	// build list of topics parameterized with the replication factor that we
@@ -100,7 +102,7 @@ func initializeEventSender(opts *EventOptions, clientId string) (events.EventSen
 			_ = fileSender.Close()
 		}
 
-		return nil, errors.WithMessage(err, "initialize event sender")
+		return nil, fmt.Errorf("initialize event sender: %w", err)
 	}
 
 	defer startup_base.Close(
@@ -152,13 +154,13 @@ func kafkaSender(opts *EventOptions, clientId string) (*kafka.Producer, error) {
 
 	for _, value := range opts.Async.Kafka.Properties {
 		if err := kafkaConfig.Set(value); err != nil {
-			return nil, errors.WithMessagef(err, "parse kafka config %q", value)
+			return nil, fmt.Errorf("parse kafka config %q: %w", value, err)
 		}
 	}
 
 	kafkaClient, err := kafka.NewProducer(&kafkaConfig)
 	if err != nil {
-		return nil, errors.WithMessage(err, "kafka producer")
+		return nil, fmt.Errorf("kafka producer: %w", err)
 	}
 
 	return kafkaClient, nil

@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"log/slog"
+	"errors"
 
-	"github.com/pkg/errors"
+	"log/slog"
 )
 
 type EventSource struct {
