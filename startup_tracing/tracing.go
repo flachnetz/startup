@@ -69,12 +69,3 @@ func (opts *TracingOptions) Initialize() {
 		))
 	})
 }
-
-type slogWriter struct {
-	logger *slog.Logger
-}
-
-func (w slogWriter) Write(p []byte) (int, error) {
-	w.logger.Info(string(p))
-	return len(p), nil
-}
