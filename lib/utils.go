@@ -1,23 +1,23 @@
 package lib
 
 import (
+	"cmp"
 	"context"
-
-	"golang.org/x/exp/constraints"
 )
 
+//go:fix inline
 func PtrOf[T any](value T) *T {
-	return &value
+	return new(value)
 }
 
-func Min[T constraints.Ordered](a, b T) T {
+func Min[T cmp.Ordered](a, b T) T {
 	if a < b {
 		return a
 	}
 	return b
 }
 
-func Max[T constraints.Ordered](a, b T) T {
+func Max[T cmp.Ordered](a, b T) T {
 	if a > b {
 		return a
 	}

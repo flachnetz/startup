@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/flachnetz/startup/v2/lib"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
@@ -17,7 +16,7 @@ func WriteToOutbox(ctx context.Context, tx sqlx.ExecerContext, metadata EventMet
 	key := metadata.Key
 
 	if key == nil {
-		key = lib.PtrOf(fmt.Sprintf("%d", time.Now().UnixMilli()))
+		key = new(fmt.Sprintf("%d", time.Now().UnixMilli()))
 	}
 
 	headerKeys := make([]string, 0, len(metadata.Headers))

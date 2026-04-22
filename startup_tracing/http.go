@@ -16,7 +16,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/flachnetz/startup/v2/lib"
 	"github.com/flachnetz/startup/v2/startup_http"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -78,7 +77,7 @@ func Tracing(service string, op string) startup_http.HttpMiddleware {
 }
 
 func cleanUrl(u *url.URL) string {
-	urlCopy := lib.PtrOf(*u)
+	urlCopy := new(*u)
 	urlCopy.RawQuery = ""
 	urlCopy.User = nil
 

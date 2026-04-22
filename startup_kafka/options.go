@@ -2,6 +2,7 @@ package startup_kafka
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -33,9 +34,7 @@ func (opts KafkaOptions) NewConsumer(config kafka.ConfigMap) *kafka.Consumer {
 		"enable.auto.commit": "false",
 	}
 
-	for key, value := range config {
-		configMap[key] = value
-	}
+	maps.Copy(configMap, config)
 
 	for _, prop := range opts.KafkaProperties {
 		err := configMap.Set(prop)
