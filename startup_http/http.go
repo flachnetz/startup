@@ -21,7 +21,6 @@ import (
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/goji/httpauth"
 	"github.com/gorilla/handlers"
-	"github.com/julienschmidt/httprouter"
 )
 
 type Config struct {
@@ -30,7 +29,7 @@ type Config struct {
 
 	// Routing configuration. You can use the supplied router or
 	// return your own handler.
-	Routing func(*httprouter.Router) http.Handler
+	Routing func(*http.ServeMux) http.Handler
 
 	// Extra admin handlers to register on the admin page
 	AdminHandlers []admin.RouteConfig
@@ -43,6 +42,8 @@ type Config struct {
 	// be to use a tracing middleware at this point.
 	UseMiddleware HttpMiddleware
 }
+
+type HttpMiddleware func(http.Handler) http.Handler
 
 type HTTPOptions struct {
 	Address string `long:"http-address" default:":3080" description:"Address to listen on."`
@@ -96,7 +97,7 @@ func (opts HTTPOptions) Serve(config Config) {
 		}))
 	}
 
-	router := httprouter.New()
+	router := http.NewServeMux()
 
 	// configure app routes
 	var handler http.Handler = router
@@ -120,8 +121,11 @@ func (opts HTTPOptions) Serve(config Config) {
 	handler = mergeWithAdminHandler(adminHandler, handler)
 
 	// don't let a panic crash the server.
-	handler = handlers.RecoveryHandler(handlers.PrintRecoveryStack(true),
-		handlers.RecoveryLogger(NewSlogRecoveryHandlerLogger()))(handler)
+	recoveryStack := handlers.RecoveryHandler(
+		handlers.PrintRecoveryStack(true),
+		handlers.RecoveryLogger(NewSlogRecoveryHandlerLogger()))
+
+	handler = recoveryStack(handler)
 
 	if opts.AccessLog == "" {
 		// log all requests using slog logger
@@ -232,14 +236,14 @@ func RegisterSignalHandlerForServer(server *http.Server) <-chan struct{} {
 	return waitCh
 }
 
-func tryRegisterAdminHandlerRedirect(router *httprouter.Router) {
+func tryRegisterAdminHandlerRedirect(router *http.ServeMux) {
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Debug("Admin handler redirect from / to /admin not possible")
 		}
 	}()
 
-	router.Handler("GET", "/",
+	router.Handle("GET /",
 		http.RedirectHandler("/admin", http.StatusTemporaryRedirect))
 }
 
