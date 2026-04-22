@@ -15,9 +15,9 @@ import (
 )
 
 type PrometheusConfig struct {
-	Disabled bool   `long:"prometheus-disabled" description:"Disable Prometheus metrics endpoint"`
-	Path     string `long:"prometheus-path" default:"/metrics" description:"Path for Prometheus metrics endpoint"`
-	Port     string `long:"prometheus-port" default:":9090" description:"Port for Prometheus metrics endpoint"`
+	Disabled bool   `long:"prometheus-disabled" env:"PROMETHEUS_DISABLED" description:"Disable Prometheus metrics endpoint"`
+	Path     string `long:"prometheus-path" env:"PROMETHEUS_PATH" default:"/metrics" description:"Path for Prometheus metrics endpoint"`
+	Port     string `long:"prometheus-port" env:"PROMETHEUS_PORT" default:":9090" description:"Port for Prometheus metrics endpoint"`
 
 	httpServer *http.Server
 }
@@ -56,6 +56,6 @@ type slogErrorLogger struct {
 	logger *slog.Logger
 }
 
-func (l *slogErrorLogger) Println(v ...interface{}) {
+func (l *slogErrorLogger) Println(v ...any) {
 	l.logger.Error(strings.TrimSpace(fmt.Sprint(v...)))
 }

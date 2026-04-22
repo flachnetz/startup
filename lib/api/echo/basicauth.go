@@ -6,7 +6,7 @@ import (
 )
 
 type RestUsers struct {
-	RestUser map[string]string `long:"http-rest-user" description:"Usernames for REST API access."`
+	RestUser map[string]string `long:"http-rest-user" env:"HTTP_REST_USER" description:"Usernames for REST API access."`
 }
 
 func BasicAuthValidator(basicAuthUser string, basicAuthPassword string) middleware.BasicAuthValidator {

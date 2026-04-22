@@ -17,7 +17,7 @@ type Error struct {
 	ErrorCode        string                  `json:"errorCode"`
 	ErrorDescription string                  `json:"errorDescription"`
 	Field            *string                 `json:"field,omitempty"`
-	Info             *map[string]interface{} `json:"info,omitempty"`
+	Info             *map[string]any `json:"info,omitempty"`
 	HttpStatusCode   int                     `json:"-"`
 	BaseError        error                   `json:"-"`
 }
@@ -63,7 +63,7 @@ func (e ErrorResponse) Error() string {
 	return e.MainError.Error()
 }
 
-func NewErrorResponse(errorCode string, errorDescription string, field string, info map[string]interface{}) ErrorResponse {
+func NewErrorResponse(errorCode string, errorDescription string, field string, info map[string]any) ErrorResponse {
 	e := Error{
 		ErrorCode:        errorCode,
 		ErrorDescription: errorDescription,

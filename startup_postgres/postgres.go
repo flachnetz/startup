@@ -28,11 +28,11 @@ import (
 type Initializer func(db *sqlx.DB) error
 
 type PostgresOptions struct {
-	URL                string `long:"postgres" default:"postgres://postgres:postgres@localhost:5432?sslmode=disable" description:"Postgres server url."`
-	PoolSize           int    `long:"postgres-pool" validate:"min=1" default:"8" description:"Maximum number of (idle) connections in the postgres connection pool."`
-	EnableQueryLogging bool   `long:"enable-query-logging" description:"Enable query logging."`
+	URL                string `long:"postgres" env:"POSTGRES" default:"postgres://postgres:postgres@localhost:5432?sslmode=disable" description:"Postgres server url."`
+	PoolSize           int    `long:"postgres-pool" env:"POSTGRES_POOL" validate:"min=1" default:"8" description:"Maximum number of (idle) connections in the postgres connection pool."`
+	EnableQueryLogging bool   `long:"enable-query-logging" env:"ENABLE_QUERY_LOGGING" description:"Enable query logging."`
 
-	ConnectionLifetime time.Duration `long:"postgres-lifetime" default:"10m" description:"Maximum time a connection in the pool can be used."`
+	ConnectionLifetime time.Duration `long:"postgres-lifetime" env:"POSTGRES_LIFETIME" default:"10m" description:"Maximum time a connection in the pool can be used."`
 
 	Inputs struct {
 		// An optional initializer. This might be used to do

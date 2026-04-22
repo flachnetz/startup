@@ -22,7 +22,7 @@ type OTELMetricsOptions struct {
 	PrometheusConfig PrometheusConfig
 
 	Inputs struct {
-		ServiceName string `long:"service-name" description:"Service name for metrics"`
+		ServiceName string `long:"service-name" env:"SERVICE_NAME" description:"Service name for metrics"`
 	}
 
 	once sync.Once

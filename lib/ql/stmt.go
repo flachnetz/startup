@@ -9,7 +9,7 @@ import (
 
 // Get runs the given query and parses the result into an object of type T.
 // If not object can be found the method will return sql.ErrNoRows and a value of nil.
-func Get[T any](ctx TxContext, query string, args ...interface{}) (*T, error) {
+func Get[T any](ctx TxContext, query string, args ...any) (*T, error) {
 	var resultValue T
 
 	err := sqlx.GetContext(ctx, ctx, &resultValue, query, args...)

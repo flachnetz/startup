@@ -88,7 +88,7 @@ func (c *Consumer) Run() {
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
 
-		doStuffAndCommit := func(message map[string]interface{}) error {
+		doStuffAndCommit := func(message map[string]any) error {
 			// stuff(message)
 
 			// commit whatever we've read

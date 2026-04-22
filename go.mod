@@ -7,7 +7,6 @@ require (
 	github.com/confluentinc/confluent-kafka-go/v2 v2.14.1
 	github.com/felixge/httpsnoop v1.0.4
 	github.com/flachnetz/go-admin v1.5.3
-	github.com/go-json-experiment/json v0.0.0-20260214004413-d219187c3433
 	github.com/goji/httpauth v0.0.0-20160601135302-2da839ab0f4d
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/gorilla/handlers v1.5.2
@@ -16,7 +15,6 @@ require (
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/jmoiron/sqlx v1.4.0
-	github.com/julienschmidt/httprouter v1.3.0
 	github.com/labstack/echo/v4 v4.15.1
 	github.com/lestrrat-go/jwx v1.2.31
 	github.com/linkedin/goavro/v2 v2.15.0

@@ -13,7 +13,7 @@ import (
 )
 
 type EventSource struct {
-	Record interface{}
+	Record any
 	Schema string
 }
 
@@ -32,7 +32,7 @@ func NewConverter(registry *SchemaRegistry, options ConverterOptions) *Converter
 	return &Converter{log: slog.With(slog.String("prefix", "avro-converter")), registry: registry, options: options}
 }
 
-func (c *Converter) Parse(data []byte) (map[string]interface{}, *EventSource, error) {
+func (c *Converter) Parse(data []byte) (map[string]any, *EventSource, error) {
 	if bytes.HasPrefix(data, []byte("Obj\x01")) {
 		// This isn't used anymore, i think.
 		return nil, nil, errors.New("events in avro container format not supported")
@@ -61,7 +61,7 @@ func (c *Converter) hexadecimalCharsOnly(bytes []byte) bool {
 	return true
 }
 
-func (c *Converter) decode(hash string, data []byte) (map[string]interface{}, *EventSource, error) {
+func (c *Converter) decode(hash string, data []byte) (map[string]any, *EventSource, error) {
 	// get the codec for the provided hash
 	codec, err := c.registry.Get(hash)
 	if err != nil {
@@ -77,17 +77,17 @@ func (c *Converter) decode(hash string, data []byte) (map[string]interface{}, *E
 	// convert form "avro native" to a clean go value.
 	parsed := c.ConvertAvroToGo(original)
 
-	return parsed.(map[string]interface{}), &EventSource{original, codec.Schema()}, nil
+	return parsed.(map[string]any), &EventSource{original, codec.Schema()}, nil
 }
 
-func (c *Converter) ConvertAvroToGo(input interface{}) interface{} {
+func (c *Converter) ConvertAvroToGo(input any) any {
 	switch input := input.(type) {
-	case map[string]interface{}:
+	case map[string]any:
 		if result, ok := c.simplifyAvroType(input); ok {
 			return c.ConvertAvroToGo(result)
 		}
 
-		result := make(map[string]interface{}, len(input))
+		result := make(map[string]any, len(input))
 
 		for key, value := range input {
 			if c.options.ToLowerCase {
@@ -98,8 +98,8 @@ func (c *Converter) ConvertAvroToGo(input interface{}) interface{} {
 
 		return result
 
-	case []interface{}:
-		result := make([]interface{}, 0, len(input))
+	case []any:
+		result := make([]any, 0, len(input))
 		for _, value := range input {
 			result = append(result, c.ConvertAvroToGo(value))
 		}
@@ -111,7 +111,7 @@ func (c *Converter) ConvertAvroToGo(input interface{}) interface{} {
 	}
 }
 
-func (c *Converter) simplifyAvroType(value map[string]interface{}) (interface{}, bool) {
+func (c *Converter) simplifyAvroType(value map[string]any) (any, bool) {
 	if len(value) == 1 {
 		for key, actualValue := range value {
 			switch key {
