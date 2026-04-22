@@ -47,20 +47,6 @@ func (c *Converter) Parse(data []byte) (map[string]any, *EventSource, error) {
 	return nil, nil, fmt.Errorf("parse event %q", string(data))
 }
 
-/**
- * Checks if the given number of bytes only contain hexadecimal characters
- */
-func (c *Converter) hexadecimalCharsOnly(bytes []byte) bool {
-	for _, by := range bytes {
-		hexChar := (by >= 'a' && by <= 'f') || (by >= '0' && by <= '9')
-		if !hexChar {
-			return false
-		}
-	}
-
-	return true
-}
-
 func (c *Converter) decode(hash string, data []byte) (map[string]any, *EventSource, error) {
 	// get the codec for the provided hash
 	codec, err := c.registry.Get(hash)

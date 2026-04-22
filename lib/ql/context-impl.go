@@ -37,7 +37,7 @@ func (c *txContext) CommitAndChain() error {
 		return err
 	}
 
-	c.hooks.RunOnCommit()
+	c.RunOnCommit()
 
 	return nil
 }
