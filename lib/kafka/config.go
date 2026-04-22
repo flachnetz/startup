@@ -11,14 +11,14 @@ type slogAdapter struct {
 	delegate *slog.Logger
 }
 
-func (l slogAdapter) Print(v ...interface{}) {
+func (l slogAdapter) Print(v ...any) {
 	l.delegate.Info(strings.TrimSpace(fmt.Sprint(v...)))
 }
 
-func (l slogAdapter) Printf(format string, v ...interface{}) {
+func (l slogAdapter) Printf(format string, v ...any) {
 	l.delegate.Info(strings.TrimSpace(fmt.Sprintf(format, v...)))
 }
 
-func (l slogAdapter) Println(v ...interface{}) {
+func (l slogAdapter) Println(v ...any) {
 	l.delegate.Info(strings.TrimSpace(fmt.Sprint(v...)))
 }

@@ -19,20 +19,20 @@ import (
 )
 
 type EventOptions struct {
-	ConfluentURL string `long:"event-sender-confluent-url" default:"http://confluent-registry.shared.svc.cluster.local" description:"Confluent schema registry url."`
+	ConfluentURL string `long:"event-sender-confluent-url" env:"EVENT_SENDER_CONFLUENT_URL" default:"http://confluent-registry.shared.svc.cluster.local" description:"Confluent schema registry url."`
 
 	Async struct {
 		Kafka struct {
-			Addr        string   `long:"event-sender-kafka-addr" default:"kafka.shared.svc.cluster.local:9093" description:"Kafka bootstrap hosts"`
-			DisableTLS  bool     `long:"event-sender-kafka-disable-tls" description:"Disable TLS, might simplify local testing"`
-			Replication int16    `long:"event-sender-kafka-replication-factor" default:"3" description:"Replication factor to use when creating kafka topics"`
-			Properties  []string `long:"event-sender-kafka-properties" description:"Pairs of key=value containing standard librdkafka configuration properties as documented in: https://github.com/edenhill/librdkafka/tree/master/CONFIGURATION.md"`
+			Addr        string   `long:"event-sender-kafka-addr" env:"EVENT_SENDER_KAFKA_ADDR" default:"kafka.shared.svc.cluster.local:9093" description:"Kafka bootstrap hosts"`
+			DisableTLS  bool     `long:"event-sender-kafka-disable-tls" env:"EVENT_SENDER_KAFKA_DISABLE_TLS" description:"Disable TLS, might simplify local testing"`
+			Replication int16    `long:"event-sender-kafka-replication-factor" env:"EVENT_SENDER_KAFKA_REPLICATION_FACTOR" default:"3" description:"Replication factor to use when creating kafka topics"`
+			Properties  []string `long:"event-sender-kafka-properties" env:"EVENT_SENDER_KAFKA_PROPERTIES" description:"Pairs of key=value containing standard librdkafka configuration properties as documented in: https://github.com/edenhill/librdkafka/tree/master/CONFIGURATION.md"`
 		}
 
-		BufferSize uint `long:"event-sender-async-buffer-size" default:"1024" description:"Number of elements to buffer in async event sender. If the buffer is full, new events will be discarded."`
+		BufferSize uint `long:"event-sender-async-buffer-size" env:"EVENT_SENDER_ASYNC_BUFFER_SIZE" default:"1024" description:"Number of elements to buffer in async event sender. If the buffer is full, new events will be discarded."`
 	}
 
-	WriteToFile string `long:"event-sender-file" description:"File to write all events to. Sender will be encoded as json"`
+	WriteToFile string `long:"event-sender-file" env:"EVENT_SENDER_FILE" description:"File to write all events to. Sender will be encoded as json"`
 
 	Inputs struct {
 		// A function to create the event topics. This option must be specified.

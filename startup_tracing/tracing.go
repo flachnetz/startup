@@ -17,7 +17,7 @@ import (
 var log = slog.With(slog.String("prefix", "tracing"))
 
 type TracingOptions struct {
-	HttpEndpoint string `long:"otlp-trace-endpoint-http" validate:"omitempty" description:"OTLP HTTP endpoint for traces, e.g. localhost:4318"`
+	HttpEndpoint string `long:"otlp-trace-endpoint-http" env:"OTLP_TRACE_ENDPOINT_HTTP" validate:"omitempty" description:"OTLP HTTP endpoint for traces, e.g. localhost:4318"`
 
 	Inputs struct {
 		// The service name of your application

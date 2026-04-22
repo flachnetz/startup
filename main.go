@@ -17,11 +17,11 @@ import (
 
 var log = slog.With(slog.String("prefix", "startup"))
 
-func MustParseCommandLine(opts interface{}) {
+func MustParseCommandLine(opts any) {
 	MustParseCommandLineWithOptions(opts, flags.HelpFlag|flags.PassDoubleDash)
 }
 
-func MustParseCommandLineWithOptions(opts interface{}, options flags.Options) {
+func MustParseCommandLineWithOptions(opts any, options flags.Options) {
 	if err := ParseCommandLineWithOptions(opts, options); err != nil {
 		cause := errors.Cause(err)
 
@@ -35,14 +35,18 @@ func MustParseCommandLineWithOptions(opts interface{}, options flags.Options) {
 	}
 }
 
-func ParseCommandLine(opts interface{}) error {
+func ParseCommandLine(opts any) error {
 	return ParseCommandLineWithOptions(opts, flags.HelpFlag|flags.PassDoubleDash)
 }
 
 // ParseCommandLineWithOptions Parses command line.
-func ParseCommandLineWithOptions(opts interface{}, options flags.Options) error {
-	if reflect.ValueOf(opts).Kind() != reflect.Ptr {
+func ParseCommandLineWithOptions(opts any, options flags.Options) error {
+	if reflect.ValueOf(opts).Kind() != reflect.Pointer {
 		return errors.New("options parameter must be pointer")
+	}
+
+	if options&flags.IgnoreUnknown != 0 {
+		log.Warn("flags.IgnoreUnknown is set, unknown options are ignored.")
 	}
 
 	parser := flags.NewParser(opts, options)
@@ -75,8 +79,7 @@ func ParseCommandLineWithOptions(opts interface{}, options flags.Options) error 
 
 	// now do the initialization for all fields
 	value := reflect.ValueOf(opts).Elem()
-	for idx := 0; idx < value.NumField(); idx++ {
-		fieldValue := value.Field(idx)
+	for _, fieldValue := range value.Fields() {
 		if fieldValue.Kind() != reflect.Struct {
 			continue
 		}
@@ -90,11 +93,11 @@ func ParseCommandLineWithOptions(opts interface{}, options flags.Options) error 
 			var inputValues []reflect.Value
 
 			initType := init.Type()
-			for idx := 0; idx < initType.NumIn(); idx++ {
-				inputValue := seen[initType.In(idx)]
+			for in := range initType.Ins() {
+				inputValue := seen[in]
 				if !inputValue.IsValid() {
 					startup_base.Panicf("Can not find value of type %s to inject into %s",
-						initType.In(idx).String(), fieldValue.Type())
+						in.String(), fieldValue.Type())
 				}
 
 				inputValues = append(inputValues, inputValue)

@@ -18,7 +18,7 @@ type TemplateResponse struct {
 	FailPointLocations       map[FailPointLocation]FailPoint
 }
 
-func renderIndex(w io.Writer, model interface{}) error {
+func renderIndex(w io.Writer, model any) error {
 	t := template.New("failpoint.gohtml").Funcs(
 		template.FuncMap{
 			"join": strings.Join,

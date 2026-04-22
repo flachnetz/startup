@@ -21,7 +21,7 @@ func NewSlogRecoveryHandlerLogger() *SlogRecoveryHandlerLogger {
 // Println implements the handlers.RecoveryHandlerLogger interface.
 // It receives the arguments from RecoveryHandler (typically panic_value, stack_trace_string)
 // and logs them as structured JSON at slog.LevelError.
-func (l *SlogRecoveryHandlerLogger) Println(v ...interface{}) {
+func (l *SlogRecoveryHandlerLogger) Println(v ...any) {
 	var panicMessage string
 	var stackTrace string
 	var attrs []any

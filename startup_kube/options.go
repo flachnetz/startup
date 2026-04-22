@@ -8,8 +8,8 @@ import (
 )
 
 type KubernetesOptions struct {
-	KubeConfig  string `long:"kube-config" description:"Filename of the kubeconfig to use. Uses in cluster config if not specified"`
-	KubeContext string `long:"kube-context" description:"Select the kubernetes context to use from the config"`
+	KubeConfig  string `long:"kube-config" env:"KUBE_CONFIG" description:"Filename of the kubeconfig to use. Uses in cluster config if not specified"`
+	KubeContext string `long:"kube-context" env:"KUBE_CONTEXT" description:"Select the kubernetes context to use from the config"`
 }
 
 func (opts *KubernetesOptions) Client() *kubernetes.Clientset {

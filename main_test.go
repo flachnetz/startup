@@ -8,7 +8,7 @@ import (
 )
 
 type testStruct struct {
-	PostgresURL string `long:"postgres-url" description:"Read data from postgres."`
+	PostgresURL string `long:"postgres-url" env:"POSTGRES_URL" description:"Read data from postgres."`
 }
 
 func TestParseCommandLineWithOptions(t *testing.T) {

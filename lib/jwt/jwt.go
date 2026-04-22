@@ -22,10 +22,10 @@ type JwtStruct struct {
 	CustomerNumber string        `json:"customerNumber"`
 	Locale         string        `json:"locale"`
 	DeviceID       string        `json:"deviceId"`
-	Authorities    []interface{} `json:"authorities"`
+	Authorities    []any `json:"authorities"`
 	ClientID       string        `json:"client_id"`
 	Site           string        `json:"site"`
-	Scope          []interface{} `json:"scope"`
+	Scope          []any `json:"scope"`
 	GrantType      string        `json:"grant_type"`
 }
 
@@ -132,7 +132,7 @@ func GetJwtToken(authHeader string, options ...jwt.ParseOption) (*JwtStruct, err
 	}
 
 	if v, ok := t.Get("authorities"); ok {
-		claims.Authorities = v.([]interface{})
+		claims.Authorities = v.([]any)
 	}
 
 	if v, ok := t.Get("clientID"); ok {
@@ -144,7 +144,7 @@ func GetJwtToken(authHeader string, options ...jwt.ParseOption) (*JwtStruct, err
 	}
 
 	if v, ok := t.Get("scope"); ok {
-		claims.Scope = v.([]interface{})
+		claims.Scope = v.([]any)
 	}
 
 	if v, ok := t.Get("grant_type"); ok {

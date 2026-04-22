@@ -43,14 +43,14 @@ func init() {
 }
 
 type BaseOptions struct {
-	Logfile                string `long:"log-file" description:"Write logs to a different file. Defaults to stdout."`
-	ForceColor             bool   `long:"log-color" description:"Forces colored output even on non TTYs."`
-	JSONFormatter          bool   `long:"log-json" description:"Log using the logrus json formatter."`
-	JSONFormatterLogSource bool   `long:"log-json-source" description:"When doing json logging, log source code file and position as well."`
+	Logfile                string `long:"log-file" env:"LOG_FILE" description:"Write logs to a different file. Defaults to stdout."`
+	ForceColor             bool   `long:"log-color" env:"LOG_COLOR" description:"Forces colored output even on non TTYs."`
+	JSONFormatter          bool   `long:"log-json" env:"LOG_JSON" description:"Log using the logrus json formatter."`
+	JSONFormatterLogSource bool   `long:"log-json-source" env:"LOG_JSON_SOURCE" description:"When doing json logging, log source code file and position as well."`
 
-	Verbose     bool   `long:"verbose" description:"Show verbose logging output."`
-	Version     bool   `long:"version" description:"Prints the build information about this application if available."`
-	Environment string `long:"environment" description:"The environment this application is running in."`
+	Verbose     bool   `long:"verbose" env:"VERBOSE" description:"Show verbose logging output."`
+	Version     bool   `long:"version" env:"VERSION" description:"Prints the build information about this application if available."`
+	Environment string `long:"environment" env:"ENVIRONMENT" description:"The environment this application is running in."`
 }
 
 func (opts *BaseOptions) Initialize() {
