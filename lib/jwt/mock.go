@@ -1,14 +1,13 @@
 package jwt
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/benbjohnson/clock"
-
-	"github.com/pkg/errors"
 )
 
 type MockService struct {

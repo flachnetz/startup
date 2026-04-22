@@ -1,6 +1,7 @@
 package startup
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -10,12 +11,12 @@ import (
 	"log/slog"
 
 	"github.com/flachnetz/startup/v2/startup_base"
+	"github.com/go-playground/validator/v10"
 	"github.com/jessevdk/go-flags"
-	"github.com/pkg/errors"
-	"gopkg.in/go-playground/validator.v9"
+	"github.com/joho/godotenv"
 )
 
-var log = slog.With(slog.String("prefix", "startup"))
+var log = slog.With(slog.String("system", "startup"))
 
 func MustParseCommandLine(opts any) {
 	MustParseCommandLineWithOptions(opts, flags.HelpFlag|flags.PassDoubleDash)
@@ -23,12 +24,8 @@ func MustParseCommandLine(opts any) {
 
 func MustParseCommandLineWithOptions(opts any, options flags.Options) {
 	if err := ParseCommandLineWithOptions(opts, options); err != nil {
-		cause := errors.Cause(err)
-
-		if cause, ok := cause.(*flags.Error); ok && cause.Type == flags.ErrHelp {
+		if cause, ok := errors.AsType[*flags.Error](err); ok && cause.Type == flags.ErrHelp {
 			_, _ = fmt.Fprintln(os.Stdout, cause)
-		} else {
-			_, _ = fmt.Fprintln(os.Stderr, err)
 		}
 
 		os.Exit(1)
@@ -43,6 +40,17 @@ func ParseCommandLine(opts any) error {
 func ParseCommandLineWithOptions(opts any, options flags.Options) error {
 	if reflect.ValueOf(opts).Kind() != reflect.Pointer {
 		return errors.New("options parameter must be pointer")
+	}
+
+	envFile := os.Getenv("ENV_FILE")
+	if envFile == "" {
+		envFile = ".env"
+	}
+
+	if err := godotenv.Load(envFile); err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("load env file %q: %w", envFile, err)
+		}
 	}
 
 	if options&flags.IgnoreUnknown != 0 {
@@ -72,7 +80,7 @@ func ParseCommandLineWithOptions(opts any, options flags.Options) error {
 	})
 
 	if err := v.Struct(opts); err != nil {
-		return errors.WithMessage(err, "validate options struct")
+		return fmt.Errorf("validate options struct: %w", err)
 	}
 
 	seen := make(map[reflect.Type]reflect.Value)
@@ -96,7 +104,7 @@ func ParseCommandLineWithOptions(opts any, options flags.Options) error {
 			for in := range initType.Ins() {
 				inputValue := seen[in]
 				if !inputValue.IsValid() {
-					startup_base.Panicf("Can not find value of type %s to inject into %s",
+					startup_base.Panicf("Can not find value of type %q to inject into %s",
 						in.String(), fieldValue.Type())
 				}
 

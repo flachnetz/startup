@@ -3,6 +3,7 @@ package idempotency
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -13,7 +14,7 @@ import (
 
 	sl "github.com/flachnetz/startup/v2/startup_logging"
 	"github.com/jmoiron/sqlx"
-	"github.com/pkg/errors"
+
 	"github.com/robfig/cron/v3"
 )
 
@@ -87,7 +88,7 @@ func NewIdempotencyStore(db *sqlx.DB, cleanUpThresholdInDays int) (IdempotencySt
 		}
 	})
 	if err != nil {
-		return nil, errors.Errorf("failed to schedule idempotency cleanup job: %q", err)
+		return nil, fmt.Errorf("failed to schedule idempotency cleanup job: %q", err)
 	}
 	i.c.Start()
 	return i, nil

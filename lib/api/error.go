@@ -14,12 +14,12 @@ var (
 )
 
 type Error struct {
-	ErrorCode        string                  `json:"errorCode"`
-	ErrorDescription string                  `json:"errorDescription"`
-	Field            *string                 `json:"field,omitempty"`
+	ErrorCode        string          `json:"errorCode"`
+	ErrorDescription string          `json:"errorDescription"`
+	Field            *string         `json:"field,omitempty"`
 	Info             *map[string]any `json:"info,omitempty"`
-	HttpStatusCode   int                     `json:"-"`
-	BaseError        error                   `json:"-"`
+	HttpStatusCode   int             `json:"-"`
+	BaseError        error           `json:"-"`
 }
 
 func (e Error) WithBaseError(err error) Error {

@@ -3,13 +3,14 @@ package ql
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 
 	"github.com/hashicorp/go-multierror"
 
 	sl "github.com/flachnetz/startup/v2/startup_logging"
 	pt "github.com/flachnetz/startup/v2/startup_postgres"
 	"github.com/jmoiron/sqlx"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -140,7 +141,7 @@ func beginTx(ctx context.Context, txStarter TxStarter) (*sqlx.Tx, func(), error)
 		// get the connection from the pool
 		conn, err := acquireConnection(ctx, pool)
 		if err != nil {
-			return nil, nil, errors.WithMessage(err, "get connection from pool")
+			return nil, nil, fmt.Errorf("get connection from pool: %w", err)
 		}
 
 		// and begin a connection on this trace
@@ -151,7 +152,7 @@ func beginTx(ctx context.Context, txStarter TxStarter) (*sqlx.Tx, func(), error)
 				err = multierror.Append(err, errClose)
 			}
 
-			return nil, nil, errors.WithMessage(err, "start transaction")
+			return nil, nil, fmt.Errorf("start transaction: %w", err)
 		}
 
 		closeConn := func() { _ = conn.Close() }

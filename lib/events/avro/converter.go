@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"log/slog"
+	"errors"
 
-	"github.com/pkg/errors"
+	"log/slog"
 )
 
 type EventSource struct {
@@ -44,21 +44,7 @@ func (c *Converter) Parse(data []byte) (map[string]any, *EventSource, error) {
 		return c.decode(strconv.Itoa(int(schemaId)), data[5:])
 	}
 
-	return nil, nil, fmt.Errorf("parse event %s", string(data))
-}
-
-/**
- * Checks if the given number of bytes only contain hexadecimal characters
- */
-func (c *Converter) hexadecimalCharsOnly(bytes []byte) bool {
-	for _, by := range bytes {
-		hexChar := (by >= 'a' && by <= 'f') || (by >= '0' && by <= '9')
-		if !hexChar {
-			return false
-		}
-	}
-
-	return true
+	return nil, nil, fmt.Errorf("parse event %q", string(data))
 }
 
 func (c *Converter) decode(hash string, data []byte) (map[string]any, *EventSource, error) {

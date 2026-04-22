@@ -1,19 +1,19 @@
 package pg
 
 import (
+	"fmt"
 	"hash/fnv"
 
 	"github.com/flachnetz/startup/v2/lib/ql"
-	"github.com/pkg/errors"
 )
 
 func LockWithTransaction(ctx ql.TxContext, key string) error {
 	lock, err := lockKey(key)
 	if err != nil {
-		return errors.WithMessage(err, "lock key")
+		return fmt.Errorf("lock key: %w", err)
 	}
 	if err := ql.Exec(ctx, "SELECT PG_ADVISORY_XACT_LOCK($1)", lock); err != nil {
-		return errors.WithMessage(err, "getting advisory lock "+key)
+		return fmt.Errorf("getting advisory lock %q: %w", key, err)
 	}
 
 	return nil
@@ -24,12 +24,12 @@ func LockWithTransaction(ctx ql.TxContext, key string) error {
 func TryLockWithTransaction(ctx ql.TxContext, key string) (bool, error) {
 	lock, err := lockKey(key)
 	if err != nil {
-		return false, errors.WithMessage(err, "lock key")
+		return false, fmt.Errorf("lock key: %w", err)
 	}
 
 	success, err := ql.Get[bool](ctx, "SELECT PG_TRY_ADVISORY_XACT_LOCK($1)", lock)
 	if err != nil {
-		return false, errors.WithMessage(err, "getting advisory lock "+key)
+		return false, fmt.Errorf("getting advisory lock %q: %w", key, err)
 	}
 
 	return *success, nil
@@ -43,7 +43,7 @@ func lockKey(key string) (uint64, error) {
 	h := fnv.New64a()
 	_, err := h.Write([]byte(key))
 	if err != nil {
-		return 0, errors.WithMessage(err, "hashing key")
+		return 0, fmt.Errorf("hashing key: %w", err)
 	}
 
 	return h.Sum64() & ^(uint64(1) << 63), nil

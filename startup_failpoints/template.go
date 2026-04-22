@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/pkg/errors"
+	"fmt"
 )
 
 //go:embed templates/failpoint.gohtml
@@ -26,11 +26,11 @@ func renderIndex(w io.Writer, model any) error {
 	)
 	tmpl, err := t.ParseFS(fpTemplate, "templates/failpoint.gohtml")
 	if err != nil {
-		return errors.WithMessage(err, "parsing template")
+		return fmt.Errorf("parsing template: %w", err)
 	}
 
 	if err = tmpl.Execute(w, model); err != nil {
-		return errors.WithMessage(err, "executing template")
+		return fmt.Errorf("executing template: %w", err)
 	}
 
 	return nil

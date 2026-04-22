@@ -3,6 +3,8 @@ package jwt
 import (
 	"context"
 	"crypto/tls"
+	"errors"
+	"fmt"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -12,21 +14,20 @@ import (
 	"github.com/benbjohnson/clock"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/lestrrat-go/jwx/jwt"
-	"github.com/pkg/errors"
 )
 
 type JwtStruct struct {
-	UserName       string        `json:"user_name"`
-	Uxid           string        `json:"uxid"`
-	SessionID      string        `json:"sessionId"`
-	CustomerNumber string        `json:"customerNumber"`
-	Locale         string        `json:"locale"`
-	DeviceID       string        `json:"deviceId"`
-	Authorities    []any `json:"authorities"`
-	ClientID       string        `json:"client_id"`
-	Site           string        `json:"site"`
-	Scope          []any `json:"scope"`
-	GrantType      string        `json:"grant_type"`
+	UserName       string `json:"user_name"`
+	Uxid           string `json:"uxid"`
+	SessionID      string `json:"sessionId"`
+	CustomerNumber string `json:"customerNumber"`
+	Locale         string `json:"locale"`
+	DeviceID       string `json:"deviceId"`
+	Authorities    []any  `json:"authorities"`
+	ClientID       string `json:"client_id"`
+	Site           string `json:"site"`
+	Scope          []any  `json:"scope"`
+	GrantType      string `json:"grant_type"`
 }
 
 type Service interface {
@@ -49,7 +50,7 @@ func NewJwtService(jwkResourceUrl string, clock clock.Clock) (Service, error) {
 		},
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to receive jwk: %s")
+		return nil, fmt.Errorf("failed to receive jwk: %w", err)
 	}
 	return &jwtService{jwkKeySet: set, clock: clock}, nil
 }

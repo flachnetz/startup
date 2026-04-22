@@ -3,8 +3,8 @@ package startup_tracing
 import (
 	"context"
 	"database/sql"
+	"errors"
 
-	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -51,7 +51,7 @@ func CurrentSpanFromContext(ctx context.Context) trace.Span {
 }
 
 func isNotErrNoRows(err error) bool {
-	return errors.Cause(err) != sql.ErrNoRows
+	return !errors.Is(err, sql.ErrNoRows)
 }
 
 var extraTagsKey = "zipkin tags"
