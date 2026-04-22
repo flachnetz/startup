@@ -12,11 +12,11 @@ import (
 
 // KafkaOptions provides simple flags for to create a kafka consumer
 type KafkaOptions struct {
-	KafkaAddresses        []string `long:"kafka-address" validate:"dive,hostport" description:"Address of kafka server to use. Can be specified multiple times to connect to multiple brokers."`
-	KafkaConsumerGroup    string   `long:"kafka-consumer-group" description:"Consumer group of kafka messages. Set to RANDOM to get a unique consumer group each time."`
-	KafkaOffsetReset      string   `long:"kafka-offset-reset" default:"smallest" description:"Offset reset for kafka topic" choice:"smallest" choice:"largest"` //nolint:all
-	KafkaSecurityProtocol string   `long:"kafka-security-protocol" default:"ssl" description:"Security protocol" choice:"ssl" choice:"plaintext"`               //nolint:all
-	KafkaProperties       []string `long:"kafka-property" description:"Rdkafka properties in key=value format"`
+	KafkaAddresses        []string `long:"kafka-address" env:"KAFKA_ADDRESS" validate:"dive,hostport" description:"Address of kafka server to use. Can be specified multiple times to connect to multiple brokers."`
+	KafkaConsumerGroup    string   `long:"kafka-consumer-group" env:"KAFKA_CONSUMER_GROUP" description:"Consumer group of kafka messages. Set to RANDOM to get a unique consumer group each time."`
+	KafkaOffsetReset      string   `long:"kafka-offset-reset" env:"KAFKA_OFFSET_RESET" default:"smallest" description:"Offset reset for kafka topic" choice:"smallest" choice:"largest"` //nolint:all
+	KafkaSecurityProtocol string   `long:"kafka-security-protocol" env:"KAFKA_SECURITY_PROTOCOL" default:"ssl" description:"Security protocol" choice:"ssl" choice:"plaintext"`          //nolint:all
+	KafkaProperties       []string `long:"kafka-property" env:"KAFKA_PROPERTY" description:"Rdkafka properties in key=value format"`
 }
 
 func (opts KafkaOptions) NewConsumer(config kafka.ConfigMap) *kafka.Consumer {

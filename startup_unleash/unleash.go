@@ -11,8 +11,8 @@ import (
 )
 
 type Unleash struct {
-	BaseUrl  startup.URL `long:"unleash-base-url" default:"http://unleash.shared.svc.cluster.local/api" description:"Unleash base URL"`
-	ApiToken string      `long:"unleash-api-token" default:"default:production.unleash-insecure-api-token" description:"Unleash API token"`
+	BaseUrl  startup.URL `long:"unleash-base-url" env:"UNLEASH_BASE_URL" default:"http://unleash.shared.svc.cluster.local/api" description:"Unleash base URL"`
+	ApiToken string      `long:"unleash-api-token" env:"UNLEASH_API_TOKEN" default:"default:production.unleash-insecure-api-token" description:"Unleash API token"`
 }
 
 func InitUnleash(appName string, unleashUrl *url.URL, token string, listener any) {

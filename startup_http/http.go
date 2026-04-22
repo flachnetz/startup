@@ -46,19 +46,19 @@ type Config struct {
 type HttpMiddleware func(http.Handler) http.Handler
 
 type HTTPOptions struct {
-	Address string `long:"http-address" default:":3080" description:"Address to listen on."`
+	Address string `long:"http-address" env:"HTTP_ADDRESS" default:":3080" description:"Address to listen on."`
 
-	TLSKeyFile  string `long:"http-tls-key" description:"Private key file to enable SSL support."`
-	TLSCertFile string `long:"http-tls-cert" description:"Certificate file to enable SSL support."`
+	TLSKeyFile  string `long:"http-tls-key" env:"HTTP_TLS_KEY" description:"Private key file to enable SSL support."`
+	TLSCertFile string `long:"http-tls-cert" env:"HTTP_TLS_CERT" description:"Certificate file to enable SSL support."`
 
-	DisableAdminRedirect bool   `long:"http-disable-admin-redirect" description:"Disable admin redirect on /"`
-	DisableAuth          bool   `long:"http-disable-admin-auth" description:"Disable basic auth"`
-	BasicAuthUsername    string `long:"http-admin-username" default:"admin" description:"Basic auth username for admin panel."`
-	BasicAuthPassword    string `long:"http-admin-password" default:"bingo" description:"Basic auth password for admin panel."`
+	DisableAdminRedirect bool   `long:"http-disable-admin-redirect" env:"HTTP_DISABLE_ADMIN_REDIRECT" description:"Disable admin redirect on /"`
+	DisableAuth          bool   `long:"http-disable-admin-auth" env:"HTTP_DISABLE_ADMIN_AUTH" description:"Disable basic auth"`
+	BasicAuthUsername    string `long:"http-admin-username" env:"HTTP_ADMIN_USERNAME" default:"admin" description:"Basic auth username for admin panel."`
+	BasicAuthPassword    string `long:"http-admin-password" env:"HTTP_ADMIN_PASSWORD" default:"bingo" description:"Basic auth password for admin panel."`
 
-	AccessLog            string `long:"http-access-log" description:"Write http access log to a file. Defaults to stdout."`
-	AccessLogAdminRoute  bool   `long:"http-access-log-admin-route" description:"If enabled, admin route requests will also be logged."`
-	AdminPageShowEnvVars bool   `long:"http-admin-show-env-vars" description:"Show environment variables on the admin page."`
+	AccessLog            string `long:"http-access-log" env:"HTTP_ACCESS_LOG" description:"Write http access log to a file. Defaults to stdout."`
+	AccessLogAdminRoute  bool   `long:"http-access-log-admin-route" env:"HTTP_ACCESS_LOG_ADMIN_ROUTE" description:"If enabled, admin route requests will also be logged."`
+	AdminPageShowEnvVars bool   `long:"http-admin-show-env-vars" env:"HTTP_ADMIN_SHOW_ENV_VARS" description:"Show environment variables on the admin page."`
 }
 
 func (opts HTTPOptions) Serve(config Config) {
