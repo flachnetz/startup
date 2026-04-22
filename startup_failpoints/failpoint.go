@@ -3,6 +3,7 @@ package startup_failpoints
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -13,8 +14,6 @@ import (
 	"log/slog"
 
 	"golang.org/x/exp/slices"
-
-	"github.com/pkg/errors"
 )
 
 type FailPointLocation string

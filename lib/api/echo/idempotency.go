@@ -3,6 +3,7 @@ package echo
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -13,7 +14,6 @@ import (
 	"github.com/flachnetz/startup/v2/lib/ql"
 	sl "github.com/flachnetz/startup/v2/startup_logging"
 	"github.com/labstack/echo/v4"
-	"github.com/pkg/errors"
 )
 
 const IdempotencyKey = "Idempotency-Key"
@@ -74,7 +74,7 @@ func IdempotencyMiddlewareEcho(store idempotency.IdempotencyStore) echo.Middlewa
 			err := ql.InNewTransaction(ctx, store.DB(), func(ctx ql.TxContext) error {
 				reqRecord, err := store.Get(ctx, idempotencyKey)
 				if err != nil {
-					return errors.New("failed to retrieve idempotency record: " + err.Error())
+					return fmt.Errorf("failed to retrieve idempotency record: %w", err)
 				}
 
 				// Handle existing requests
@@ -103,15 +103,15 @@ func IdempotencyMiddlewareEcho(store idempotency.IdempotencyStore) echo.Middlewa
 					case idempotency.Pending:
 						// if it is still pending for more than 2 minutes, we can assume it is stuck
 						if time.Since(reqRecord.CreatedAt) > 2*time.Minute {
-							return errors.Errorf("idempotency key '%s' is stuck in pending state", idempotencyKey)
+							return fmt.Errorf("idempotency key %q is stuck in pending state", idempotencyKey)
 						}
-						return errors.Errorf("idempotency key '%s' is still pending, please retry later", idempotencyKey)
+						return fmt.Errorf("idempotency key %q is still pending, please retry later", idempotencyKey)
 					}
 				}
 
 				// Handle new requests: Create pending record
 				if err := store.Create(ctx, idempotencyKey); err != nil {
-					return errors.Errorf("failed to create idempotency record for key '%s': %q", idempotencyKey, err)
+					return fmt.Errorf("failed to create idempotency record for key %q: %w", idempotencyKey, err)
 				}
 
 				// Call the actual handler and capture the response

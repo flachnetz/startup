@@ -1,10 +1,10 @@
 package events
 
 import (
+	"fmt"
 	"reflect"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
-	"github.com/pkg/errors"
 )
 
 type EventHeader struct {
@@ -37,7 +37,7 @@ func (topics *NormalizedEventTypes) MetadataOf(event Event) (*EventMetadata, err
 	// get the topic of the actual event
 	topic, err := topics.TopicForType(eventType)
 	if err != nil {
-		return nil, errors.WithMessage(err, "lookup event type")
+		return nil, fmt.Errorf("lookup event type: %w", err)
 	}
 
 	// build metadata object for event

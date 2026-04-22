@@ -9,7 +9,8 @@ import (
 	"github.com/flachnetz/startup/v2/startup_http"
 	"github.com/gorilla/handlers"
 
-	"github.com/pkg/errors"
+	"errors"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )

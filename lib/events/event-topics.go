@@ -1,10 +1,10 @@
 package events
 
 import (
+	"fmt"
 	"reflect"
 
 	"github.com/flachnetz/startup/v2/lib/kafka"
-	"github.com/pkg/errors"
 )
 
 // TopicsFunc builds an EventTopics instance for the given kafka replication factor.
@@ -41,7 +41,7 @@ func (topics *EventTopics) Normalized() (*NormalizedEventTypes, error) {
 		eventType = derefEventType(eventType)
 
 		if eventType.Kind() != reflect.Struct {
-			return nil, errors.Errorf("invalid event type: '%s'", eventType)
+			return nil, fmt.Errorf("invalid event type: %q", eventType)
 		}
 
 		normalizedTypes[eventType] = kafkaTopic
@@ -58,5 +58,5 @@ func (topics *NormalizedEventTypes) TopicForType(eventType reflect.Type) (string
 		return topic.Name, nil
 	}
 
-	return "", errors.Errorf("no topic found for event type %s", eventType)
+	return "", fmt.Errorf("no topic found for event type %q", eventType)
 }

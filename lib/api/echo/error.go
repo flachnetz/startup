@@ -7,9 +7,11 @@ import (
 
 	"github.com/flachnetz/startup/v2/lib/api"
 
+	"errors"
+
 	sl "github.com/flachnetz/startup/v2/startup_logging"
+
 	"github.com/labstack/echo/v4"
-	"github.com/pkg/errors"
 )
 
 //lint:ignore U1000

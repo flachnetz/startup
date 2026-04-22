@@ -7,6 +7,7 @@ require (
 	github.com/confluentinc/confluent-kafka-go/v2 v2.14.1
 	github.com/felixge/httpsnoop v1.0.4
 	github.com/flachnetz/go-admin v1.5.3
+	github.com/go-playground/validator/v10 v10.30.2
 	github.com/goji/httpauth v0.0.0-20160601135302-2da839ab0f4d
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/gorilla/handlers v1.5.2
@@ -15,12 +16,12 @@ require (
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/jmoiron/sqlx v1.4.0
+	github.com/joho/godotenv v1.5.1
 	github.com/labstack/echo/v4 v4.15.1
 	github.com/lestrrat-go/jwx v1.2.31
 	github.com/linkedin/goavro/v2 v2.15.0
 	github.com/mattn/go-isatty v0.0.21
 	github.com/oklog/ulid v1.3.1
-	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.2
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/rubenv/sql-migrate v1.8.1
@@ -34,7 +35,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.43.0
 	go.uber.org/atomic v1.11.0
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f
-	gopkg.in/go-playground/validator.v9 v9.31.0
 	k8s.io/api v0.35.4
 	k8s.io/apimachinery v0.35.4
 	k8s.io/client-go v0.35.4
@@ -49,6 +49,7 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.1 // indirect
+	github.com/gabriel-vasile/mimetype v1.4.13 // indirect
 	github.com/go-gorp/gorp/v3 v3.1.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -93,6 +94,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.67.5 // indirect
@@ -125,7 +127,6 @@ require (
 	google.golang.org/grpc v1.80.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
-	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
