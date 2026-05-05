@@ -47,7 +47,7 @@ func ParseCommandLineWithOptions(opts any, options flags.Options) error {
 		envFile = ".env"
 	}
 
-	if err := godotenv.Overload(envFile); err != nil {
+	if err := godotenv.Load(envFile); err != nil {
 		if !os.IsNotExist(err) {
 			return fmt.Errorf("load env file %q: %w", envFile, err)
 		}
