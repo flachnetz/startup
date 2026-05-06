@@ -13,7 +13,7 @@ var log = slog.With(slog.String("prefix", "startup-base"))
 
 func FatalOnError(err error, reason string, args ...any) {
 	if err != nil {
-		log.Error("%s: %s", fmt.Sprintf(reason, args...), err)
+		log.Error(fmt.Sprintf(reason, args...), sl.Error(err))
 		os.Exit(1)
 		return
 	}
