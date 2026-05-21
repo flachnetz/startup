@@ -13,7 +13,7 @@ import (
 	"github.com/flachnetz/startup/v2/lib/api/idempotency"
 	"github.com/flachnetz/startup/v2/lib/ql"
 	sl "github.com/flachnetz/startup/v2/startup_logging"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 const IdempotencyKey = "Idempotency-Key"
@@ -55,7 +55,7 @@ func (w *responseWriterInterceptor) Header() http.Header {
 // IdempotencyMiddlewareEcho provides idempotency for Echo handlers.
 func IdempotencyMiddlewareEcho(store idempotency.IdempotencyStore) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			// Only apply to methods that change state
 			method := c.Request().Method
 			if method != http.MethodPost && method != http.MethodPatch && method != http.MethodPut {
@@ -114,21 +114,21 @@ func IdempotencyMiddlewareEcho(store idempotency.IdempotencyStore) echo.Middlewa
 					return fmt.Errorf("failed to create idempotency record for key %q: %w", idempotencyKey, err)
 				}
 
-				// Call the actual handler and capture the response
-				originalWriter := c.Response().Writer
-				interceptor := &responseWriterInterceptor{
-					ResponseWriter: originalWriter,
-					body:           bytes.NewBufferString(""),
-					statusCode:     http.StatusOK, // Default
-					header:         make(http.Header),
-				}
-				c.Response().Writer = interceptor
-				req := c.Request().Clone(ctx)
-				c.SetRequest(req)
-				handlerErr := next(c)
-				c.Response().Writer = originalWriter
+			// Call the actual handler and capture the response
+			originalWriter := c.Response()
+			interceptor := &responseWriterInterceptor{
+				ResponseWriter: originalWriter,
+				body:           bytes.NewBufferString(""),
+				statusCode:     http.StatusOK, // Default
+				header:         make(http.Header),
+			}
+			c.SetResponse(interceptor)
+			req := c.Request().Clone(ctx)
+			c.SetRequest(req)
+			handlerErr := next(c)
+			c.SetResponse(originalWriter)
 
-				headersBytes, err := json.Marshal(c.Response().Header())
+			headersBytes, err := json.Marshal(interceptor.Header())
 				if err != nil {
 					// Log the error but do not return it to avoid breaking the response flow
 					loggerOf.ErrorContext(ctx, "Failed to marshal response headers", sl.Error(err))

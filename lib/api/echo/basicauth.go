@@ -1,8 +1,8 @@
 package echo
 
 import (
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
 )
 
 type RestUsers struct {
@@ -10,7 +10,7 @@ type RestUsers struct {
 }
 
 func BasicAuthValidator(basicAuthUser string, basicAuthPassword string) middleware.BasicAuthValidator {
-	return func(user string, password string, context echo.Context) (bool, error) {
+	return func(c *echo.Context, user string, password string) (bool, error) {
 		if user == basicAuthUser && password == basicAuthPassword {
 			return true, nil
 		}
@@ -19,7 +19,7 @@ func BasicAuthValidator(basicAuthUser string, basicAuthPassword string) middlewa
 }
 
 func BasicAuthUsersValidator(users map[string]string) middleware.BasicAuthValidator {
-	return func(user string, password string, context echo.Context) (bool, error) {
+	return func(c *echo.Context, user string, password string) (bool, error) {
 		if pass, ok := users[user]; ok && pass == password {
 			return true, nil
 		}
