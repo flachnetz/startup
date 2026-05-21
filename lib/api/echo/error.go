@@ -11,12 +11,12 @@ import (
 
 	sl "github.com/flachnetz/startup/v2/startup_logging"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 //lint:ignore U1000
-func CustomErrorHandler[E ApiError](errorHandler ErrorHandler[E]) func(error, echo.Context) {
-	return func(err error, c echo.Context) {
+func CustomErrorHandler[E ApiError](errorHandler ErrorHandler[E]) func(error, *echo.Context) {
+	return func(err error, c *echo.Context) {
 		errorHandler.HandleError(c.Request().Context(), c, err)
 	}
 }
@@ -60,14 +60,13 @@ func (eh *ErrorHandler[E]) httpStatusFrom(ctx context.Context, err error) int {
 		return eh.HttpStatusFrom(ctx, err)
 	}
 	httpStatusFrom := http.StatusInternalServerError
-	var he *echo.HTTPError
-	if errors.As(err, &he) {
+	if he, ok := errors.AsType[*echo.HTTPError](err); ok {
 		httpStatusFrom = he.Code
 	}
 	return httpStatusFrom
 }
 
-func (eh *ErrorHandler[E]) HandleError(ctx context.Context, c echo.Context, err error) {
+func (eh *ErrorHandler[E]) HandleError(ctx context.Context, c *echo.Context, err error) {
 	logger := sl.LoggerOf(ctx)
 	apiError := eh.toApiError(err)
 	httpStatusFrom := eh.httpStatusFrom(ctx, err)
@@ -76,9 +75,11 @@ func (eh *ErrorHandler[E]) HandleError(ctx context.Context, c echo.Context, err 
 	}
 
 	LogHttpError(ctx, logger, c.Path(), httpStatusFrom, apiError)
-	if c.Response().Committed {
-		logger.WarnContext(ctx, "response already committed")
-		return
+	if resp, uErr := echo.UnwrapResponse(c.Response()); uErr == nil {
+		if resp.Committed {
+			logger.WarnContext(ctx, "response already committed")
+			return
+		}
 	}
 	switch c.Request().Method {
 	case http.MethodHead, http.MethodOptions:
