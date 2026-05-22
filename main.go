@@ -24,10 +24,7 @@ func MustParseCommandLine(opts any) {
 
 func MustParseCommandLineWithOptions(opts any, options flags.Options) {
 	if err := ParseCommandLineWithOptions(opts, options); err != nil {
-		if cause, ok := errors.AsType[*flags.Error](err); ok && cause.Type == flags.ErrHelp {
-			_, _ = fmt.Fprintln(os.Stdout, cause)
-		}
-
+		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
