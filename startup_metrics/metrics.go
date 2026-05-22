@@ -2,12 +2,10 @@ package startup_metrics
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 	"sync"
 	"time"
-
-	"log/slog"
-
-	"errors"
 
 	"github.com/flachnetz/startup/v2/startup_base"
 	sl "github.com/flachnetz/startup/v2/startup_logging"

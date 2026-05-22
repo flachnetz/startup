@@ -5,14 +5,13 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"reflect"
 	"strings"
 	"sync"
 	"time"
-
-	"fmt"
 
 	confluent "github.com/Landoop/schema-registry"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
@@ -104,9 +103,7 @@ func (ev *eventSender) Close() error {
 }
 
 func (ev *eventSender) launchAsyncTasks() {
-
 	ev.wg.Go(func() {
-
 		defer func() {
 			if ev.KafkaSender != nil {
 				if count := ev.KafkaSender.Flush(5_000); count > 0 {

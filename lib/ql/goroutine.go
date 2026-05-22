@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"runtime"
 	"strconv"
 	"sync"
 	"unsafe"
-
-	"log/slog"
 
 	sl "github.com/flachnetz/startup/v2/startup_logging"
 )

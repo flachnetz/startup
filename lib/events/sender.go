@@ -3,9 +3,8 @@ package events
 import (
 	"context"
 	"io"
-	"time"
-
 	"log/slog"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 )

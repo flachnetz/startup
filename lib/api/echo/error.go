@@ -2,12 +2,11 @@ package echo
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/flachnetz/startup/v2/lib/api"
-
-	"errors"
 
 	sl "github.com/flachnetz/startup/v2/startup_logging"
 

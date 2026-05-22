@@ -1,6 +1,7 @@
 package startup_metrics
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -8,8 +9,6 @@ import (
 
 	"github.com/flachnetz/startup/v2/startup_http"
 	"github.com/gorilla/handlers"
-
-	"errors"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"

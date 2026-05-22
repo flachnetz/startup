@@ -3,12 +3,11 @@ package startup
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/url"
 	"os"
 	"reflect"
-
-	"log/slog"
 
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/go-playground/validator/v10"

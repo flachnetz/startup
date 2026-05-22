@@ -1,6 +1,7 @@
 package startup_events
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -8,8 +9,6 @@ import (
 	"sync"
 	"time"
 	"unicode"
-
-	"fmt"
 
 	confluent "github.com/Landoop/schema-registry"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
