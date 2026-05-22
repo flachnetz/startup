@@ -2,11 +2,10 @@ package startup_failpoints
 
 import (
 	"embed"
+	"fmt"
 	"html/template"
 	"io"
 	"strings"
-
-	"fmt"
 )
 
 //go:embed templates/failpoint.gohtml

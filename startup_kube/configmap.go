@@ -161,7 +161,6 @@ func valuesToConfigMap(name string, namespace string, data ConfigMapValues) (*v1
 		default:
 			return nil, fmt.Errorf("unsupported type: %T", value)
 		}
-
 	}
 
 	return cm, nil

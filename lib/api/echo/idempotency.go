@@ -114,21 +114,21 @@ func IdempotencyMiddlewareEcho(store idempotency.IdempotencyStore) echo.Middlewa
 					return fmt.Errorf("failed to create idempotency record for key %q: %w", idempotencyKey, err)
 				}
 
-			// Call the actual handler and capture the response
-			originalWriter := c.Response()
-			interceptor := &responseWriterInterceptor{
-				ResponseWriter: originalWriter,
-				body:           bytes.NewBufferString(""),
-				statusCode:     http.StatusOK, // Default
-				header:         make(http.Header),
-			}
-			c.SetResponse(interceptor)
-			req := c.Request().Clone(ctx)
-			c.SetRequest(req)
-			handlerErr := next(c)
-			c.SetResponse(originalWriter)
+				// Call the actual handler and capture the response
+				originalWriter := c.Response()
+				interceptor := &responseWriterInterceptor{
+					ResponseWriter: originalWriter,
+					body:           bytes.NewBufferString(""),
+					statusCode:     http.StatusOK, // Default
+					header:         make(http.Header),
+				}
+				c.SetResponse(interceptor)
+				req := c.Request().Clone(ctx)
+				c.SetRequest(req)
+				handlerErr := next(c)
+				c.SetResponse(originalWriter)
 
-			headersBytes, err := json.Marshal(interceptor.Header())
+				headersBytes, err := json.Marshal(interceptor.Header())
 				if err != nil {
 					// Log the error but do not return it to avoid breaking the response flow
 					loggerOf.ErrorContext(ctx, "Failed to marshal response headers", sl.Error(err))

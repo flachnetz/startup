@@ -3,13 +3,11 @@ package avro
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
-
-	"errors"
-
-	"log/slog"
 )
 
 type EventSource struct {

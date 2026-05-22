@@ -1,12 +1,11 @@
 package avro
 
 import (
+	"fmt"
 	"log/slog"
 	"regexp"
 	"strconv"
 	"sync"
-
-	"fmt"
 
 	schemaregistry "github.com/Landoop/schema-registry"
 	"github.com/linkedin/goavro/v2"

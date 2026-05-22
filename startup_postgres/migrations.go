@@ -1,10 +1,9 @@
 package startup_postgres
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
-
-	"fmt"
 
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/jmoiron/sqlx"

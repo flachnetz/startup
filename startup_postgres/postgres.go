@@ -4,18 +4,16 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
 
-	"log/slog"
-
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
-
-	"errors"
 
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/jackc/pgx/v5"

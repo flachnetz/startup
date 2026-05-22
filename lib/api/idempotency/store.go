@@ -6,9 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"time"
-
 	"log/slog"
+	"time"
 
 	"github.com/flachnetz/startup/v2/lib/ql"
 
