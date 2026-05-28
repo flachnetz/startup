@@ -3,6 +3,7 @@ package jwt
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -39,11 +40,17 @@ func NewTokenVerifier(ctx context.Context, url string) (*TokenVerifier, error) {
 		return nil, fmt.Errorf("create http client: %w", err)
 	}
 
-	err = cache.Register(ctx, url,
-		jwkfetch.WithWaitReady(true),
-		jwkfetch.WithMinInterval(10*time.Second),
-		jwkfetch.WithMaxInterval(60*time.Second))
+	slog.InfoContext(ctx, "Fetching jwt keyset", slog.String("url", url))
+	{
+		ctx, cancelTimeout := context.WithTimeout(ctx, 3*time.Second)
+		defer cancelTimeout()
 
+		err = cache.Register(ctx, url,
+			jwkfetch.WithWaitReady(true),
+			jwkfetch.WithMinInterval(10*time.Second),
+			jwkfetch.WithMaxInterval(60*time.Second))
+
+	}
 	if err != nil {
 		// cancel the background process due to the rror
 		cancelContext()
