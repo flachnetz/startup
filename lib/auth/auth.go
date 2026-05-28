@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -18,6 +19,7 @@ type Transport struct {
 	TokenURL     string
 	ClientId     string
 	ClientSecret string
+	Scopes       []string
 
 	state atomic.Pointer[authState]
 }
@@ -57,6 +59,7 @@ func (k *Transport) ensureAuthState() (*authState, error) {
 	form.Set("grant_type", "client_credentials")
 	form.Set("client_id", k.ClientId)
 	form.Set("client_secret", k.ClientSecret)
+	form.Set("scope", strings.Join(k.Scopes, " "))
 	body := bytes.NewReader([]byte(form.Encode()))
 
 	// we need a new access token

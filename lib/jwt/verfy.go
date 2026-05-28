@@ -14,6 +14,10 @@ import (
 
 type Token = jwt.Token
 
+func NewBuilder() *jwt.Builder {
+	return jwt.NewBuilder()
+}
+
 type TokenVerifier struct {
 	Close context.CancelFunc
 	cache *jwkfetch.Cache

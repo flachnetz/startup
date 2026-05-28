@@ -3,6 +3,7 @@ package jwt
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"regexp"
 
 	"github.com/flachnetz/startup/v2/startup_base"
@@ -12,19 +13,10 @@ import (
 
 var reAuthBearer = regexp.MustCompile(`(?i)^Bearer\s+`)
 
-var ErrNoToken = errors.New("no token")
+var ErrUnauthorized = echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 
-type VerifyTokenError struct {
-	Cause error
-}
-
-func (v VerifyTokenError) Error() string {
-	return fmt.Sprintf("verify token: %s", v.Cause.Error())
-}
-
-func (v VerifyTokenError) Unwrap() error {
-	return v.Cause
-}
+// ErrNoToken unwraps to ErrUnauthorized
+var ErrNoToken = ErrUnauthorized.Wrap(errors.New("no token"))
 
 type MiddlewareOptions[Claims any] struct {
 	TokenVerifier *TokenVerifier
@@ -46,7 +38,7 @@ func Middleware[Claims any](opts MiddlewareOptions[Claims]) echo.MiddlewareFunc 
 
 			claims, token, err := ParseJWT[Claims](ctx, opts.TokenVerifier, rawToken)
 			if err != nil {
-				return VerifyTokenError{Cause: err}
+				return ErrUnauthorized.Wrap(fmt.Errorf("verify token failed with error: %w", err))
 			}
 
 			if startup_base.IsDevelopment() {
