@@ -99,3 +99,18 @@ type tokenJSON struct {
 	AccessToken string `json:"access_token"`
 	ExpiresIn   int    `json:"expires_in"`
 }
+
+
+func test() {
+	httpClient := &http.Client{
+		Transport: &Transport{
+			Next:         http.DefaultTransport,
+			TokenURL:     "https://keycloak/get-token",
+			ClientId:     "order-service",
+			ClientSecret: "foobar123",
+			Scopes:       []string{"player-service"},
+		},
+	}
+
+	httpClient.Get("/foobar")
+}
