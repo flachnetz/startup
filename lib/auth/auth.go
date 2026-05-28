@@ -100,7 +100,6 @@ type tokenJSON struct {
 	ExpiresIn   int    `json:"expires_in"`
 }
 
-
 func test() {
 	httpClient := &http.Client{
 		Transport: &Transport{
