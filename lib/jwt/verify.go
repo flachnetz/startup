@@ -83,7 +83,6 @@ func (v *TokenVerifier) Verify(ctx context.Context, rawToken string) (jwt.Token,
 		// validate exp/nbf/iat automatically
 		jwt.WithValidate(true),
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf("verify jwt: %w", err)
 	}

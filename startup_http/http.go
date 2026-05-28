@@ -131,12 +131,16 @@ func (opts HTTPOptions) Serve(config Config) {
 		// log all requests using slog logger
 		handler = loggingHandler{
 			handler: handler,
-			log: func(ctx context.Context, line string) {
-				if !opts.AccessLogAdminRoute && strings.Contains(line, "/admin/") {
-					return
+			log: func(ctx context.Context, attrs []slog.Attr) {
+				if !opts.AccessLogAdminRoute {
+					for _, a := range attrs {
+						if a.Key == "uri" && strings.Contains(a.Value.String(), "/admin/") {
+							return
+						}
+					}
 				}
 
-				access(ctx, line)
+				access(ctx, attrs)
 			},
 		}
 	} else if opts.AccessLog != "/dev/null" {
@@ -147,8 +151,18 @@ func (opts HTTPOptions) Serve(config Config) {
 			// write events directly to log file
 			handler = loggingHandler{
 				handler: handler,
-				log: func(ctx context.Context, line string) {
-					_, _ = fp.Write([]byte(line + "\n"))
+				log: func(_ context.Context, attrs []slog.Attr) {
+					var b strings.Builder
+					for i, a := range attrs {
+						if i > 0 {
+							b.WriteByte(' ')
+						}
+						b.WriteString(a.Key)
+						b.WriteByte('=')
+						b.WriteString(a.Value.String())
+					}
+					b.WriteByte('\n')
+					_, _ = fp.Write([]byte(b.String()))
 				},
 			}
 		}
@@ -207,8 +221,12 @@ func WithPrometheusMetrics(s string) admin.RouteConfig {
 		}))
 }
 
-func access(ctx context.Context, line string) {
-	slog.DebugContext(ctx, line)
+func access(ctx context.Context, attrs []slog.Attr) {
+	args := make([]any, len(attrs))
+	for i, a := range attrs {
+		args[i] = a
+	}
+	slog.DebugContext(ctx, "access", args...)
 }
 
 func RegisterSignalHandlerForServer(server *http.Server) <-chan struct{} {
