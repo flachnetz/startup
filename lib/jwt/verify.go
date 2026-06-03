@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/flachnetz/startup/v2/lib/clock"
 	"github.com/flachnetz/startup/v2/startup_tracing"
 	"github.com/jwx-go/jwkfetch/v4"
 	"github.com/lestrrat-go/httprc/v3"
@@ -82,6 +83,9 @@ func (v *TokenVerifier) Verify(ctx context.Context, rawToken string) (jwt.Token,
 
 		// validate exp/nbf/iat automatically
 		jwt.WithValidate(true),
+
+		// take time from the global clock
+		jwt.WithClock(clock.GlobalClock),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("verify jwt: %w", err)
