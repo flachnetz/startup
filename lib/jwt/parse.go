@@ -8,9 +8,14 @@ import (
 	"github.com/lestrrat-go/jwx/v4/jwt"
 )
 
+type Verifier interface {
+	// Verify parses & verifies the token.
+	Verify(ctx context.Context, rawToken string) (jwt.Token, error)
+}
+
 // ParseJWT parses and validates the provided token. The claims are then parsed into
 // the provided type T and returned on success.
-func ParseJWT[T any](ctx context.Context, verifier *TokenVerifier, rawToken string) (T, jwt.Token, error) {
+func ParseJWT[T any](ctx context.Context, verifier Verifier, rawToken string) (T, jwt.Token, error) {
 	var tZero T
 
 	token, err := verifier.Verify(ctx, rawToken)
