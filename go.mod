@@ -7,8 +7,10 @@ require (
 	github.com/confluentinc/confluent-kafka-go/v2 v2.14.1
 	github.com/felixge/httpsnoop v1.0.4
 	github.com/flachnetz/go-admin v1.5.3
+	github.com/flachnetz/pgtest/v2 v2.0.5
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/goji/httpauth v0.0.0-20160601135302-2da839ab0f4d
+	github.com/google/uuid v1.6.0
 	github.com/gorilla/handlers v1.5.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v1.0.2
@@ -71,10 +73,10 @@ require (
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
+	github.com/gofrs/flock v0.13.0 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/gnostic-models v0.7.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
