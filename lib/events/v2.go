@@ -33,6 +33,9 @@ type eventSender struct {
 	// schema cache
 	SchemaIdCache map[reflect.Type]uint32
 
+	// set to true to disable avro encoding
+	NoAvro bool
+
 	// wait group to wait for pending background tasks on close
 	wg sync.WaitGroup
 }
@@ -88,6 +91,11 @@ func (ev *eventSender) SendAsyncCh() chan<- Event {
 }
 
 func (ev *eventSender) SendInTx(ctx context.Context, tx sqlx.ExecerContext, event Event) error {
+	if ev.NoAvro {
+		slog.WarnContext(ctx, "Will not write event to outbox, avro is disabled", slog.Any("event", event))
+		return nil
+	}
+
 	meta, avro, err := ev.encodeAvro(event)
 	if err != nil {
 		return fmt.Errorf("encode event: %w", err)

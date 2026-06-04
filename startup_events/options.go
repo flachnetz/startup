@@ -20,11 +20,11 @@ import (
 )
 
 type EventOptions struct {
-	ConfluentURL string `long:"event-sender-confluent-url" env:"EVENT_SENDER_CONFLUENT_URL" default:"http://confluent-registry.shared.svc.cluster.local" description:"Confluent schema registry url."`
+	ConfluentURL string `long:"event-sender-confluent-url" env:"EVENT_SENDER_CONFLUENT_URL" description:"Confluent schema registry url."`
 
 	Async struct {
 		Kafka struct {
-			Addr        string   `long:"event-sender-kafka-addr" env:"EVENT_SENDER_KAFKA_ADDR" default:"kafka.shared.svc.cluster.local:9093" description:"Kafka bootstrap hosts"`
+			Addr        string   `long:"event-sender-kafka-addr" env:"EVENT_SENDER_KAFKA_ADDR" description:"Kafka bootstrap hosts"`
 			DisableTLS  bool     `long:"event-sender-kafka-disable-tls" env:"EVENT_SENDER_KAFKA_DISABLE_TLS" description:"Disable TLS, might simplify local testing"`
 			Replication int16    `long:"event-sender-kafka-replication-factor" env:"EVENT_SENDER_KAFKA_REPLICATION_FACTOR" default:"3" description:"Replication factor to use when creating kafka topics"`
 			Properties  []string `long:"event-sender-kafka-properties" env:"EVENT_SENDER_KAFKA_PROPERTIES" description:"Pairs of key=value containing standard librdkafka configuration properties as documented in: https://github.com/edenhill/librdkafka/tree/master/CONFIGURATION.md"`

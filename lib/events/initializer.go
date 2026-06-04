@@ -53,6 +53,7 @@ func (esi *eventSenderInitializer) Initialize() (EventSender, error) {
 	// mark the event sender as initialized
 	eventSender := esi.eventSender
 	eventSender.SchemaIdCache = schemaIdCache
+	eventSender.NoAvro = schemaIdCache == nil
 
 	// and remove it from this initializer
 	esi.eventSender = nil
