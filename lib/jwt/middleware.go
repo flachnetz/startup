@@ -19,7 +19,7 @@ var ErrUnauthorized = echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 var ErrNoToken = ErrUnauthorized.Wrap(errors.New("no token"))
 
 type MiddlewareOptions[Claims any] struct {
-	TokenVerifier *TokenVerifier
+	TokenVerifier Verifier
 	UpdateContext func(c *echo.Context, token jwt.Token, claims Claims) error
 }
 
