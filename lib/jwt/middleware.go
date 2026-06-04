@@ -3,6 +3,8 @@ package jwt
 import (
 	"errors"
 	"fmt"
+	"log/slog"
+	"maps"
 	"net/http"
 	"regexp"
 
@@ -42,12 +44,13 @@ func Middleware[Claims any](opts MiddlewareOptions[Claims]) echo.MiddlewareFunc 
 			}
 
 			if startup_base.IsDevelopment() {
-				fmt.Println()
+				exp, _ := token.Expiration()
 
-				for key, value := range token.Claims() {
-					// print the raw claims
-					fmt.Println("Claim:", key, value)
-				}
+				slog.DebugContext(ctx,
+					"Got valid jwt in middleware",
+					slog.Any("validUntil", exp),
+					slog.Any("claims", maps.Collect(token.Claims())),
+				)
 			}
 
 			if err := opts.UpdateContext(c, token, claims); err != nil {
