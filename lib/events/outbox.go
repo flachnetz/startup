@@ -10,7 +10,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func WriteToOutbox(ctx context.Context, tx sqlx.ExecerContext, metadata EventMetadata, payload []byte) error {
+func WriteToOutbox(ctx context.Context, tx sqlx.ExecerContext, metadata EventMetadata, table string, payload []byte) error {
 	topic := metadata.Topic
 	key := metadata.Key
 
@@ -27,16 +27,16 @@ func WriteToOutbox(ctx context.Context, tx sqlx.ExecerContext, metadata EventMet
 	}
 
 	// insert event into database and notify listeners
-	stmt := `
+	stmt := fmt.Sprintf(`
 		WITH
 			ids AS (
-				INSERT INTO public.kafka_outbox (kafka_topic, kafka_key, kafka_value, kafka_header_keys, kafka_header_values)
+				INSERT INTO %s (kafka_topic, kafka_key, kafka_value, kafka_header_keys, kafka_header_values)
 				VALUES ($1, $2, $3, $4, $5)
 				RETURNING id)
 
 		SELECT pg_notify('kafka-message', id::text)
 		FROM ids;
-	`
+	`, table)
 	_, err := tx.ExecContext(ctx, stmt, topic, key, payload, headerKeys, headerValues)
 	if err != nil {
 		return fmt.Errorf("write event into database: %w", err)

@@ -19,6 +19,7 @@ type EventSenderInitializer interface {
 type eventSenderInitializer struct {
 	ConfluentClient *confluent.Client
 	EventTopics     *NormalizedEventTypes
+	OutboxTable     string
 
 	eventSender *eventSender
 }
@@ -54,6 +55,7 @@ func (esi *eventSenderInitializer) Initialize() (EventSender, error) {
 	eventSender := esi.eventSender
 	eventSender.SchemaIdCache = schemaIdCache
 	eventSender.NoAvro = schemaIdCache == nil
+	eventSender.OutboxTable = esi.OutboxTable
 
 	// and remove it from this initializer
 	esi.eventSender = nil

@@ -36,6 +36,9 @@ type eventSender struct {
 	// set to true to disable avro encoding
 	NoAvro bool
 
+	// the table to write events to
+	OutboxTable string
+
 	// wait group to wait for pending background tasks on close
 	wg sync.WaitGroup
 }
@@ -45,6 +48,7 @@ func NewInitializer(
 	kafkaSender *kafka.Producer,
 	fileSender io.WriteCloser,
 	eventTopics EventTopics,
+	outboxTable string,
 	bufferSize uint,
 ) (EventSenderInitializer, error) {
 	if bufferSize == 0 {
@@ -72,6 +76,7 @@ func NewInitializer(
 	eventSenderInitializer := &eventSenderInitializer{
 		ConfluentClient: confluentClient,
 		EventTopics:     eventTopicsNormalized,
+		OutboxTable:     outboxTable,
 		eventSender:     eventSender,
 	}
 
@@ -101,7 +106,7 @@ func (ev *eventSender) SendInTx(ctx context.Context, tx sqlx.ExecerContext, even
 		return fmt.Errorf("encode event: %w", err)
 	}
 
-	return WriteToOutbox(ctx, tx, *meta, avro)
+	return WriteToOutbox(ctx, tx, *meta, ev.OutboxTable, avro)
 }
 
 func (ev *eventSender) Close() error {
