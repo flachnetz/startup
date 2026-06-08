@@ -1,6 +1,7 @@
 package startup_events
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -37,7 +38,8 @@ type EventOptions struct {
 
 	Inputs struct {
 		// A function to create the event topics. This option must be specified.
-		Topics events.TopicsFunc `validate:"required"`
+		Topics      events.TopicsFunc `validate:"required"`
+		OutboxTable string            `json:"outboxTable"`
 	}
 
 	eventSenderOnce sync.Once
@@ -78,6 +80,11 @@ func initializeEventSender(opts *EventOptions, clientId string) (events.EventSen
 		return nil, fmt.Errorf("file sender: %w", err)
 	}
 
+	outboxTable := opts.Inputs.OutboxTable
+	if outboxTable == "" {
+		return nil, errors.New("no outbox table specified in Inputs")
+	}
+
 	// build list of topics parameterized with the replication factor that we
 	// would like to have now.
 	eventTopics := opts.Inputs.Topics(opts.Async.Kafka.Replication)
@@ -90,6 +97,7 @@ func initializeEventSender(opts *EventOptions, clientId string) (events.EventSen
 		kafkaSender,
 		fileSender,
 		eventTopics,
+		outboxTable,
 		bufferSize,
 	)
 	if err != nil {
