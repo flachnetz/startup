@@ -2,6 +2,7 @@ package testx
 
 import (
 	"context"
+	"io"
 	"testing"
 
 	"github.com/flachnetz/startup/v2/lib/events"
@@ -18,26 +19,29 @@ func CaptureEvents(t *testing.T) *MockEvents {
 	prevSender := events.Sender
 	t.Cleanup(func() { events.Sender = prevSender })
 
-	mock := new(MockEvents)
+	mock := &MockEvents{Testing: t}
 	events.Sender = mock
 
 	return mock
 }
 
 type MockEvents struct {
-	Events []events.Event
+	Testing *testing.T
+	Events  []events.Event
 }
 
-func (m *MockEvents) SendAsync(ctx context.Context, event events.Event) {
+func (m *MockEvents) SendAsync(_ context.Context, event events.Event) {
+	err := event.Serialize(io.Discard)
+	require.NoError(m.Testing, err)
+
 	m.Events = append(m.Events, event)
 }
 
-func (m *MockEvents) SendAsyncCh() chan<- events.Event {
-	panic("not implemented")
-}
+func (m *MockEvents) SendInTx(ctx context.Context, _ sqlx.ExecerContext, event events.Event) error {
+	err := event.Serialize(io.Discard)
+	require.NoError(m.Testing, err)
 
-func (m *MockEvents) SendInTx(ctx context.Context, tx sqlx.ExecerContext, event events.Event) error {
-	ctx.(ql.TxContext).OnCommit(func() {
+	ql.TxContextFromContext(ctx).OnCommit(func() {
 		m.Events = append(m.Events, event)
 	})
 

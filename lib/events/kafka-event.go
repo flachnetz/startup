@@ -23,3 +23,11 @@ func WithKey(ev Event, key string, headers ...EventHeader) *KafkaEvent {
 		Headers: append(EventHeaders(nil), headers...),
 	}
 }
+
+func unwrapEvent(ev Event) Event {
+	if ev, ok := ev.(KafkaEvent); ok {
+		return unwrapEvent(ev.Event)
+	}
+
+	return ev
+}
