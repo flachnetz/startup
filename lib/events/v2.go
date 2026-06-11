@@ -15,6 +15,7 @@ import (
 
 	confluent "github.com/Landoop/schema-registry"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	sl "github.com/flachnetz/startup/v2/startup_logging"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -85,20 +86,19 @@ func NewInitializer(
 
 func (ev *eventSender) SendAsync(ctx context.Context, event Event) {
 	select {
+	case <-ctx.Done():
 	case ev.AsyncBufferCh <- event:
 	default:
 		log.Warn("Async event queue is full, discarding event", slog.String("event", eventToString(event)))
 	}
 }
 
-func (ev *eventSender) SendAsyncCh() chan<- Event {
-	return ev.AsyncBufferCh
-}
-
 func (ev *eventSender) SendInTx(ctx context.Context, tx sqlx.ExecerContext, event Event) error {
 	if ev.NoAvro {
 		slog.WarnContext(ctx, "Will not write event to outbox, avro is disabled", slog.Any("event", event))
-		return nil
+
+		// still serialize event to ensure it is well-defined
+		return event.Serialize(io.Discard)
 	}
 
 	meta, avro, err := ev.encodeAvro(event)
@@ -119,9 +119,16 @@ func (ev *eventSender) launchAsyncTasks() {
 	ev.wg.Go(func() {
 		defer func() {
 			if ev.KafkaSender != nil {
-				if count := ev.KafkaSender.Flush(5_000); count > 0 {
+				for {
+					count := ev.KafkaSender.Flush(5_000)
+					if count == 0 {
+						break
+					}
+
 					log.Warn("Flush says there are still queued messages to be send.", slog.Int("count", count))
 				}
+
+				ev.KafkaSender.Close()
 			}
 		}()
 
@@ -131,27 +138,40 @@ func (ev *eventSender) launchAsyncTasks() {
 	})
 
 	if ev.KafkaSender != nil {
-		go func() {
+		ev.wg.Go(func() {
 			for e := range ev.KafkaSender.Events() {
 				switch ev := e.(type) {
 				case *kafka.Message:
 					if ev.TopicPartition.Error != nil {
-						log.Warn("Delivery failed", slog.Any("topicPartition", ev.TopicPartition), slog.String("error", ev.TopicPartition.Error.Error()))
+						log.Warn("Event delivery failed",
+							slog.Any("topicPartition", ev.TopicPartition),
+							slog.String("key", string(ev.Key)),
+							sl.Error(ev.TopicPartition.Error),
+						)
 					}
 				}
 			}
-		}()
+		})
 	}
 }
 
 func (ev *eventSender) doSendAsync(event Event) {
 	// ignore error as we're in the process of sending an async
 	if err := ev.writeToFile(event); err != nil {
-		log.Warn("Failed to write async event to file", slog.String("error", err.Error()))
+		eventType := reflect.TypeOf(unwrapEvent(event)).String()
+		log.Warn("Failed to write async event to file", slog.String("type", eventType), sl.Error(err))
 	}
 
 	if err := ev.sendToKafka(event); err != nil {
-		log.Warn("Failed to send async event to kafka", slog.String("error", err.Error()))
+		eventType := reflect.TypeOf(unwrapEvent(event)).String()
+		log.Warn("Failed to send async event to kafka", slog.String("type", eventType), sl.Error(err))
+	}
+
+	if ev.FileSender == nil && ev.KafkaSender == nil {
+		// serialize event just to check for the error
+		err := event.Serialize(io.Discard)
+		eventType := reflect.TypeOf(unwrapEvent(event)).String()
+		log.Warn("Failed to send async event to kafka", slog.String("type", eventType), sl.Error(err))
 	}
 }
 
