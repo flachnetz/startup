@@ -54,7 +54,8 @@ func (opts *PostgresOptions) Connection() *sqlx.DB {
 		startup_base.PanicOnError(err, "Failed to parse database connection")
 
 		if err == nil {
-			logger.Info("Connecting to postgres database",
+			logger.Info(
+				"Connecting to postgres database",
 				slog.String("user", conf.User),
 				slog.String("host", conf.Host),
 				slog.Int("port", int(conf.Port)),

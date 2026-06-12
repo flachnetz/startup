@@ -27,7 +27,8 @@ func Migration(table, directory string) Initializer {
 			return fmt.Errorf("applying database migration: %w", err)
 		}
 
-		slog.Info("Migrations executed",
+		slog.Info(
+			"Migrations executed",
 			slog.String("prefix", "database"),
 			slog.Int("count", n),
 		)

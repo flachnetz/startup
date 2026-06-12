@@ -46,7 +46,8 @@ func Middleware[Claims any](opts MiddlewareOptions[Claims]) echo.MiddlewareFunc 
 			if startup_base.IsDevelopment() {
 				exp, _ := token.Expiration()
 
-				slog.DebugContext(ctx,
+				slog.DebugContext(
+					ctx,
 					"Got valid jwt in middleware",
 					slog.Any("validUntil", exp),
 					slog.Any("claims", maps.Collect(token.Claims())),

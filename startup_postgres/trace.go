@@ -14,9 +14,9 @@ type tracerWrapper struct {
 }
 
 var (
-	_ = (pgx.QueryTracer)(tracerWrapper{})
-	_ = (pgx.PrepareTracer)(tracerWrapper{})
-	_ = (pgx.ConnectTracer)(tracerWrapper{})
+	_ = pgx.QueryTracer(tracerWrapper{})
+	_ = pgx.PrepareTracer(tracerWrapper{})
+	_ = pgx.ConnectTracer(tracerWrapper{})
 )
 
 func (m tracerWrapper) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
@@ -24,7 +24,8 @@ func (m tracerWrapper) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data
 		return ctx
 	}
 	if m.logger != nil {
-		m.logger.DebugContext(ctx, "Query start",
+		m.logger.DebugContext(
+			ctx, "Query start",
 			slog.String("query", data.SQL),
 			slog.Any("args", data.Args),
 		)
@@ -54,7 +55,8 @@ func (m tracerWrapper) TracePrepareStart(ctx context.Context, conn *pgx.Conn, da
 		return ctx
 	}
 	if m.logger != nil {
-		m.logger.DebugContext(ctx, "Prepare start",
+		m.logger.DebugContext(
+			ctx, "Prepare start",
 			slog.String("name", data.Name),
 			slog.String("sql", data.SQL),
 		)

@@ -143,7 +143,8 @@ func (ev *eventSender) launchAsyncTasks() {
 				switch ev := e.(type) {
 				case *kafka.Message:
 					if ev.TopicPartition.Error != nil {
-						log.Warn("Event delivery failed",
+						log.Warn(
+							"Event delivery failed",
 							slog.Any("topicPartition", ev.TopicPartition),
 							slog.String("key", string(ev.Key)),
 							sl.Error(ev.TopicPartition.Error),

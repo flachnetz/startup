@@ -69,7 +69,8 @@ func (opts *OTELMetricsOptions) createResource(serviceName string) (*resource.Re
 		semconv.ServiceName(serviceName),
 	}
 
-	return resource.New(context.Background(),
+	return resource.New(
+		context.Background(),
 		resource.WithAttributes(attributes...),
 		resource.WithFromEnv(),
 		resource.WithHost(),

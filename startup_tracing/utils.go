@@ -22,7 +22,8 @@ func Trace(ctx context.Context, op string, fn func(ctx context.Context, span tra
 
 // TraceWithResult traces a child call while propagating the span using the context.
 func TraceWithResult[T any](ctx context.Context, op string, fn func(ctx context.Context, span trace.Span) (T, error)) (result T, err error) {
-	ctx, span := otel.Tracer("").Start(ctx, op,
+	ctx, span := otel.Tracer("").Start(
+		ctx, op,
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(TagsFromContext(ctx)...),
 	)

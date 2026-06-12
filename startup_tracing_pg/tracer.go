@@ -122,7 +122,8 @@ func (t *tracer) startSpan(ctx context.Context, res string) (context.Context, tr
 		return ctx, trace.SpanFromContext(ctx)
 	}
 
-	ctx, span := otel.Tracer("").Start(ctx, t.ServiceName,
+	ctx, span := otel.Tracer("").Start(
+		ctx, t.ServiceName,
 		trace.WithSpanKind(trace.SpanKindClient),
 	)
 
