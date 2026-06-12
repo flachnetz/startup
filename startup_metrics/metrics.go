@@ -74,7 +74,8 @@ func (opts *MetricsOptions) createResource(serviceName string) (*resource.Resour
 		semconv.ServiceName(serviceName),
 	}
 
-	return resource.New(context.Background(),
+	return resource.New(
+		context.Background(),
 		resource.WithAttributes(attributes...),
 		resource.WithFromEnv(),
 		resource.WithHost(),

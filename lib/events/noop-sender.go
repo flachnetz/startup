@@ -11,8 +11,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-type NoopEventSender struct {
-}
+type NoopEventSender struct{}
 
 func (n *NoopEventSender) SendAsync(ctx context.Context, event Event) {
 	err := event.Serialize(io.Discard)

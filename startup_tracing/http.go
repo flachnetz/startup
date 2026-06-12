@@ -51,7 +51,8 @@ func Tracing(service string, op string) startup_http.HttpMiddleware {
 				return
 			}
 
-			ctx, serverSpan := tracer.Start(ctx, op,
+			ctx, serverSpan := tracer.Start(
+				ctx, op,
 				trace.WithSpanKind(trace.SpanKindServer),
 				trace.WithAttributes(
 					attribute.String("peer.service", service),
@@ -125,7 +126,8 @@ func (rt tracingRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 	}
 
 	tracer := otel.Tracer("")
-	ctx, span := tracer.Start(ctx, "http-client",
+	ctx, span := tracer.Start(
+		ctx, "http-client",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			semconv.HTTPRequestMethodKey.String(req.Method),
@@ -186,7 +188,8 @@ func configureDnsHooks(ct *httptrace.ClientTrace, parentCtx context.Context) {
 			finishSpan(dnsSpan, errors.New("interrupted"))
 		}
 
-		_, dnsSpan = otel.Tracer("").Start(parentCtx, "http-client:dns",
+		_, dnsSpan = otel.Tracer("").Start(
+			parentCtx, "http-client:dns",
 			trace.WithSpanKind(trace.SpanKindClient),
 			trace.WithAttributes(attribute.String("host", info.Host)),
 		)
@@ -214,7 +217,8 @@ func configureConnectHooks(ct *httptrace.ClientTrace, parentCtx context.Context)
 			finishSpan(span, errors.New("interrupted"))
 		}
 
-		_, connSpans[key] = otel.Tracer("").Start(parentCtx, "http-client:connect",
+		_, connSpans[key] = otel.Tracer("").Start(
+			parentCtx, "http-client:connect",
 			trace.WithSpanKind(trace.SpanKindClient),
 			trace.WithAttributes(
 				attribute.String("network", network),
@@ -245,7 +249,8 @@ func configureTlsHooks(ct *httptrace.ClientTrace, parentCtx context.Context) {
 			finishSpan(tlsSpan, errors.New("interrupted"))
 		}
 
-		_, tlsSpan = otel.Tracer("").Start(parentCtx, "http-client:tls-handshake",
+		_, tlsSpan = otel.Tracer("").Start(
+			parentCtx, "http-client:tls-handshake",
 			trace.WithSpanKind(trace.SpanKindClient),
 		)
 	}

@@ -123,7 +123,8 @@ func (opts HTTPOptions) Serve(config Config) {
 	// don't let a panic crash the server.
 	recoveryStack := handlers.RecoveryHandler(
 		handlers.PrintRecoveryStack(true),
-		handlers.RecoveryLogger(NewSlogRecoveryHandlerLogger()))
+		handlers.RecoveryLogger(NewSlogRecoveryHandlerLogger()),
+	)
 
 	handler = recoveryStack(handler)
 
@@ -218,7 +219,8 @@ func WithPrometheusMetrics(s string) admin.RouteConfig {
 			w.Header().Set("Content-Type", "text/plain")
 			prometheusHandler := promhttp.Handler()
 			prometheusHandler.ServeHTTP(w, req)
-		}))
+		}),
+	)
 }
 
 func access(ctx context.Context, attrs []slog.Attr) {
@@ -313,5 +315,6 @@ func updateLogLevelHandler() admin.RouteConfig {
 			}
 
 			http.Error(w, "Method must be GET or POST", http.StatusMethodNotAllowed)
-		}))
+		}),
+	)
 }

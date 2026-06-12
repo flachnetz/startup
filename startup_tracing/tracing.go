@@ -39,7 +39,8 @@ func (opts *TracingOptions) Initialize() {
 	opts.once.Do(func() {
 		ctx := context.Background()
 
-		res, err := resource.New(ctx,
+		res, err := resource.New(
+			ctx,
 			resource.WithAttributes(
 				semconv.ServiceName(opts.Inputs.ServiceName),
 			),
@@ -50,7 +51,8 @@ func (opts *TracingOptions) Initialize() {
 
 		if opts.HttpEndpoint != "" {
 			log.Info("Sending traces via OTLP HTTP", slog.String("endpoint", opts.HttpEndpoint))
-			exporter, err = otlptracehttp.New(ctx,
+			exporter, err = otlptracehttp.New(
+				ctx,
 				otlptracehttp.WithEndpoint(opts.HttpEndpoint),
 				otlptracehttp.WithInsecure(),
 			)

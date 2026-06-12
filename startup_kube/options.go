@@ -16,7 +16,8 @@ func (opts *KubernetesOptions) Client() *kubernetes.Clientset {
 	if opts.KubeConfig != "" {
 		config, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 			&clientcmd.ClientConfigLoadingRules{ExplicitPath: opts.KubeConfig},
-			&clientcmd.ConfigOverrides{CurrentContext: opts.KubeContext}).ClientConfig()
+			&clientcmd.ConfigOverrides{CurrentContext: opts.KubeContext},
+		).ClientConfig()
 
 		startup_base.FatalOnError(err, "Initializing kube config failed")
 
