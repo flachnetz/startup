@@ -11,8 +11,8 @@ import (
 	"time"
 	"unicode"
 
-	confluent "github.com/Landoop/schema-registry"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	confluent "github.com/confluentinc/confluent-kafka-go/v2/schemaregistry"
 
 	"github.com/flachnetz/startup/v2/startup_tracing"
 
@@ -173,7 +173,7 @@ func kafkaSender(opts *EventOptions, clientId string) (*kafka.Producer, error) {
 	return kafkaClient, nil
 }
 
-func confluentClient(baseUrl string) (*confluent.Client, error) {
+func confluentClient(baseUrl string) (confluent.Client, error) {
 	if baseUrl == "" {
 		return nil, nil
 	}
@@ -184,5 +184,8 @@ func confluentClient(baseUrl string) (*confluent.Client, error) {
 		},
 	)
 
-	return confluent.NewClient(baseUrl, confluent.UsingClient(httpClient))
+	config := confluent.NewConfig(baseUrl)
+	config.HTTPClient = httpClient
+
+	return confluent.NewClient(config)
 }

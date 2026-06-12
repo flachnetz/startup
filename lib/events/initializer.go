@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"reflect"
 
-	confluent "github.com/Landoop/schema-registry"
 	rdkafka "github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	confluent "github.com/confluentinc/confluent-kafka-go/v2/schemaregistry"
 )
 
 type EventSenderInitializer interface {
@@ -17,7 +17,7 @@ type EventSenderInitializer interface {
 }
 
 type eventSenderInitializer struct {
-	ConfluentClient *confluent.Client
+	ConfluentClient confluent.Client
 	EventTopics     *NormalizedEventTypes
 	OutboxTable     string
 
@@ -84,7 +84,8 @@ func (esi *eventSenderInitializer) registerSchemaCache() (map[reflect.Type]uint3
 		event := reflect.New(eventType).Interface().(Event)
 
 		// register the schema with confluent
-		schemaId, err := esi.ConfluentClient.RegisterNewSchema(nameOf(event), event.Schema())
+		schemaInfo := confluent.SchemaInfo{Schema: event.Schema()}
+		schemaId, err := esi.ConfluentClient.Register(nameOf(event), schemaInfo, true)
 		if err != nil {
 			return nil, fmt.Errorf("register schema for event type %q: %w", eventType, err)
 		}
