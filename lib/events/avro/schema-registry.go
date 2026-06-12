@@ -7,12 +7,12 @@ import (
 	"strconv"
 	"sync"
 
-	schemaregistry "github.com/Landoop/schema-registry"
+	confluent "github.com/confluentinc/confluent-kafka-go/v2/schemaregistry"
 	"github.com/linkedin/goavro/v2"
 )
 
 type SchemaRegistry struct {
-	ConfluentClient *schemaregistry.Client
+	ConfluentClient confluent.Client
 
 	cache sync.Map
 }
@@ -33,13 +33,15 @@ func (r *SchemaRegistry) Get(key string) (*goavro.Codec, error) {
 			return nil, fmt.Errorf("parse schema id as integer: %w", err)
 		}
 
-		avroSchema, err = r.ConfluentClient.GetSchemaByID(schemaId)
+		schemaInfo, err := r.ConfluentClient.GetBySubjectAndID("", schemaId)
 		if err != nil {
 			return nil, fmt.Errorf("lookup schema in confluent %d: %w", schemaId, err)
 		}
 
+		avroSchema = schemaInfo.Schema
+
 	} else {
-		// still no schema? thats too bad
+		// still no schema? that is too bad
 		return nil, fmt.Errorf("no schema found for key %q", key)
 	}
 

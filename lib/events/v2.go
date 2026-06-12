@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	confluent "github.com/Landoop/schema-registry"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	confluent "github.com/confluentinc/confluent-kafka-go/v2/schemaregistry"
 	sl "github.com/flachnetz/startup/v2/startup_logging"
 	"github.com/jmoiron/sqlx"
 )
@@ -45,7 +45,7 @@ type eventSender struct {
 }
 
 func NewInitializer(
-	confluentClient *confluent.Client,
+	confluentClient confluent.Client,
 	kafkaSender *kafka.Producer,
 	fileSender io.WriteCloser,
 	eventTopics EventTopics,
