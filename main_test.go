@@ -98,9 +98,9 @@ func TestParseCommandLineWithOptions(t *testing.T) {
 
 			var err error
 			if tt.args.nonPointer {
-				err = ParseCommandLineWithOptions(tt.args.opts, tt.args.options)
+				err = ParseCommandLineWithOptions(t.Context(), tt.args.opts, tt.args.options)
 			} else {
-				err = ParseCommandLineWithOptions(&tt.args.opts, tt.args.options)
+				err = ParseCommandLineWithOptions(t.Context(), &tt.args.opts, tt.args.options)
 			}
 
 			if (err != nil) != tt.wantErr {
