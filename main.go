@@ -1,6 +1,7 @@
 package startup
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -17,23 +18,23 @@ import (
 
 var log = slog.With(slog.String("system", "startup"))
 
-func MustParseCommandLine(opts any) {
-	MustParseCommandLineWithOptions(opts, flags.HelpFlag|flags.PassDoubleDash)
+func MustParseCommandLine(ctx context.Context, opts any) {
+	MustParseCommandLineWithOptions(ctx, opts, flags.HelpFlag|flags.PassDoubleDash)
 }
 
-func MustParseCommandLineWithOptions(opts any, options flags.Options) {
-	if err := ParseCommandLineWithOptions(opts, options); err != nil {
+func MustParseCommandLineWithOptions(ctx context.Context, opts any, options flags.Options) {
+	if err := ParseCommandLineWithOptions(ctx, opts, options); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func ParseCommandLine(opts any) error {
-	return ParseCommandLineWithOptions(opts, flags.HelpFlag|flags.PassDoubleDash)
+func ParseCommandLine(ctx context.Context, opts any) error {
+	return ParseCommandLineWithOptions(ctx, opts, flags.HelpFlag|flags.PassDoubleDash)
 }
 
 // ParseCommandLineWithOptions Parses command line.
-func ParseCommandLineWithOptions(opts any, options flags.Options) error {
+func ParseCommandLineWithOptions(ctx context.Context, opts any, options flags.Options) error {
 	if reflect.ValueOf(opts).Kind() != reflect.Pointer {
 		return errors.New("options parameter must be pointer")
 	}
@@ -98,9 +99,17 @@ func ParseCommandLineWithOptions(opts any, options flags.Options) error {
 
 			initType := init.Type()
 			for in := range initType.Ins() {
-				inputValue := seen[in]
-				if !inputValue.IsValid() {
-					startup_base.Panicf("Can not find value of type %q to inject into %s",
+				var inputValue reflect.Value
+
+				switch {
+				case in == reflect.TypeFor[context.Context]():
+					inputValue = reflect.ValueOf(ctx)
+
+				case seen[in].IsValid():
+					inputValue = seen[in]
+
+				default:
+					startup_base.Panicf("Can not find value of type %q to inject into %q",
 						in.String(), fieldValue.Type())
 				}
 
