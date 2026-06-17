@@ -15,7 +15,7 @@ func main() {
 		startup_kube.KubernetesOptions
 	}
 
-	startup.MustParseCommandLine(&opts)
+	startup.MustParseCommandLine(context.Background(), &opts)
 
 	client := opts.Client()
 
