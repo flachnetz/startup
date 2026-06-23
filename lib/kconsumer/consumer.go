@@ -28,7 +28,7 @@ type HandleMessage func(ctx context.Context, msg *kafka.Message) error
 // If you return an error from your handler, you get two retries before the
 // consumer will quit and shutdown with an error.
 type PartitionConsumer struct {
-	Topic      string
+	Topics     []string
 	Brokers    []string
 	GroupID    string
 	Properties []string
@@ -65,8 +65,8 @@ func (c *PartitionConsumer) Consume(ctx context.Context, handle HandleMessage) e
 	}
 	defer startup_base.Close(consumer, "Close kafka consumer")
 
-	if err := consumer.Subscribe(c.Topic, nil); err != nil {
-		return fmt.Errorf("subscribe to %s: %w", c.Topic, err)
+	if err := consumer.SubscribeTopics(c.Topics, nil); err != nil {
+		return fmt.Errorf("subscribe to %v: %w", c.Topics, err)
 	}
 
 	workers := partitionsWorkers{
@@ -74,7 +74,7 @@ func (c *PartitionConsumer) Consume(ctx context.Context, handle HandleMessage) e
 		Workers:  map[int32]*partitionWorker{},
 	}
 
-	slog.Info("Partition consumer started", slog.String("topic", c.Topic), slog.String("groupID", c.GroupID))
+	slog.Info("Partition consumer started", slog.String("groupID", c.GroupID))
 
 	lastStored := time.Now()
 
