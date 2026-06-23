@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"github.com/flachnetz/startup/v2/lib/testx"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,27 +23,20 @@ func TestPartitionConsumer(t *testing.T) {
 	ctx, cancelTimeout := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancelTimeout()
 
-	cluster, err := kafka.NewMockCluster(1)
-	require.NoError(t, err, "create mock cluster")
-	defer cluster.Close()
+	cluster := testx.KafkaCluster(t)
 
-	brokers := cluster.BootstrapServers()
+	cluster.CreateTopic(topic, 3)
 
-	err = cluster.CreateTopic(topic, 3, 1)
-	require.NoError(t, err, "create topic")
-
-	produceMessagesAsync(t, brokers,
-		messageOf(topic, 0, "message-0"),
-		messageOf(topic, 1, "message-1"),
-		messageOf(topic, 2, "message-2"),
-		messageOf(topic, 0, "message-3"),
-		messageOf(topic, 1, "message-4"),
-	)
+	cluster.Send(messageOf(topic, 0, "message-0"))
+	cluster.Send(messageOf(topic, 1, "message-1"))
+	cluster.Send(messageOf(topic, 2, "message-2"))
+	cluster.Send(messageOf(topic, 0, "message-3"))
+	cluster.Send(messageOf(topic, 1, "message-4"))
 
 	// t.Context() is cancelled when the test finishes; we wrap it so we can
 	// cancel the consumer ourselves once all expected messages arrived.
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	ctx, cancelContext := context.WithCancel(t.Context())
+	defer cancelContext()
 
 	var (
 		mu       sync.Mutex
@@ -65,8 +59,8 @@ func TestPartitionConsumer(t *testing.T) {
 	}
 
 	consumer := &PartitionConsumer{
-		Topic:   topic,
-		Brokers: []string{brokers},
+		Topics:  []string{topic},
+		Brokers: []string{cluster.BootstrapServers},
 		GroupID: groupID,
 		// MockCluster speaks plaintext, so override the default ssl protocol.
 		Properties: []string{"security.protocol=plaintext"},
@@ -80,9 +74,9 @@ func TestPartitionConsumer(t *testing.T) {
 	select {
 	case <-done:
 		// got all messages, stop the consumer
-		cancel()
+		cancelContext()
 	case <-time.After(30 * time.Second):
-		cancel()
+		cancelContext()
 		require.Fail(t, "timed out waiting for messages")
 	}
 
@@ -143,8 +137,8 @@ func produceMessagesAsync(t *testing.T, brokers string, messages ...kafka.Messag
 	}()
 }
 
-func messageOf(topic string, partition int, payload string) kafka.Message {
-	return kafka.Message{
+func messageOf(topic string, partition int, payload string) *kafka.Message {
+	return &kafka.Message{
 		TopicPartition: kafka.TopicPartition{
 			Topic:     new(topic),
 			Partition: int32(partition),
