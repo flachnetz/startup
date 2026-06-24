@@ -3,6 +3,7 @@ package testx
 import (
 	"context"
 	"io"
+	"slices"
 	"sync"
 	"testing"
 
@@ -34,8 +35,15 @@ func CaptureEvents(t *testing.T) *MockEvents {
 // Events sent transactionally are recorded only after the transaction commits.
 type MockEvents struct {
 	Testing *testing.T
-	Events  []events.Event
+	events  []events.Event
 	lock    sync.Mutex
+}
+
+// Events returns a copy of the recorded events.
+func (m *MockEvents) Events() []events.Event {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	return slices.Clone(m.events)
 }
 
 // SendAsync serializes the event (failing the test on error) and records it
@@ -45,7 +53,7 @@ func (m *MockEvents) SendAsync(_ context.Context, event events.Event) {
 	require.NoError(m.Testing, err)
 
 	m.lock.Lock()
-	m.Events = append(m.Events, event)
+	m.events = append(m.events, event)
 	m.lock.Unlock()
 }
 
@@ -57,7 +65,7 @@ func (m *MockEvents) SendInTx(ctx context.Context, _ sqlx.ExecerContext, event e
 
 	ql.TxContextFromContext(ctx).OnCommit(func() {
 		m.lock.Lock()
-		m.Events = append(m.Events, event)
+		m.events = append(m.events, event)
 		m.lock.Unlock()
 	})
 
@@ -84,7 +92,7 @@ func MockEventsGetAll[T events.Event](t *testing.T, m *MockEvents, predicates ..
 	t.Helper()
 	var res []T
 
-	for _, ev := range m.Events {
+	for _, ev := range m.Events() {
 		e, ok := events.WithKey(ev, "").Event.(T)
 		if !ok {
 			continue
