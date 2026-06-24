@@ -3,7 +3,6 @@ package events
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	confluent "github.com/confluentinc/confluent-kafka-go/v2/schemaregistry"
+	"github.com/flachnetz/startup/v2/lib/events/avro"
 	sl "github.com/flachnetz/startup/v2/startup_logging"
 	"github.com/jmoiron/sqlx"
 )
@@ -159,19 +159,19 @@ func (ev *eventSender) launchAsyncTasks() {
 func (ev *eventSender) doSendAsync(event Event) {
 	// ignore error as we're in the process of sending an async
 	if err := ev.writeToFile(event); err != nil {
-		eventType := reflect.TypeOf(unwrapEvent(event)).String()
+		eventType := avro.EventTypeOf(event)
 		log.Warn("Failed to write async event to file", slog.String("type", eventType), sl.Error(err))
 	}
 
 	if err := ev.sendToKafka(event); err != nil {
-		eventType := reflect.TypeOf(unwrapEvent(event)).String()
+		eventType := avro.EventTypeOf(event)
 		log.Warn("Failed to send async event to kafka", slog.String("type", eventType), sl.Error(err))
 	}
 
 	if ev.FileSender == nil && ev.KafkaSender == nil {
 		// serialize event just to check for the error
 		err := event.Serialize(io.Discard)
-		eventType := reflect.TypeOf(unwrapEvent(event)).String()
+		eventType := avro.EventTypeOf(event)
 		log.Warn("Failed to send async event to kafka", slog.String("type", eventType), sl.Error(err))
 	}
 }
@@ -256,32 +256,12 @@ func (ev *eventSender) encodeAvro(event Event) (*EventMetadata, []byte, error) {
 		return nil, nil, fmt.Errorf("no schema found for %q", meta.Type)
 	}
 
-	avro, err := ev.eventToConfluentAvro(schemaId, event)
+	buf, err := avro.SerializeWithSchemaId(schemaId, event)
 	if err != nil {
-		return nil, nil, fmt.Errorf("serialize to avro: %w", err)
+		return nil, nil, fmt.Errorf("serialize event: %w", err)
 	}
 
-	return meta, avro, nil
-}
-
-func (ev *eventSender) eventToConfluentAvro(schemaId uint32, event Event) ([]byte, error) {
-	// encode id in 4 bytes
-	var buf [4]byte
-	binary.BigEndian.PutUint32(buf[:], schemaId)
-
-	// write the magic byte followed by the 4 byte id.
-	// see https://docs.confluent.io/current/schema-registry/docs/serializer-formatter.html
-	// for a description of the format.
-	var buffer bytes.Buffer
-	buffer.WriteByte(0)
-	buffer.Write(buf[:])
-
-	// serialize the event
-	if err := event.Serialize(&buffer); err != nil {
-		return nil, fmt.Errorf("encode avro event: %w", err)
-	}
-
-	return buffer.Bytes(), nil
+	return meta, buf, nil
 }
 
 func eventToString(event Event) string {

@@ -1,32 +1,9 @@
 package events
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 )
-
-func nameOf(event Event) string {
-	// try to take the Name of the schema
-	var schema struct{ Name string }
-	if json.Unmarshal([]byte(event.Schema()), &schema) == nil && schema.Name != "" {
-		return schema.Name
-	}
-
-	// get the event class
-	eventType := reflect.ValueOf(event).Type()
-	for eventType.Kind() == reflect.Pointer || eventType.Kind() == reflect.Interface {
-		eventType = eventType.Elem()
-	}
-
-	// and take the name of it
-	name := eventType.Name()
-	if name != "" {
-		return name
-	}
-
-	return "GoAvroEvent"
-}
 
 var eventInterfaceType = reflect.TypeFor[Event]()
 

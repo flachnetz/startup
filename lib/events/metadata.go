@@ -22,10 +22,12 @@ type EventMetadata struct {
 func (topics *NormalizedEventTypes) MetadataOf(event Event) (*EventMetadata, error) {
 	var key *string
 	var headers EventHeaders
+	var topic string
 
 	if msg, ok := event.(*KafkaEvent); ok {
 		key = &msg.Key
 		headers = msg.Headers
+		topic = msg.Topic
 
 		// unwrap the actual event
 		event = msg.Event
@@ -34,10 +36,14 @@ func (topics *NormalizedEventTypes) MetadataOf(event Event) (*EventMetadata, err
 	// now we can get the actual event type
 	eventType := derefEventType(reflect.TypeOf(event))
 
-	// get the topic of the actual event
-	topic, err := topics.TopicForType(eventType)
-	if err != nil {
-		return nil, fmt.Errorf("lookup event type: %w", err)
+	if topic == "" {
+		var err error
+
+		// get the topic of the actual event
+		topic, err = topics.TopicForType(eventType)
+		if err != nil {
+			return nil, fmt.Errorf("lookup event type: %w", err)
+		}
 	}
 
 	// build metadata object for event
