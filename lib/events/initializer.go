@@ -9,6 +9,7 @@ import (
 
 	rdkafka "github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	confluent "github.com/confluentinc/confluent-kafka-go/v2/schemaregistry"
+	"github.com/flachnetz/startup/v2/lib/events/avro"
 )
 
 type EventSenderInitializer interface {
@@ -85,7 +86,7 @@ func (esi *eventSenderInitializer) registerSchemaCache() (map[reflect.Type]uint3
 
 		// register the schema with confluent
 		schemaInfo := confluent.SchemaInfo{Schema: event.Schema()}
-		schemaId, err := esi.ConfluentClient.Register(nameOf(event), schemaInfo, true)
+		schemaId, err := esi.ConfluentClient.Register(avro.EventTypeOf(event), schemaInfo, true)
 		if err != nil {
 			return nil, fmt.Errorf("register schema for event type %q: %w", eventType, err)
 		}

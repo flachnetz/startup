@@ -31,7 +31,7 @@ type ConsumerOptions struct {
 	KafkaConsumerGroup string
 	KafkaOffsetReset   string
 
-	SchemaRegistry *avro.SchemaRegistry
+	SchemaRegistry *avro.SchemaCache
 }
 
 func NewConsumer(options ConsumerOptions) *Consumer {

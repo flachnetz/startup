@@ -2,10 +2,10 @@ package events
 
 import (
 	"context"
-	"io"
 	"log/slog"
 	"time"
 
+	"github.com/flachnetz/startup/v2/lib/events/avro"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -19,13 +19,7 @@ func FromEventTimestamp(timestamp int64) time.Time {
 
 var log = slog.With(slog.String("prefix", "events"))
 
-type Event interface {
-	// Schema returns the avro schema of this event
-	Schema() string
-
-	// Serialize writes the event (in avro format) to the given writer.
-	Serialize(io.Writer) error
-}
+type Event = avro.Event
 
 type EventSender interface {
 	// SendAsync sends the given event. This method should be non-blocking and

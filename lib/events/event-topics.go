@@ -31,9 +31,9 @@ type NormalizedEventTypes struct {
 	EventTopics
 }
 
-// Normalized returns a Normalized EventTopics instance where the event types point
+// Normalized returns a NormalizedEventTypes instance where the event types point
 // directly to the events struct type and not to any kind of pointer.
-// This ways we prevent issues with pointers to event types not getting matched to a topic.
+// This way we prevent issues with pointers to event types not getting matched to a topic.
 func (topics *EventTopics) Normalized() (*NormalizedEventTypes, error) {
 	normalizedTypes := map[reflect.Type]kafka.Topic{}
 

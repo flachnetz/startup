@@ -85,7 +85,7 @@ func MockEventsGetAll[T events.Event](t *testing.T, m *MockEvents, predicates ..
 	var res []T
 
 	for _, ev := range m.Events {
-		e, ok := events.ToKafkaEvent("", ev).Event.(T)
+		e, ok := events.WithKey(ev, "").Event.(T)
 		if !ok {
 			continue
 		}

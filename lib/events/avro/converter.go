@@ -1,12 +1,9 @@
 package avro
 
 import (
-	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"log/slog"
-	"strconv"
 	"strings"
 )
 
@@ -17,7 +14,7 @@ type EventSource struct {
 
 type Converter struct {
 	log      *slog.Logger
-	registry *SchemaRegistry
+	registry *SchemaCache
 	options  ConverterOptions
 }
 
@@ -26,28 +23,23 @@ type ConverterOptions struct {
 	ToLowerCase   bool   // map all field names to lower case
 }
 
-func NewConverter(registry *SchemaRegistry, options ConverterOptions) *Converter {
+func NewConverter(registry *SchemaCache, options ConverterOptions) *Converter {
 	return &Converter{log: slog.With(slog.String("prefix", "avro-converter")), registry: registry, options: options}
 }
 
 func (c *Converter) Parse(data []byte) (map[string]any, *EventSource, error) {
-	if bytes.HasPrefix(data, []byte("Obj\x01")) {
-		// This isn't used anymore, i think.
-		return nil, nil, errors.New("events in avro container format not supported")
-	}
-
 	if len(data) >= 5 && data[0] == 0 {
 		// confluent format: convert 4 byte integer to schema key string
 		schemaId := binary.BigEndian.Uint32(data[1:5])
-		return c.decode(strconv.Itoa(int(schemaId)), data[5:])
+		return c.decode(schemaId, data[5:])
 	}
 
 	return nil, nil, fmt.Errorf("parse event %q", string(data))
 }
 
-func (c *Converter) decode(hash string, data []byte) (map[string]any, *EventSource, error) {
+func (c *Converter) decode(schemaId uint32, data []byte) (map[string]any, *EventSource, error) {
 	// get the codec for the provided hash
-	codec, err := c.registry.Get(hash)
+	codec, err := c.registry.Get(schemaId)
 	if err != nil {
 		return nil, nil, err
 	}
