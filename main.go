@@ -108,6 +108,19 @@ func ParseCommandLineWithOptions(ctx context.Context, opts any, options flags.Op
 				case seen[in].IsValid():
 					inputValue = seen[in]
 
+				case in.Kind() == reflect.Pointer:
+					// get T instead of *T
+					inType := in.Elem()
+
+					// pointers indicate optional values
+					if value := seen[inType]; value.IsValid() {
+						// set inputValue to (*T)(&value)
+						inputValue = value.Addr()
+					} else {
+						// set inputValue to (*T)(nil)
+						inputValue = reflect.New(in).Elem()
+					}
+
 				default:
 					startup_base.Panicf("Can not find value of type %q to inject into %q",
 						in.String(), fieldValue.Type())

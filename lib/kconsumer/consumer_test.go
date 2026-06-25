@@ -16,7 +16,6 @@ import (
 func TestPartitionConsumer(t *testing.T) {
 	const (
 		topic    = "test-topic"
-		groupID  = "test-group"
 		msgCount = 5
 	)
 
@@ -59,11 +58,8 @@ func TestPartitionConsumer(t *testing.T) {
 	}
 
 	consumer := &PartitionConsumer{
-		Topics:  []string{topic},
-		Brokers: []string{cluster.BootstrapServers},
-		GroupID: groupID,
-		// MockCluster speaks plaintext, so override the default ssl protocol.
-		Properties: []string{"security.protocol=plaintext"},
+		Consumer: cluster.Consumer(),
+		Topics:   []string{topic},
 	}
 
 	errCh := make(chan error, 1)

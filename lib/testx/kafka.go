@@ -67,6 +67,9 @@ func kafkaWorker(ctx context.Context, producer *kafka.Producer, messagesCh chan 
 		default:
 			// flush for a moment
 			producer.Flush(50)
+
+			// flush might return directly, so wait a little here
+			time.Sleep(25 * time.Millisecond)
 		}
 	}
 }
@@ -83,21 +86,16 @@ func (k *Kafka) CreateTopic(name string, partitions int) {
 	require.NoErrorf(k.testing, err, "Create topic %q", name)
 }
 
-// Consumer creates a consumer subscribed to the given topic(s). The consumer is
+// TestConsumer creates a consumer subscribed to the given topic(s). The consumer is
 // closed automatically on test cleanup.
-func (k *Kafka) Consumer(topic string, moreTopics ...string) *KafkaConsumer {
-	config := &kafka.ConfigMap{"bootstrap.servers": k.BootstrapServers}
-
+func (k *Kafka) TestConsumer(topic string, moreTopics ...string) *KafkaConsumer {
 	slog.Info("Create test consumer")
-	consumer, err := kafka.NewConsumer(config)
-	require.NoError(k.testing, err)
-
-	k.testing.Cleanup(func() { _ = consumer.Close() })
+	consumer := k.Consumer()
 
 	topics := append([]string{topic}, moreTopics...)
 
 	slog.Info("Subscribing to test topic", slog.Any("topics", topics))
-	err = consumer.SubscribeTopics(topics, nil)
+	err := consumer.SubscribeTopics(topics, nil)
 	require.NoErrorf(k.testing, err, "Subscribe to topic %q", topic)
 
 	return &KafkaConsumer{
@@ -105,6 +103,32 @@ func (k *Kafka) Consumer(topic string, moreTopics ...string) *KafkaConsumer {
 		testing:  k.testing,
 		topic:    topic,
 	}
+}
+
+func (k *Kafka) Consumer() *kafka.Consumer {
+	config := &kafka.ConfigMap{
+		"group.id":          time.Now().String(),
+		"bootstrap.servers": k.BootstrapServers,
+		"auto.offset.reset": "earliest",
+	}
+
+	consumer, err := kafka.NewConsumer(config)
+	require.NoError(k.testing, err, "Create consumer")
+
+	k.testing.Cleanup(func() { _ = consumer.Close() })
+
+	return consumer
+}
+
+func (k *Kafka) Producer() *kafka.Producer {
+	config := &kafka.ConfigMap{"bootstrap.servers": k.cluster.BootstrapServers()}
+
+	producer, err := kafka.NewProducer(config)
+	require.NoError(k.testing, err, "Create producer")
+
+	k.testing.Cleanup(producer.Close)
+
+	return producer
 }
 
 // KafkaConsumer is a handle to a Kafka consumer subscribed to one or more topics.
