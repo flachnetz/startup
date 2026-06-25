@@ -4,21 +4,24 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/flachnetz/startup/v2/lib/kafka"
+	"github.com/flachnetz/startup/v2/startup_kafka"
 )
 
 // TopicsFunc builds an EventTopics instance for the given kafka replication factor.
 type TopicsFunc func(replicationFactor int16) EventTopics
 
+type Topics = startup_kafka.Topics
+type Topic = startup_kafka.Topic
+
 // EventTopics contains a mapping from event struct type to a kafka topic.
 // This map must contain all event types that are going to be send. If this misses an event,
 // sending that event will fail.
 type EventTopics struct {
-	EventTypes map[reflect.Type]kafka.Topic
+	EventTypes map[reflect.Type]Topic
 }
 
-func (topics *EventTopics) Topics() kafka.Topics {
-	var result kafka.Topics
+func (topics *EventTopics) Topics() Topics {
+	var result Topics
 
 	for _, topic := range topics.EventTypes {
 		result = append(result, topic)
@@ -35,7 +38,7 @@ type NormalizedEventTypes struct {
 // directly to the events struct type and not to any kind of pointer.
 // This way we prevent issues with pointers to event types not getting matched to a topic.
 func (topics *EventTopics) Normalized() (*NormalizedEventTypes, error) {
-	normalizedTypes := map[reflect.Type]kafka.Topic{}
+	normalizedTypes := map[reflect.Type]Topic{}
 
 	for eventType, kafkaTopic := range topics.EventTypes {
 		eventType = derefEventType(eventType)

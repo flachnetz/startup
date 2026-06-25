@@ -1,4 +1,4 @@
-package kafka
+package startup_kafka
 
 type Topics []Topic
 

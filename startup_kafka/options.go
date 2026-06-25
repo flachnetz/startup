@@ -12,8 +12,6 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	confluent "github.com/confluentinc/confluent-kafka-go/v2/schemaregistry"
-	"github.com/flachnetz/startup/v2"
-	sk "github.com/flachnetz/startup/v2/lib/kafka"
 	"github.com/flachnetz/startup/v2/startup_base"
 	sl "github.com/flachnetz/startup/v2/startup_logging"
 	"github.com/flachnetz/startup/v2/startup_tracing"
@@ -26,7 +24,10 @@ type KafkaOptions struct {
 	// by the caller before Initialize runs.
 	Inputs struct {
 		// Set topics to automatically create topics on startup
-		Topics sk.TopicsFunc
+		Topics TopicsFunc
+
+		// Additional configuration options to apply to all clients
+		DefaultConfig kafka.ConfigMap
 	}
 
 	KafkaAddresses        []string `long:"kafka-address" env:"KAFKA_ADDRESS" validate:"dive,hostport" description:"Address of kafka server to use. Can be specified multiple times to connect to multiple brokers."`
@@ -38,7 +39,7 @@ type KafkaOptions struct {
 
 	// schema registry is not really kafka, but it is only used with kafka,
 	// so I guess it is okay to put it here.
-	ConfluentURL startup.URL `long:"confluent-url" default:"http://confluent-registry.shared.svc.cluster.local" env:"EVENT_SENDER_CONFLUENT_URL" description:"Confluent schema registry url."`
+	ConfluentURL string `long:"confluent-url" default:"http://confluent-registry.shared.svc.cluster.local" env:"EVENT_SENDER_CONFLUENT_URL" description:"Confluent schema registry url."`
 }
 
 // Initialize creates the configured topics on startup. It is a no-op unless
@@ -50,8 +51,6 @@ func (opts *KafkaOptions) Initialize(ctx context.Context) {
 	}
 
 	config := opts.DefaultConfig(nil)
-
-	// new(config) returns a pointer to a copy of the config map.
 	client, err := kafka.NewAdminClient(new(config))
 	startup_base.FatalOnError(err, "Create kafka admin client")
 
@@ -131,6 +130,9 @@ func (opts *KafkaOptions) DefaultConfig(overrideConfig kafka.ConfigMap) kafka.Co
 		"go.logs.channel.enable": true,
 	}
 
+	// extend with custom config from inputs
+	maps.Copy(config, opts.Inputs.DefaultConfig)
+
 	// extend with custom config
 	maps.Copy(config, overrideConfig)
 
@@ -145,7 +147,11 @@ func (opts *KafkaOptions) DefaultConfig(overrideConfig kafka.ConfigMap) kafka.Co
 
 // ConfluentClient creates a schema registry client pointing at ConfluentURL.
 func (opts *KafkaOptions) ConfluentClient() confluent.Client {
-	config := confluent.NewConfig(opts.ConfluentURL.String())
+	if opts.ConfluentURL == "" {
+		startup_base.FatalOnError(errors.New("url not set"), "Create confluent client")
+	}
+
+	config := confluent.NewConfig(opts.ConfluentURL)
 	config.HTTPClient = startup_tracing.WithSpanPropagation(
 		&http.Client{
 			Timeout: 3 * time.Second,
@@ -160,7 +166,7 @@ func (opts *KafkaOptions) ConfluentClient() confluent.Client {
 
 // CreateTopics creates the given topics, deduplicating by name and treating an
 // already existing topic as success.
-func CreateTopics(ctx context.Context, adminClient *kafka.AdminClient, topics sk.Topics) error {
+func CreateTopics(ctx context.Context, adminClient *kafka.AdminClient, topics Topics) error {
 	var topicSpecifications []kafka.TopicSpecification
 
 	// skip duplicate topic names so CreateTopics does not reject the request
