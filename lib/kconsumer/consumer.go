@@ -5,12 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
-	"github.com/flachnetz/startup/v2/startup_base"
 	sl "github.com/flachnetz/startup/v2/startup_logging"
 	"github.com/flachnetz/startup/v2/startup_tracing"
 	"go.opentelemetry.io/otel/trace"
@@ -28,10 +26,8 @@ type HandleMessage func(ctx context.Context, msg *kafka.Message) error
 // If you return an error from your handler, you get two retries before the
 // consumer will quit and shutdown with an error.
 type PartitionConsumer struct {
-	Topics     []string
-	Brokers    []string
-	GroupID    string
-	Properties []string
+	Topics   []string
+	Consumer *kafka.Consumer
 }
 
 type partitionWorker struct {
@@ -44,37 +40,16 @@ type partitionWorker struct {
 }
 
 func (c *PartitionConsumer) Consume(ctx context.Context, handle HandleMessage) error {
-	configMap := kafka.ConfigMap{
-		"bootstrap.servers":        strings.Join(c.Brokers, ","),
-		"group.id":                 c.GroupID,
-		"auto.offset.reset":        "earliest",
-		"security.protocol":        "ssl",
-		"enable.auto.commit":       true,
-		"enable.auto.offset.store": false,
-	}
-
-	for _, prop := range c.Properties {
-		if err := configMap.Set(prop); err != nil {
-			return fmt.Errorf("set property %q: %w", prop, err)
-		}
-	}
-
-	consumer, err := kafka.NewConsumer(&configMap)
-	if err != nil {
-		return fmt.Errorf("create kafka consumer: %w", err)
-	}
-	defer startup_base.Close(consumer, "Close kafka consumer")
-
-	if err := consumer.SubscribeTopics(c.Topics, nil); err != nil {
+	if err := c.Consumer.SubscribeTopics(c.Topics, nil); err != nil {
 		return fmt.Errorf("subscribe to %v: %w", c.Topics, err)
 	}
 
 	workers := partitionsWorkers{
-		Consumer: consumer,
+		Consumer: c.Consumer,
 		Workers:  map[int32]*partitionWorker{},
 	}
 
-	slog.Info("Partition consumer started", slog.String("groupID", c.GroupID))
+	slog.Info("Partition consumer started", slog.Any("topics", c.Topics))
 
 	lastStored := time.Now()
 
@@ -100,7 +75,7 @@ func (c *PartitionConsumer) Consume(ctx context.Context, handle HandleMessage) e
 			}
 		}
 
-		msg, err := consumer.ReadMessage(5 * time.Second)
+		msg, err := c.Consumer.ReadMessage(5 * time.Second)
 		if err != nil {
 			if ke, ok := errors.AsType[kafka.Error](err); ok {
 				if ke.IsTimeout() {

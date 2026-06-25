@@ -10,6 +10,7 @@ import (
 	rdkafka "github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	confluent "github.com/confluentinc/confluent-kafka-go/v2/schemaregistry"
 	"github.com/flachnetz/startup/v2/lib/events/avro"
+	"github.com/flachnetz/startup/v2/startup_kafka"
 )
 
 type EventSenderInitializer interface {
@@ -111,56 +112,6 @@ func (esi *eventSenderInitializer) createKafkaTopics() error {
 
 	defer func() { go adminClient.Close() }()
 
-	var topicSpecifications []rdkafka.TopicSpecification
-	topicSeen := map[string]bool{}
-
-	for _, topic := range topics {
-		if topicSeen[topic.Name] {
-			continue
-		}
-
-		config := map[string]string{}
-		for k, v := range topic.Config {
-			if v != nil {
-				config[k] = *v
-			}
-		}
-
-		topicSpecifications = append(topicSpecifications, rdkafka.TopicSpecification{
-			Topic:             topic.Name,
-			NumPartitions:     int(topic.NumPartitions),
-			ReplicationFactor: int(topic.ReplicationFactor),
-			Config:            config,
-		})
-
-		topicSeen[topic.Name] = true
-	}
-
 	log.Info("Creating kafka topics", slog.Int("count", len(topics)))
-	results, err := adminClient.CreateTopics(context.Background(), topicSpecifications)
-
-	// check results first
-	for _, result := range results {
-		switch result.Error.Code() {
-		case rdkafka.ErrNoError:
-			log.Info("Kafka topic created", slog.String("topic", result.Topic))
-
-		case rdkafka.ErrTopicAlreadyExists:
-			log.Info("Kafka topic already exists", slog.String("topic", result.Topic))
-
-		default:
-			log.Warn("Failed to create topic", slog.String("topic", result.Topic), slog.String("error", result.Error.String()))
-
-			if err == nil {
-				err = errors.New("one or more topics could not be created")
-			}
-		}
-	}
-
-	// and then fail if we have any kind of error
-	if err != nil {
-		return fmt.Errorf("topic creation: %w", err)
-	}
-
-	return nil
+	return startup_kafka.CreateTopics(context.Background(), adminClient, topics)
 }

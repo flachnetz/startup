@@ -10,5 +10,5 @@ type Topic struct {
 	ReplicationFactor int16
 
 	// https://docs.confluent.io/platform/current/installation/configuration/topic-configs.html
-	Config map[string]*string
+	Config map[string]string
 }

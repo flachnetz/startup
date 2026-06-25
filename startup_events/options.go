@@ -4,51 +4,42 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
-	"strings"
 	"sync"
-	"time"
-	"unicode"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	confluent "github.com/confluentinc/confluent-kafka-go/v2/schemaregistry"
-
-	"github.com/flachnetz/startup/v2/startup_tracing"
+	"github.com/flachnetz/startup/v2/startup_kafka"
 
 	"github.com/flachnetz/startup/v2/lib/events"
 	"github.com/flachnetz/startup/v2/startup_base"
 )
 
 type EventOptions struct {
-	ConfluentURL string `long:"event-sender-confluent-url" env:"EVENT_SENDER_CONFLUENT_URL" description:"Confluent schema registry url."`
-
-	Async struct {
-		Kafka struct {
-			Addr        string   `long:"event-sender-kafka-addr" env:"EVENT_SENDER_KAFKA_ADDR" description:"Kafka bootstrap hosts"`
-			DisableTLS  bool     `long:"event-sender-kafka-disable-tls" env:"EVENT_SENDER_KAFKA_DISABLE_TLS" description:"Disable TLS, might simplify local testing"`
-			Replication int16    `long:"event-sender-kafka-replication-factor" env:"EVENT_SENDER_KAFKA_REPLICATION_FACTOR" default:"3" description:"Replication factor to use when creating kafka topics"`
-			Properties  []string `long:"event-sender-kafka-properties" env:"EVENT_SENDER_KAFKA_PROPERTIES" description:"Pairs of key=value containing standard librdkafka configuration properties as documented in: https://github.com/edenhill/librdkafka/tree/master/CONFIGURATION.md"`
-		}
-
-		BufferSize uint `long:"event-sender-async-buffer-size" env:"EVENT_SENDER_ASYNC_BUFFER_SIZE" default:"1024" description:"Number of elements to buffer in async event sender. If the buffer is full, new events will be discarded."`
-	}
-
-	WriteToFile string `long:"event-sender-file" env:"EVENT_SENDER_FILE" description:"File to write all events to. Sender will be encoded as json"`
+	AsyncBufferSize uint   `long:"event-sender-async-buffer-size" env:"EVENT_SENDER_ASYNC_BUFFER_SIZE" default:"1024" description:"Maximum number of elements to buffer in async event sender. If the buffer is full, new events will be discarded."`
+	WriteToFile     string `long:"event-sender-file" env:"EVENT_SENDER_FILE" description:"File to write all events to. Sender will be encoded as json"`
 
 	Inputs struct {
-		// A function to create the event topics. This option must be specified.
-		Topics      events.TopicsFunc `validate:"required"`
-		OutboxTable string            `json:"outboxTable"`
+		// A function to define event mapping & existing topics
+		Topics events.TopicsFunc `validate:"required"`
+
+		// OutboxTable is the name of the outbox table
+		OutboxTable string `json:"outboxTable"`
 	}
+
+	kafkaOptions *startup_kafka.KafkaOptions
 
 	eventSenderOnce sync.Once
 	eventSender     events.EventSender
 }
 
-func (opts *EventOptions) EventSender(clientId string) events.EventSender {
+func (opts *EventOptions) Initialize(kafkaOptions *startup_kafka.KafkaOptions) {
+	opts.kafkaOptions = kafkaOptions
+}
+
+func (opts *EventOptions) EventSender() events.EventSender {
 	opts.eventSenderOnce.Do(func() {
-		eventSender, err := initializeEventSender(opts, clientId)
+		eventSender, err := initializeEventSender(opts)
 		startup_base.FatalOnError(err, "initialize event sender")
 
 		// register as global event sender
@@ -60,15 +51,21 @@ func (opts *EventOptions) EventSender(clientId string) events.EventSender {
 	return opts.eventSender
 }
 
-func initializeEventSender(opts *EventOptions, clientId string) (events.EventSender, error) {
-	confluentClient, err := confluentClient(opts.ConfluentURL)
-	if err != nil {
-		return nil, fmt.Errorf("confluent registry client: %w", err)
-	}
+func initializeEventSender(opts *EventOptions) (events.EventSender, error) {
+	var confluentClient confluent.Client
+	var kafkaSender *kafka.Producer
 
-	kafkaSender, err := kafkaSender(opts, clientId)
-	if err != nil {
-		return nil, fmt.Errorf("kafka client: %w", err)
+	// default to 1 if we don't have any kafka option set
+	var kafkaReplication int16 = 1
+
+	if opts.kafkaOptions != nil {
+		confluentClient = opts.kafkaOptions.ConfluentClient()
+
+		if len(opts.kafkaOptions.KafkaAddresses) > 0 {
+			kafkaSender = opts.kafkaOptions.NewProducer(nil)
+		}
+
+		kafkaReplication = opts.kafkaOptions.KafkaReplication
 	}
 
 	fileSender, err := fileSender(opts.WriteToFile)
@@ -87,10 +84,10 @@ func initializeEventSender(opts *EventOptions, clientId string) (events.EventSen
 
 	// build list of topics parameterized with the replication factor that we
 	// would like to have now.
-	eventTopics := opts.Inputs.Topics(opts.Async.Kafka.Replication)
+	eventTopics := opts.Inputs.Topics(kafkaReplication)
 
 	// buffer size for async event queue
-	bufferSize := opts.Async.BufferSize
+	bufferSize := opts.AsyncBufferSize
 
 	eventSenderInitializer, err := events.NewInitializer(
 		confluentClient,
@@ -125,67 +122,4 @@ func fileSender(file string) (io.WriteCloser, error) {
 	}
 
 	return os.OpenFile(file, os.O_CREATE|os.O_WRONLY, 0o644)
-}
-
-func kafkaSender(opts *EventOptions, clientId string) (*kafka.Producer, error) {
-	if opts.Async.Kafka.Addr == "" {
-		return nil, nil
-	}
-
-	isCommaOrSpace := func(ch rune) bool {
-		return unicode.IsSpace(ch) || ch == ','
-	}
-
-	// split by spaces or commas
-	bootstrapServers := strings.FieldsFunc(opts.Async.Kafka.Addr, isCommaOrSpace)
-	kafkaConfig := kafka.ConfigMap{
-		"client.id":         clientId,
-		"bootstrap.servers": strings.Join(bootstrapServers, ","),
-		"compression.codec": "gzip",
-		"compression.level": "6",
-
-		// buffer messages locally before sending them in one batch
-		"queue.buffering.max.ms": "200",
-
-		// this is the same that the java client uses. This way the client maps
-		// the same key to the same partition as the java client does.
-		"partitioner": "murmur2_random",
-	}
-
-	// enable or disable ssl
-	if opts.Async.Kafka.DisableTLS {
-		kafkaConfig["security.protocol"] = "plaintext"
-	} else {
-		kafkaConfig["security.protocol"] = "ssl"
-	}
-
-	for _, value := range opts.Async.Kafka.Properties {
-		if err := kafkaConfig.Set(value); err != nil {
-			return nil, fmt.Errorf("parse kafka config %q: %w", value, err)
-		}
-	}
-
-	kafkaClient, err := kafka.NewProducer(&kafkaConfig)
-	if err != nil {
-		return nil, fmt.Errorf("kafka producer: %w", err)
-	}
-
-	return kafkaClient, nil
-}
-
-func confluentClient(baseUrl string) (confluent.Client, error) {
-	if baseUrl == "" {
-		return nil, nil
-	}
-
-	httpClient := startup_tracing.WithSpanPropagation(
-		&http.Client{
-			Timeout: 3 * time.Second,
-		},
-	)
-
-	config := confluent.NewConfig(baseUrl)
-	config.HTTPClient = httpClient
-
-	return confluent.NewClient(config)
 }
