@@ -182,7 +182,7 @@ func TestTrackAsyncFlushesQueuedRecords(t *testing.T) {
 	// start the background flush task.
 	service.SendAsync(ctx)
 
-	// tracking outside of a transaction enqueues the record to be flushed later.
+	// tracking outside a transaction enqueues the record to be flushed later.
 	service.Track(context.Background(), GroupId("group-1"), item{Value: "hello"})
 
 	// the background task flushes the queued record in its own transaction and

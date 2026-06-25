@@ -27,13 +27,13 @@ type EventOptions struct {
 		OutboxTable string `json:"outboxTable"`
 	}
 
-	kafkaOptions *startup_kafka.KafkaOptions
+	kafkaOptions startup_kafka.KafkaOptions
 
 	eventSenderOnce sync.Once
 	eventSender     events.EventSender
 }
 
-func (opts *EventOptions) Initialize(kafkaOptions *startup_kafka.KafkaOptions) {
+func (opts *EventOptions) Initialize(kafkaOptions startup_kafka.KafkaOptions) {
 	opts.kafkaOptions = kafkaOptions
 }
 
@@ -53,19 +53,13 @@ func (opts *EventOptions) EventSender() events.EventSender {
 
 func initializeEventSender(opts *EventOptions) (events.EventSender, error) {
 	var confluentClient confluent.Client
-	var kafkaSender *kafka.Producer
-
-	// default to 1 if we don't have any kafka option set
-	var kafkaReplication int16 = 1
-
-	if opts.kafkaOptions != nil {
+	if opts.kafkaOptions.ConfluentURL != "" {
 		confluentClient = opts.kafkaOptions.ConfluentClient()
+	}
 
-		if len(opts.kafkaOptions.KafkaAddresses) > 0 {
-			kafkaSender = opts.kafkaOptions.NewProducer(nil)
-		}
-
-		kafkaReplication = opts.kafkaOptions.KafkaReplication
+	var kafkaSender *kafka.Producer
+	if len(opts.kafkaOptions.KafkaAddresses) > 0 {
+		kafkaSender = opts.kafkaOptions.NewProducer(nil)
 	}
 
 	fileSender, err := fileSender(opts.WriteToFile)
@@ -84,7 +78,7 @@ func initializeEventSender(opts *EventOptions) (events.EventSender, error) {
 
 	// build list of topics parameterized with the replication factor that we
 	// would like to have now.
-	eventTopics := opts.Inputs.Topics(kafkaReplication)
+	eventTopics := opts.Inputs.Topics(opts.kafkaOptions.KafkaReplication)
 
 	// buffer size for async event queue
 	bufferSize := opts.AsyncBufferSize
