@@ -14,6 +14,12 @@ import (
 )
 
 // ErrorResponse is the JSON body returned to clients when a request fails.
+// It wraps an ErrorResponse object.
+type ErrorResponseWrapper struct {
+	Error ErrorResponse `json:"error"`
+}
+
+// ErrorResponse is the error returned to clients when a request fails.
 // It mirrors the public fields of Error and additionally carries the HTTP
 // status code to use for the response.
 type ErrorResponse struct {
@@ -78,7 +84,7 @@ func ErrorHandler(mapper ErrorMapper) echo.HTTPErrorHandler {
 			_ = c.NoContent(resp.StatusCode)
 
 		default:
-			_ = c.JSON(resp.StatusCode, resp)
+			_ = c.JSON(resp.StatusCode, ErrorResponseWrapper{Error: resp})
 		}
 	}
 }
