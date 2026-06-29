@@ -70,13 +70,19 @@ func ErrorHandler(mapper ErrorMapper) echo.HTTPErrorHandler {
 			resp = mapToErrorResponse(err)
 		}
 
-		slog.ErrorContext(
-			ctx, "An error occurred",
+		attrs := []any{
 			slog.String("method", c.Request().Method),
 			slog.String("path", c.Request().URL.Path),
 			slog.Int("httpStatus", resp.StatusCode),
 			sl.Error(err),
-		)
+		}
+
+		switch resp.StatusCode / 100 {
+		case 4:
+			slog.WarnContext(ctx, "Request failed", attrs...)
+		default:
+			slog.ErrorContext(ctx, "An error occurred", attrs...)
+		}
 
 		switch c.Request().Method {
 		case http.MethodHead, http.MethodOptions:
