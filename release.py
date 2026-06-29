@@ -66,7 +66,7 @@ def main():
     subprocess.check_call(["git", "tag", release_tag], cwd=str(root))
 
     print("Push to go remote")
-    subprocess.check_call(["git", "push", "origin", "master", "--tags"], cwd=str(root))
+    subprocess.check_call(["git", "push", "origin", "main", "--tags"], cwd=str(root))
 
     return True
 
