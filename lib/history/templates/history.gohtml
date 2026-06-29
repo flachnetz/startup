@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ .Title }}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sakura.css/css/sakura.css" type="text/css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release/build/styles/default.min.css">
+    <style>
+        body { max-width: 60em; }
+        dt { font-weight: bold; margin-top: 0.5em; }
+        .meta { color: #666; font-size: 0.85em; font-family: monospace; }
+        details > summary { cursor: pointer; }
+        pre { margin: 0.3em 0; }
+        hr { border: none; border-top: 2px solid #ddd; margin: 1.5em 0; }
+        .summary { background: #f4f6f8; border: 1px solid #d7dde3; border-radius: 8px;
+            padding: 1em 1.25em; margin: 1em 0 2em; display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.4em 2em; }
+        .summary div { display: flex; gap: 0.6em; align-items: baseline;
+            border-bottom: 1px solid #e3e8ec; padding: 0.25em 0; }
+        .summary span.k { font-weight: bold; min-width: 9em; color: #444; }
+        .summary span.v { font-family: monospace; word-break: break-all; }
+        .ledger > div { border-top: 1px solid #e3e8ec; padding: 0.75em 0; }
+        .ledger .step { font-weight: bold; font-size: 1.05em; }
+    </style>
+</head>
+<body>
+<h1>{{ .Title }}</h1>
+<p class="meta">GroupId: {{ .GroupId }}</p>
+{{ if .Summary }}
+<div class="summary">
+    {{ range .Summary }}<div><span class="k">{{ .Label }}</span><span class="v">{{ .Value }}</span></div>{{ end }}
+</div>
+{{ end }}
+{{ if .ErrorMessage }}<p style="color:red">{{ .ErrorMessage }}</p>{{ end }}
+<div class="ledger">
+    {{ range .Records }}
+        {{ if .ShowSeparator }}<hr>{{ end }}
+        <div>
+            <p class="step">{{ .Step }}</p>
+            <p>{{ .Description }}</p>
+            <p class="meta">{{ formatTime .Timestamp }} · TraceId: {{ .RequestTraceId }} · EventSender: {{ .EventSender }}{{ if .EventSenderVersion }} ({{ .EventSenderVersion }}){{ end }}</p>
+            <details>
+                <summary>payload</summary>
+                <pre><code class="language-json">{{ .JSON }}</code></pre>
+            </details>
+        </div>
+    {{ else }}
+        <p>No history records.</p>
+    {{ end }}
+</div>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release/build/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

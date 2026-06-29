@@ -10,8 +10,10 @@ import (
 // TopicsFunc builds an EventTopics instance for the given kafka replication factor.
 type TopicsFunc func(replicationFactor int16) EventTopics
 
-type Topics = startup_kafka.Topics
-type Topic = startup_kafka.Topic
+type (
+	Topics = startup_kafka.Topics
+	Topic  = startup_kafka.Topic
+)
 
 // EventTopics contains a mapping from event struct type to a kafka topic.
 // This map must contain all event types that are going to be send. If this misses an event,

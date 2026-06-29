@@ -67,7 +67,7 @@ func (opts *KafkaOptions) NewConsumer(overrideConfig kafka.ConfigMap) *kafka.Con
 
 	// Resolve the special RANDOM group into a unique group id once, so repeated
 	// calls keep using the same generated group.
-	var consumerGroup = opts.KafkaConsumerGroup
+	consumerGroup := opts.KafkaConsumerGroup
 	if consumerGroup == "RANDOM" {
 		consumerGroup = fmt.Sprintf("golang-%d", time.Now().UnixNano())
 	}
