@@ -50,7 +50,7 @@ func ErrorHandler(mapper ErrorMapper) echo.HTTPErrorHandler {
 			slog.ErrorContext(
 				ctx, "An error occurred, response already written",
 				slog.String("method", c.Request().Method),
-				slog.String("path", c.Path()),
+				slog.String("path", c.Request().URL.Path),
 				sl.Error(err),
 			)
 
@@ -73,7 +73,7 @@ func ErrorHandler(mapper ErrorMapper) echo.HTTPErrorHandler {
 		slog.ErrorContext(
 			ctx, "An error occurred",
 			slog.String("method", c.Request().Method),
-			slog.String("path", c.Path()),
+			slog.String("path", c.Request().URL.Path),
 			slog.Int("httpStatus", resp.StatusCode),
 			sl.Error(err),
 		)
