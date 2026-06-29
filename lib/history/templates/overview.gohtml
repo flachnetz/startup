@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{{ .Title }}</title>
+    <style>
+        body { max-width: 80em; margin: 2em auto; font-family: sans-serif; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { text-align: left; padding: 6px 12px; border-bottom: 1px solid #e3e8ec; }
+        tr.row { cursor: pointer; }
+        tr.row:hover { background: #f4f6f8; }
+        td { font-family: monospace; }
+        a { text-decoration: none; }
+    </style>
+</head>
+<body>
+<h1>{{ .Title }}</h1>
+<table>
+    <tr>{{ range .Headers }}<th>{{ . }}</th>{{ end }}</tr>
+    {{ range .Rows }}
+    <tr class="row" onclick="location='{{ .Link }}'">
+        {{ range .Cells }}<td>{{ . }}</td>{{ end }}
+    </tr>
+    {{ else }}
+    <tr><td>No records.</td></tr>
+    {{ end }}
+</table>
+</body>
+</html>
