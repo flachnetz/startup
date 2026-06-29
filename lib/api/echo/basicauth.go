@@ -5,8 +5,10 @@ import (
 	"github.com/labstack/echo/v5/middleware"
 )
 
-type User string
-type Password string
+type (
+	User     string
+	Password string
+)
 
 type RestUsers struct {
 	RestUser map[User]Password `long:"http-rest-user" env:"HTTP_REST_USER" description:"Usernames for REST API access."`

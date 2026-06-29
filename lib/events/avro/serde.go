@@ -11,8 +11,10 @@ import (
 	confluent "github.com/confluentinc/confluent-kafka-go/v2/schemaregistry"
 )
 
-var ErrPayloadToShort = errors.New("payload too short")
-var ErrInvalidMagicByte = errors.New("invalid magic byte value")
+var (
+	ErrPayloadToShort   = errors.New("payload too short")
+	ErrInvalidMagicByte = errors.New("invalid magic byte value")
+)
 
 type Event interface {
 	// Schema returns the avro schema of this event
