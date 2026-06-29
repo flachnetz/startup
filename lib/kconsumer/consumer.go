@@ -142,7 +142,6 @@ func runWorker(ctx context.Context, w *partitionWorker, handle HandleMessage) {
 
 			return
 		})
-
 		if err != nil {
 			log.Error("Giving up on message", slog.Int64("offset", int64(offset)))
 			w.errCh <- err

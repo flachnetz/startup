@@ -2,7 +2,9 @@ package history
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 
 	"github.com/flachnetz/startup/v2/lib/events"
@@ -34,7 +36,6 @@ func InitializeGlobal(ctx context.Context, opts Options) error {
 	err := ql.InNewTransaction(ctx, opts.DB, func(ctx ql.TxContext) error {
 		return CreateTable(ctx, opts.HistoryTable)
 	})
-
 	if err != nil {
 		return fmt.Errorf("create history table: %w", err)
 	}
@@ -64,4 +65,23 @@ func Track[T ~string](ctx context.Context, groupId T, item Item) {
 	}
 
 	instance.Track(ctx, GroupId(groupId), item)
+}
+
+// RenderPage uses the global history singleton to render the history page for
+// groupId. You need to initialize it using InitializeGlobal first.
+func RenderPage[T ~string](ctx context.Context, w io.Writer, groupId T, title string) error {
+	if instance == nil {
+		return errors.New("history: global instance not initialized")
+	}
+
+	return instance.RenderPage(ctx, w, GroupId(groupId), title)
+}
+
+// RenderPageSummary is RenderPage with a current-state summary above the ledger.
+func RenderPageSummary[T ~string](ctx context.Context, w io.Writer, groupId T, title string, summary []SummaryItem) error {
+	if instance == nil {
+		return errors.New("history: global instance not initialized")
+	}
+
+	return instance.RenderPageSummary(ctx, w, GroupId(groupId), title, summary)
 }
