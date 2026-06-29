@@ -14,6 +14,10 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// The default time that the kafka consumer polls for a new message before
+// it checks the context for cancellation.
+var DefaultPollTimeout = 100 * time.Millisecond
+
 // HandleMessage is the user-provided function called for each consumed message.
 // It receives the raw *kafka.Message so the caller has access to key, headers,
 // and partition/offset metadata.
@@ -75,7 +79,7 @@ func (c *PartitionConsumer) Consume(ctx context.Context, handle HandleMessage) e
 			}
 		}
 
-		msg, err := c.Consumer.ReadMessage(5 * time.Second)
+		msg, err := c.Consumer.ReadMessage(DefaultPollTimeout)
 		if err != nil {
 			if ke, ok := errors.AsType[kafka.Error](err); ok {
 				if ke.IsTimeout() {
