@@ -79,9 +79,20 @@ type Service struct {
 	txStarter    ql.TxStarter
 	table        pgx.Identifier
 	eventSending *EventSending
+	athena       *AthenaConfig
 
 	// record to send out async
 	queue chan RecordToSend
+}
+
+// Option customizes a Service created with New.
+type Option func(*Service)
+
+// WithAthena enables the Athena fallback for reads: RecordsAt loads records
+// from Athena instead of the local table when the tracked object is older than
+// AthenaConfig.LookupThreshold. See RecordsAt.
+func WithAthena(cfg AthenaConfig) Option {
+	return func(s *Service) { s.athena = &cfg }
 }
 
 // New creates a new history.Service instance to trace events. By default the service writes
@@ -97,7 +108,7 @@ type Service struct {
 //
 // You can specify parameter table as nil to not write to the history table. If you specify an
 // EventSending config, history entries are then only sent out as events.
-func New(txStarter ql.TxStarter, table pgx.Identifier, eventSending *EventSending) *Service {
+func New(txStarter ql.TxStarter, table pgx.Identifier, eventSending *EventSending, opts ...Option) *Service {
 	if eventSending != nil {
 		if eventSending.EventSender == nil || eventSending.EventCreator == nil {
 			panic(errors.New("history: EventSending requires both EventSender and EventCreator"))
@@ -115,11 +126,15 @@ func New(txStarter ql.TxStarter, table pgx.Identifier, eventSending *EventSendin
 			}
 		}
 	}
-	return &Service{
+	s := &Service{
 		txStarter:    txStarter,
 		table:        table,
 		eventSending: eventSending,
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // Track records the given item under groupId. Depending on the Service configuration the
