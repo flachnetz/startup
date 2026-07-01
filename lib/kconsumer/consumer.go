@@ -14,7 +14,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// The default time that the kafka consumer polls for a new message before
+// DefaultPollTimeout is default time that the kafka consumer polls for a new message before
 // it checks the context for cancellation.
 var DefaultPollTimeout = 100 * time.Millisecond
 
@@ -43,6 +43,15 @@ type partitionWorker struct {
 	errCh     chan error
 }
 
+// Consume subscribes to the configured topics and dispatches every consumed
+// message to handle. Each assigned partition is processed by its own worker
+// goroutine, so messages within a partition are handled in order while
+// different partitions run concurrently.
+//
+// Offsets are stored only after a message was handled successfully and are
+// flushed to the broker roughly every five seconds (and once more on
+// shutdown). Consume blocks until ctx is canceled or a worker fails, in
+// which case it shuts the workers down and returns an error.
 func (c *PartitionConsumer) Consume(ctx context.Context, handle HandleMessage) error {
 	if err := c.Consumer.SubscribeTopics(c.Topics, nil); err != nil {
 		return fmt.Errorf("subscribe to %v: %w", c.Topics, err)
@@ -53,6 +62,8 @@ func (c *PartitionConsumer) Consume(ctx context.Context, handle HandleMessage) e
 		Workers:  map[int32]*partitionWorker{},
 	}
 
+	defer workers.Shutdown()
+
 	slog.Info("Partition consumer started", slog.Any("topics", c.Topics))
 
 	lastStored := time.Now()
@@ -60,8 +71,6 @@ func (c *PartitionConsumer) Consume(ctx context.Context, handle HandleMessage) e
 	for {
 		if err := ctx.Err(); err != nil {
 			slog.Info("Context closed, shutting consumer down", sl.Error(err))
-			workers.Shutdown()
-
 			return fmt.Errorf("context: %w", err)
 		}
 
