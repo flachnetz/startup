@@ -9,8 +9,131 @@ import (
 	"strings"
 	"time"
 
+	"github.com/flachnetz/startup/v2/lib/clock"
+	"github.com/flachnetz/startup/v2/lib/ql"
 	"github.com/flachnetz/startup/v2/startup_base"
+	sl "github.com/flachnetz/startup/v2/startup_logging"
+
+	// registers the "athena" database/sql driver used by AthenaQuery.
+	_ "github.com/speee/go-athena"
 )
+
+// Default thresholds applied by RecordsAt when AthenaConfig leaves them zero.
+const (
+	defaultLookupThreshold = 24 * time.Hour
+	defaultLookbackMargin  = 30 * time.Minute
+)
+
+// AthenaConfig enables the Athena read fallback on a Service (see WithAthena).
+type AthenaConfig struct {
+	// required Athena configuration
+	Database       string
+	Table          string
+	WorkGroup      string
+	OutputLocation string
+
+	// optional AWS region
+	Region string
+
+	// LookupThreshold selects Athena over the local table once the tracked
+	// object is older than this. Defaults to 24h when zero.
+	LookupThreshold time.Duration
+
+	// LookbackMargin is subtracted from the object creation time to form the
+	// Athena query's MinTimestamp, bounding the scanned partitions. Defaults
+	// to 30m when zero.
+	LookbackMargin time.Duration
+}
+
+// RecordsAt returns the records for groupId. With Athena configured (WithAthena)
+// it bridges the local table and long-term Athena storage, because a cleanup job
+// deletes local rows after a retention window while Athena keeps them forever:
+//
+//   - createdTime older than AthenaConfig.LookupThreshold: read from Athena,
+//     falling back to the local table if Athena fails.
+//   - createdTime within the threshold: read the local table only.
+//   - createdTime zero (age unknown): read the local table first and, only when
+//     it returns nothing, fall back to Athena — so records aged out of the local
+//     table are still found.
+//
+// Any Athena failure is logged and never fails the read.
+func (h *Service) RecordsAt(ctx ql.TxContext, groupId GroupId, createdTime time.Time) ([]Record, error) {
+	cfg := h.athena
+	if cfg == nil {
+		return h.Records(ctx, groupId)
+	}
+
+	threshold := cfg.LookupThreshold
+	if threshold <= 0 {
+		threshold = defaultLookupThreshold
+	}
+
+	knownOld := !createdTime.IsZero() && clock.GlobalClock.Now().Sub(createdTime) > threshold
+	if knownOld {
+		if records, ok := h.recordsFromAthena(ctx, cfg, groupId, createdTime); ok {
+			return records, nil
+		}
+		return h.Records(ctx, groupId)
+	}
+
+	records, err := h.Records(ctx, groupId)
+	if err != nil {
+		return nil, err
+	}
+
+	// ponytail: unknown-age group with an empty local table always hits Athena
+	// (aged out, or never existed). Fine for the rare history-page render; pass
+	// createdTime when the caller knows it to skip this probe.
+	if len(records) == 0 && createdTime.IsZero() {
+		if athenaRecords, ok := h.recordsFromAthena(ctx, cfg, groupId, time.Time{}); ok {
+			return athenaRecords, nil
+		}
+	}
+
+	return records, nil
+}
+
+// recordsFromAthena runs the Athena query for groupId. A non-zero createdTime
+// bounds the scan to createdTime-LookbackMargin; a zero createdTime means no
+// lower bound (full scan). ok is false when Athena is misconfigured or errored,
+// signalling the caller to fall back to the local table.
+func (h *Service) recordsFromAthena(ctx ql.TxContext, cfg *AthenaConfig, groupId GroupId, createdTime time.Time) (_ []Record, ok bool) {
+	loc, err := url.Parse(cfg.OutputLocation)
+	if err != nil {
+		sl.LoggerOf(ctx).WarnContext(ctx, "invalid athena output location, using local history", sl.Error(err))
+		return nil, false
+	}
+
+	var minTimestamp *time.Time
+	if !createdTime.IsZero() {
+		margin := cfg.LookbackMargin
+		if margin <= 0 {
+			margin = defaultLookbackMargin
+		}
+		minTimestamp = new(createdTime.Add(-margin))
+	}
+
+	query := AthenaQuery{
+		GroupId:        groupId,
+		Database:       cfg.Database,
+		Table:          cfg.Table,
+		WorkGroup:      cfg.WorkGroup,
+		OutputLocation: loc,
+		Region:         cfg.Region,
+		MinTimestamp:   minTimestamp,
+	}
+
+	queryCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	records, err := query.Records(queryCtx)
+	if err != nil {
+		sl.LoggerOf(ctx).WarnContext(ctx, "failed to load history from athena, using local history", sl.Error(err))
+		return nil, false
+	}
+
+	return records, true
+}
 
 type AthenaQuery struct {
 	GroupId GroupId
