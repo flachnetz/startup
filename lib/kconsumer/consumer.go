@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"runtime/debug"
 	"sync/atomic"
 	"time"
 
@@ -27,8 +28,11 @@ type HandleMessage func(ctx context.Context, msg *kafka.Message) error
 // assigned partition. Offset storage is explicit: only messages that were
 // successfully handled are stored for auto-commit.
 //
-// If you return an error from your handler, you get two retries before the
-// consumer will quit and shutdown with an error.
+// If your handler returns an error, it is retried twice (three attempts in
+// total). If it still fails, or if it panics, the affected worker stops and
+// Consume shuts the whole consumer down, returning that error. A panic is
+// recovered and reported like any other handler failure, so it never crashes
+// the process or deadlocks the remaining partition workers.
 type PartitionConsumer struct {
 	Topics   []string
 	Consumer *kafka.Consumer
@@ -50,8 +54,9 @@ type partitionWorker struct {
 //
 // Offsets are stored only after a message was handled successfully and are
 // flushed to the broker roughly every five seconds (and once more on
-// shutdown). Consume blocks until ctx is canceled or a worker fails, in
-// which case it shuts the workers down and returns an error.
+// shutdown). Consume blocks until ctx is canceled or a worker fails (because
+// its handler exhausted its retries or panicked), in which case it shuts the
+// workers down and returns an error.
 func (c *PartitionConsumer) Consume(ctx context.Context, handle HandleMessage) error {
 	if err := c.Consumer.SubscribeTopics(c.Topics, nil); err != nil {
 		return fmt.Errorf("subscribe to %v: %w", c.Topics, err)
@@ -76,15 +81,8 @@ func (c *PartitionConsumer) Consume(ctx context.Context, handle HandleMessage) e
 
 		// check all workers for done or errors
 		for _, w := range workers.Workers {
-			select {
-			case err := <-w.errCh:
-				return fmt.Errorf("worker for partition %d died with error: %w", w.partition, err)
-
-			case <-w.done:
-				return fmt.Errorf("worker for partition %d died", w.partition)
-
-			default:
-				// do not block
+			if err := w.stopped(); err != nil {
+				return err
 			}
 		}
 
@@ -116,8 +114,29 @@ func (c *PartitionConsumer) Consume(ctx context.Context, handle HandleMessage) e
 			return fmt.Errorf("worker for partition %d died with error: %w", w.partition, err)
 
 		case <-w.done:
-			return fmt.Errorf("worker for partition %d died", w.partition)
+			// The worker always writes to errCh before closing done, so prefer
+			// the concrete error if one is available.
+			return w.stopped()
 		}
+	}
+}
+
+// stopped reports a non-nil error if the worker has stopped, preferring the
+// concrete failure over the generic "died". It never blocks. Because a worker
+// always writes to errCh before closing done, checking errCh first guarantees
+// that a reported error is never lost.
+func (w *partitionWorker) stopped() error {
+	select {
+	case err := <-w.errCh:
+		return fmt.Errorf("worker for partition %d died with error: %w", w.partition, err)
+	default:
+	}
+
+	select {
+	case <-w.done:
+		return fmt.Errorf("worker for partition %d died", w.partition)
+	default:
+		return nil
 	}
 }
 
@@ -129,13 +148,30 @@ func runWorker(ctx context.Context, w *partitionWorker, handle HandleMessage) {
 		slog.Int("partition", int(w.partition)),
 	)
 
+	// A panic in the handler would otherwise crash the whole process. Recover it
+	// and report it as an error so Consume can shut the consumer down cleanly
+	// instead of leaving the other workers deadlocked.
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error(
+				"Worker panicked",
+				slog.Any("panic", r),
+				slog.String("stack", string(debug.Stack())),
+			)
+			// Report the panic. errCh is buffered, so this never blocks even if
+			// Consume already returned because another worker failed first.
+			w.errCh <- fmt.Errorf("worker for partition %d panicked: %v", w.partition, r)
+		}
+	}()
+
 	for msg := range w.msgs {
 		offset := msg.TopicPartition.Offset
 
 		err := startup_tracing.Trace(ctx, "kafka:consume", func(ctx context.Context, span trace.Span) (err error) {
 			for attempt := 1; attempt <= 3; attempt++ {
 				if err = handle(ctx, msg); err != nil {
-					log.Error("Handle failed",
+					log.Error(
+						"Handle failed",
 						slog.Int64("offset", int64(offset)),
 						slog.Int("attempt", attempt),
 						slog.Any("error", err),
@@ -153,6 +189,8 @@ func runWorker(ctx context.Context, w *partitionWorker, handle HandleMessage) {
 		})
 		if err != nil {
 			log.Error("Giving up on message", slog.Int64("offset", int64(offset)))
+			// errCh is buffered, so this never blocks even if Consume already
+			// returned because another worker failed first.
 			w.errCh <- err
 			break
 		}
@@ -188,13 +226,16 @@ func (p *partitionsWorkers) Get(ctx context.Context, topic string, partition int
 		partition: partition,
 		msgs:      make(chan *kafka.Message, 64),
 		done:      make(chan struct{}),
-		errCh:     make(chan error),
+		// buffered so a failing worker can report its error without blocking,
+		// even if Consume has already returned for another worker.
+		errCh: make(chan error, 1),
 	}
 
 	w.handled.Store(-1)
 	p.Workers[partition] = w
 
-	slog.Info("Spawning worker",
+	slog.Info(
+		"Spawning worker",
 		slog.String("topic", topic),
 		slog.Int("partition", int(partition)),
 	)

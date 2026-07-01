@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -90,47 +91,93 @@ func TestPartitionConsumer(t *testing.T) {
 	require.Len(t, received, msgCount)
 }
 
-func produceMessagesAsync(t *testing.T, brokers string, messages ...kafka.Message) {
-	errorCh := make(chan error)
+// TestPartitionConsumer_WorkerReturnsErrors makes every handler invocation fail.
+// After the configured retries the affected worker gives up, and Consume must
+// return that error instead of hanging. With two failing partitions this also
+// exercises the shutdown path where more than one worker fails at once.
+func TestPartitionConsumer_WorkerReturnsErrors(t *testing.T) {
+	const topic = "error-topic"
 
-	go func() {
-		for {
-			select {
-			case <-t.Context().Done():
-				return
+	cluster := testx.KafkaCluster(t)
+	cluster.CreateTopic(topic, 2)
 
-			case err := <-errorCh:
-				t.Logf("Failure sending mocked messages: %s", err)
-			}
+	cluster.Send(messageOf(topic, 0, "fail-0"))
+	cluster.Send(messageOf(topic, 1, "fail-1"))
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	var calls atomic.Int64
+	handle := func(ctx context.Context, msg *kafka.Message) error {
+		calls.Add(1)
+		return fmt.Errorf("permanent failure")
+	}
+
+	consumer := &PartitionConsumer{
+		Consumer: cluster.Consumer(),
+		Topics:   []string{topic},
+	}
+
+	errCh := make(chan error, 1)
+	go func() { errCh <- consumer.Consume(ctx, handle) }()
+
+	select {
+	case err := <-errCh:
+		require.Error(t, err)
+		require.NotErrorIs(t, err, context.Canceled)
+		require.Contains(t, err.Error(), "permanent failure")
+
+	case <-time.After(30 * time.Second):
+		cancel()
+		require.Fail(t, "consumer did not shut down after repeated handler errors")
+	}
+
+	// the failing message must have been retried three times before giving up.
+	require.GreaterOrEqual(t, calls.Load(), int64(3))
+}
+
+// TestPartitionConsumer_WorkerPanics ensures a panic inside the handler does not
+// crash the process or deadlock the other workers. The panicking worker must be
+// recovered, reported as an error, and Consume must shut everything down.
+func TestPartitionConsumer_WorkerPanics(t *testing.T) {
+	const topic = "panic-topic"
+
+	cluster := testx.KafkaCluster(t)
+	cluster.CreateTopic(topic, 2)
+
+	// partition 0 is handled fine, partition 1 panics.
+	cluster.Send(messageOf(topic, 0, "ok-0"))
+	cluster.Send(messageOf(topic, 1, "boom-1"))
+	cluster.Send(messageOf(topic, 0, "ok-2"))
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	handle := func(ctx context.Context, msg *kafka.Message) error {
+		if msg.TopicPartition.Partition == 1 {
+			panic("handler blew up")
 		}
-	}()
+		return nil
+	}
 
-	go func() {
-		producer, err := kafka.NewProducer(&kafka.ConfigMap{
-			"bootstrap.servers": brokers,
-		})
-		if err != nil {
-			errorCh <- fmt.Errorf("create producer: %v", err)
-			return
-		}
+	consumer := &PartitionConsumer{
+		Consumer: cluster.Consumer(),
+		Topics:   []string{topic},
+	}
 
-		defer producer.Close()
+	errCh := make(chan error, 1)
+	go func() { errCh <- consumer.Consume(ctx, handle) }()
 
-		for idx, msg := range messages {
-			if err := producer.Produce(new(msg), nil); err != nil {
-				errorCh <- fmt.Errorf("produce message %d: %v", idx, err)
-				return
-			}
-		}
+	select {
+	case err := <-errCh:
+		require.Error(t, err)
+		require.NotErrorIs(t, err, context.Canceled)
+		require.Contains(t, err.Error(), "panicked")
 
-		if remaining := producer.Flush(10_000); remaining > 0 {
-			// TODO Flush actually sends those messages but still reports that they
-			//  are remaining and unsent. Probably a MockCluster issue.
-			//  We just ignore it here and assume that we'll
-			errorCh <- fmt.Errorf("failed to flush %d messages", remaining)
-			return
-		}
-	}()
+	case <-time.After(20 * time.Second):
+		cancel()
+		require.Fail(t, "consumer did not shut down after worker panic")
+	}
 }
 
 func messageOf(topic string, partition int, payload string) *kafka.Message {
