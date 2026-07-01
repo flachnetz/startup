@@ -43,8 +43,6 @@ type partitionWorker struct {
 	errCh     chan error
 }
 
-type Stop func()
-
 // Consume subscribes to the configured topics and dispatches every consumed
 // message to handle. Each assigned partition is processed by its own worker
 // goroutine, so messages within a partition are handled in order while
