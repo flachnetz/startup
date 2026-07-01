@@ -50,7 +50,7 @@ type partitionWorker struct {
 //
 // Offsets are stored only after a message was handled successfully and are
 // flushed to the broker roughly every five seconds (and once more on
-// shutdown). Consume blocks until ctx is cancelled or a worker fails, in
+// shutdown). Consume blocks until ctx is canceled or a worker fails, in
 // which case it shuts the workers down and returns an error.
 func (c *PartitionConsumer) Consume(ctx context.Context, handle HandleMessage) error {
 	if err := c.Consumer.SubscribeTopics(c.Topics, nil); err != nil {
@@ -62,6 +62,8 @@ func (c *PartitionConsumer) Consume(ctx context.Context, handle HandleMessage) e
 		Workers:  map[int32]*partitionWorker{},
 	}
 
+	defer workers.Shutdown()
+
 	slog.Info("Partition consumer started", slog.Any("topics", c.Topics))
 
 	lastStored := time.Now()
@@ -69,8 +71,6 @@ func (c *PartitionConsumer) Consume(ctx context.Context, handle HandleMessage) e
 	for {
 		if err := ctx.Err(); err != nil {
 			slog.Info("Context closed, shutting consumer down", sl.Error(err))
-			workers.Shutdown()
-
 			return fmt.Errorf("context: %w", err)
 		}
 
