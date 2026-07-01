@@ -88,11 +88,27 @@ func (h *Service) RenderPage(ctx context.Context, w io.Writer, groupId GroupId, 
 	return h.RenderPageSummary(ctx, w, groupId, title, nil)
 }
 
+// RenderPageAt is RenderPage with an Athena fallback: records are loaded via
+// RecordsAt using createdTime to decide between the local table and Athena.
+func (h *Service) RenderPageAt(ctx context.Context, w io.Writer, groupId GroupId, title string, createdTime time.Time) error {
+	return h.renderPage(ctx, w, groupId, title, nil, createdTime)
+}
+
 // RenderPageSummary is RenderPage with an extra current-state summary rendered
 // above the ledger.
 func (h *Service) RenderPageSummary(ctx context.Context, w io.Writer, groupId GroupId, title string, summary []SummaryItem) error {
+	// zero time: RecordsAt always reads the local table.
+	return h.renderPage(ctx, w, groupId, title, summary, time.Time{})
+}
+
+// RenderPageSummaryAt is RenderPageSummary with the Athena fallback (see RenderPageAt).
+func (h *Service) RenderPageSummaryAt(ctx context.Context, w io.Writer, groupId GroupId, title string, summary []SummaryItem, createdTime time.Time) error {
+	return h.renderPage(ctx, w, groupId, title, summary, createdTime)
+}
+
+func (h *Service) renderPage(ctx context.Context, w io.Writer, groupId GroupId, title string, summary []SummaryItem, createdTime time.Time) error {
 	records, err := ql.InNewTransactionWithResult(ctx, h.txStarter, func(ctx ql.TxContext) ([]Record, error) {
-		return h.Records(ctx, groupId)
+		return h.RecordsAt(ctx, groupId, createdTime)
 	})
 	if err != nil {
 		return fmt.Errorf("load records: %w", err)

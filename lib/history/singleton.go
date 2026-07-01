@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"time"
 
 	"github.com/flachnetz/startup/v2/lib/events"
 	"github.com/flachnetz/startup/v2/lib/ql"
@@ -24,6 +25,9 @@ type Options struct {
 	HistoryTable string
 	// EventCreator builds the event that is sent out for every tracked record.
 	EventCreator EventCreator
+	// Athena, when set, enables the Athena read fallback for old records
+	// (see WithAthena and Service.RecordsAt).
+	Athena *AthenaConfig
 }
 
 // instance holds the global history Service initialized by InitializeGlobal.
@@ -40,13 +44,18 @@ func InitializeGlobal(ctx context.Context, opts Options) error {
 		return fmt.Errorf("create history table: %w", err)
 	}
 
+	var histOpts []Option
+	if opts.Athena != nil {
+		histOpts = append(histOpts, WithAthena(*opts.Athena))
+	}
+
 	instance = New(opts.DB, pgx.Identifier{opts.HistoryTable}, &EventSending{
 		EventSender:    events.Sender,
 		EventCreator:   opts.EventCreator,
 		ServiceId:      opts.ServiceId,
 		ServiceVersion: startup_base.BuildVersion,
 		WriteToOutbox:  true,
-	})
+	}, histOpts...)
 
 	// start the background task that flushes records tracked outside of a
 	// transaction. Cancel ctx to stop it.
@@ -77,6 +86,16 @@ func RenderPage[T ~string](ctx context.Context, w io.Writer, groupId T, title st
 	return instance.RenderPage(ctx, w, GroupId(groupId), title)
 }
 
+// RenderPageAt is RenderPage with the Athena fallback: createdTime decides
+// whether records are read from the local table or from Athena.
+func RenderPageAt[T ~string](ctx context.Context, w io.Writer, groupId T, title string, createdTime time.Time) error {
+	if instance == nil {
+		return errors.New("history: global instance not initialized")
+	}
+
+	return instance.RenderPageAt(ctx, w, GroupId(groupId), title, createdTime)
+}
+
 // RenderPageSummary is RenderPage with a current-state summary above the ledger.
 func RenderPageSummary[T ~string](ctx context.Context, w io.Writer, groupId T, title string, summary []SummaryItem) error {
 	if instance == nil {
@@ -84,4 +103,23 @@ func RenderPageSummary[T ~string](ctx context.Context, w io.Writer, groupId T, t
 	}
 
 	return instance.RenderPageSummary(ctx, w, GroupId(groupId), title, summary)
+}
+
+// RenderPageSummaryAt is RenderPageSummary with the Athena fallback (see RenderPageAt).
+func RenderPageSummaryAt[T ~string](ctx context.Context, w io.Writer, groupId T, title string, summary []SummaryItem, createdTime time.Time) error {
+	if instance == nil {
+		return errors.New("history: global instance not initialized")
+	}
+
+	return instance.RenderPageSummaryAt(ctx, w, GroupId(groupId), title, summary, createdTime)
+}
+
+// RecordsAt uses the global history singleton to load records for groupId with
+// the Athena fallback (see Service.RecordsAt).
+func RecordsAt[T ~string](ctx ql.TxContext, groupId T, createdTime time.Time) ([]Record, error) {
+	if instance == nil {
+		return nil, errors.New("history: global instance not initialized")
+	}
+
+	return instance.RecordsAt(ctx, GroupId(groupId), createdTime)
 }

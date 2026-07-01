@@ -2,6 +2,7 @@ package history
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"testing"
 	"time"
@@ -200,4 +201,51 @@ func TestTrackAsyncFlushesQueuedRecords(t *testing.T) {
 		require.Len(t, records, 1)
 		return nil
 	})
+}
+
+// TestRecordsAtRoutesToLocal covers the RecordsAt paths that resolve from the
+// local table without touching Athena: no Athena config, a zero createdTime with
+// data still present locally, and a createdTime newer than the lookup threshold.
+// The Athena-hitting paths (known-old, and empty-local fallback) are not
+// exercised here because they require a live AWS Athena endpoint.
+func TestRecordsAtRoutesToLocal(t *testing.T) {
+	db := testx.NewConnection(t, "history_migrations")
+
+	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
+		return CreateTable(ctx, "history")
+	})
+
+	testx.MustTransact(t, db, func(ctx ql.TxContext) {
+		New(db, pgx.Identifier{"history"}, nil).
+			Track(ctx, GroupId("group-1"), item{Value: "hello"})
+	})
+
+	athenaCfg := AthenaConfig{Database: "db", Table: "t", WorkGroup: "wg", OutputLocation: "s3://bucket/out/"}
+
+	cases := []struct {
+		name        string
+		opts        []Option
+		createdTime time.Time
+	}{
+		{"no athena config", nil, time.Now().Add(-72 * time.Hour)},
+		{"zero created time", []Option{WithAthena(athenaCfg)}, time.Time{}},
+		{"newer than threshold", []Option{WithAthena(athenaCfg)}, time.Now()},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			service := New(db, pgx.Identifier{"history"}, nil, tc.opts...)
+			testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
+				records, err := service.RecordsAt(ctx, GroupId("group-1"), tc.createdTime)
+				require.NoError(t, err)
+				require.Len(t, records, 1)
+				require.Equal(t, "hello", func() string {
+					var i item
+					_ = json.Unmarshal(records[0].Payload, &i)
+					return i.Value
+				}())
+				return nil
+			})
+		})
+	}
 }
