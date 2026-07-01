@@ -33,7 +33,10 @@ func KafkaCluster(t *testing.T) *Kafka {
 	t.Cleanup(cluster.Close)
 
 	// create a kafka producer
-	config := &kafka.ConfigMap{"bootstrap.servers": cluster.BootstrapServers()}
+	servers := cluster.BootstrapServers()
+	require.NotEmpty(t, servers)
+
+	config := &kafka.ConfigMap{"bootstrap.servers": servers}
 	producer, err := kafka.NewProducer(config)
 	require.NoError(t, err)
 
