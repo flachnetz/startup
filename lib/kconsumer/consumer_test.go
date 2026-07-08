@@ -51,7 +51,7 @@ func TestPartitionConsumer(t *testing.T) {
 		mu.Unlock()
 
 		if n == msgCount {
-			slog.Info("Got all messages")
+			slog.InfoContext(ctx, "Got all messages")
 			close(done)
 		}
 

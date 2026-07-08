@@ -69,13 +69,13 @@ func (c *PartitionConsumer) Consume(ctx context.Context, handle HandleMessage) e
 
 	defer workers.Shutdown()
 
-	slog.Info("Partition consumer started", slog.Any("topics", c.Topics))
+	slog.InfoContext(ctx, "Partition consumer started", slog.Any("topics", c.Topics))
 
 	lastStored := time.Now()
 
 	for {
 		if err := ctx.Err(); err != nil {
-			slog.Info("Context closed, shutting consumer down", sl.Error(err))
+			slog.InfoContext(ctx, "Context closed, shutting consumer down", sl.Error(err))
 			return fmt.Errorf("context: %w", err)
 		}
 
@@ -96,7 +96,7 @@ func (c *PartitionConsumer) Consume(ctx context.Context, handle HandleMessage) e
 					return fmt.Errorf("fatal kafka error: %w", ke)
 				}
 			}
-			slog.Warn("Error reading message", slog.Any("error", err))
+			slog.WarnContext(ctx, "Error reading message", slog.Any("error", err))
 			continue
 		}
 
@@ -153,7 +153,7 @@ func runWorker(ctx context.Context, w *partitionWorker, handle HandleMessage) {
 	// instead of leaving the other workers deadlocked.
 	defer func() {
 		if r := recover(); r != nil {
-			log.Error(
+			log.ErrorContext(ctx,
 				"Worker panicked",
 				slog.Any("panic", r),
 				slog.String("stack", string(debug.Stack())),
@@ -170,7 +170,7 @@ func runWorker(ctx context.Context, w *partitionWorker, handle HandleMessage) {
 		err := startup_tracing.Trace(ctx, "kafka:consume", func(ctx context.Context, span trace.Span) (err error) {
 			for attempt := 1; attempt <= 3; attempt++ {
 				if err = continueTrace(ctx, msg, handle); err != nil {
-					log.Error(
+					log.ErrorContext(ctx,
 						"Handle failed",
 						slog.Int64("offset", int64(offset)),
 						slog.Int("attempt", attempt),
@@ -188,7 +188,7 @@ func runWorker(ctx context.Context, w *partitionWorker, handle HandleMessage) {
 			return
 		})
 		if err != nil {
-			log.Error("Giving up on message", slog.Int64("offset", int64(offset)))
+			log.ErrorContext(ctx, "Giving up on message", slog.Int64("offset", int64(offset)))
 			// errCh is buffered, so this never blocks even if Consume already
 			// returned because another worker failed first.
 			w.errCh <- err
@@ -198,7 +198,7 @@ func runWorker(ctx context.Context, w *partitionWorker, handle HandleMessage) {
 		w.handled.Store(int64(offset))
 	}
 
-	log.Info("Worker exiting", slog.Int64("lastHandled", w.handled.Load()))
+	log.InfoContext(ctx, "Worker exiting", slog.Int64("lastHandled", w.handled.Load()))
 }
 
 type partitionsWorkers struct {
@@ -234,7 +234,7 @@ func (p *partitionsWorkers) Get(ctx context.Context, topic string, partition int
 	w.handled.Store(-1)
 	p.Workers[partition] = w
 
-	slog.Info(
+	slog.InfoContext(ctx,
 		"Spawning worker",
 		slog.String("topic", topic),
 		slog.Int("partition", int(partition)),

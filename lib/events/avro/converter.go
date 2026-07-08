@@ -1,6 +1,7 @@
 package avro
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"log/slog"
@@ -27,19 +28,19 @@ func NewConverter(registry *SchemaCache, options ConverterOptions) *Converter {
 	return &Converter{log: slog.With(slog.String("prefix", "avro-converter")), registry: registry, options: options}
 }
 
-func (c *Converter) Parse(data []byte) (map[string]any, *EventSource, error) {
+func (c *Converter) Parse(ctx context.Context, data []byte) (map[string]any, *EventSource, error) {
 	if len(data) >= 5 && data[0] == 0 {
 		// confluent format: convert 4 byte integer to schema key string
 		schemaId := binary.BigEndian.Uint32(data[1:5])
-		return c.decode(schemaId, data[5:])
+		return c.decode(ctx, schemaId, data[5:])
 	}
 
 	return nil, nil, fmt.Errorf("parse event %q", string(data))
 }
 
-func (c *Converter) decode(schemaId uint32, data []byte) (map[string]any, *EventSource, error) {
+func (c *Converter) decode(ctx context.Context, schemaId uint32, data []byte) (map[string]any, *EventSource, error) {
 	// get the codec for the provided hash
-	codec, err := c.registry.Get(schemaId)
+	codec, err := c.registry.Get(ctx, schemaId)
 	if err != nil {
 		return nil, nil, err
 	}
