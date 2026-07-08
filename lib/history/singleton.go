@@ -12,6 +12,7 @@ import (
 	"github.com/flachnetz/startup/v2/lib/ql"
 	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/jackc/pgx/v5"
+	"github.com/jmoiron/sqlx"
 )
 
 // Options configures the global history Service set up by InitializeGlobal.
@@ -50,7 +51,7 @@ func InitializeGlobal(ctx context.Context, opts Options) error {
 	}
 
 	instance = New(opts.DB, pgx.Identifier{opts.HistoryTable}, &EventSending{
-		EventSender:    events.Sender,
+		EventSender:    forwardSender{},
 		EventCreator:   opts.EventCreator,
 		ServiceId:      opts.ServiceId,
 		ServiceVersion: startup_base.BuildVersion,
@@ -122,4 +123,18 @@ func RecordsAt[T ~string](ctx ql.TxContext, groupId T, createdTime time.Time) ([
 	}
 
 	return instance.RecordsAt(ctx, GroupId(groupId), createdTime)
+}
+
+type forwardSender struct{}
+
+func (f forwardSender) SendAsync(ctx context.Context, event events.Event) {
+	events.Sender.SendAsync(ctx, event)
+}
+
+func (f forwardSender) SendInTx(ctx context.Context, tx sqlx.ExecerContext, event events.Event) error {
+	return events.Sender.SendInTx(ctx, tx, event)
+}
+
+func (f forwardSender) Close() error {
+	return nil
 }
