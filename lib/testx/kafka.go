@@ -23,6 +23,9 @@ type Kafka struct {
 
 // KafkaCluster starts a single-broker in-memory mock Kafka cluster and a background
 // producer. The cluster and producer are closed automatically on test cleanup.
+//
+// Warning: The mock cluster does not support topic creation with AdminClient.CreateTopic,
+// you need to create topics via the CreateTopic method on the mock cluster
 func KafkaCluster(t *testing.T) *Kafka {
 	t.Helper()
 

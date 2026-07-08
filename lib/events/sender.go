@@ -2,7 +2,6 @@ package events
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
 	"github.com/flachnetz/startup/v2/lib/events/avro"
@@ -16,8 +15,6 @@ func TimeToEventTimestamp(ts time.Time) int64 {
 func FromEventTimestamp(timestamp int64) time.Time {
 	return time.Unix(0, timestamp*int64(time.Millisecond))
 }
-
-var log = slog.With(slog.String("prefix", "events"))
 
 type Event = avro.Event
 

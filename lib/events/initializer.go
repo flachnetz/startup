@@ -62,7 +62,7 @@ func (esi *eventSenderInitializer) Initialize() (EventSender, error) {
 	// and remove it from this initializer
 	esi.eventSender = nil
 
-	log.Info("Event sender initialized")
+	slog.Info("Event sender initialized")
 
 	return eventSender, nil
 }
@@ -77,7 +77,7 @@ func (esi *eventSenderInitializer) registerSchemaCache() (map[reflect.Type]uint3
 		return nil, nil
 	}
 
-	log.Info("Registering event schemas in confluent registry")
+	slog.Info("Registering event schemas in confluent registry")
 
 	schemaIdCache := map[reflect.Type]uint32{}
 
@@ -112,6 +112,5 @@ func (esi *eventSenderInitializer) createKafkaTopics() error {
 
 	defer func() { go adminClient.Close() }()
 
-	log.Info("Creating kafka topics", slog.Int("count", len(topics)))
 	return startup_kafka.CreateTopics(context.Background(), adminClient, topics)
 }

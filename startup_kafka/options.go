@@ -169,11 +169,30 @@ func (opts *KafkaOptions) ConfluentClient() confluent.Client {
 func CreateTopics(ctx context.Context, adminClient *kafka.AdminClient, topics Topics) error {
 	var topicSpecifications []kafka.TopicSpecification
 
+	metadata, err := adminClient.GetMetadata(nil, true, 5000)
+	if err != nil {
+		return fmt.Errorf("fetch metadata: %w", err)
+	}
+
 	// skip duplicate topic names so CreateTopics does not reject the request
 	topicSeen := map[string]bool{}
 
 	for _, topic := range topics {
 		if topicSeen[topic.Name] {
+			continue
+		}
+
+		topicSeen[topic.Name] = true
+
+		metaTopic, exists := metadata.Topics[topic.Name]
+		if exists {
+			partitionCount := len(metaTopic.Partitions)
+
+			slog.Info(
+				"Kafka topic already exists",
+				slog.String("topic", metaTopic.Topic),
+				slog.Int("partitionCount", partitionCount))
+
 			continue
 		}
 
@@ -184,7 +203,11 @@ func CreateTopics(ctx context.Context, adminClient *kafka.AdminClient, topics To
 			Config:            topic.Config,
 		})
 
-		topicSeen[topic.Name] = true
+	}
+
+	if len(topicSpecifications) == 0 {
+		slog.Info("All kafka topics already exist", slog.Int("count", len(topics)))
+		return nil
 	}
 
 	slog.Info("Creating kafka topics", slog.Int("count", len(topics)))
