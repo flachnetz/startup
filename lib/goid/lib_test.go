@@ -9,30 +9,37 @@ import (
 
 func TestGetIsStable(t *testing.T) {
 	id := Get()
-	for range 1024 {
+	for range 1_000_000 {
 		require.Equal(t, id, Get())
 	}
 }
 
-func TestGetIsIncreasing(t *testing.T) {
-	var prevId = Get()
+func TestGetIsChanging(t *testing.T) {
+	seen := make(map[Id]bool, 1_000_000)
 
-	for range 1024 {
-		var id Id
+	var closeCh = make(chan struct{})
+	defer close(closeCh)
 
-		var wg sync.WaitGroup
-		wg.Go(func() { id = Get() })
-		wg.Wait()
+	for range 1_000_000 {
+		var idCh = make(chan Id)
 
-		// we expect that a the Id is just increasing
-		require.Greater(t, id, prevId)
+		go func() {
+			idCh <- Get()
+			<-closeCh
+		}()
 
-		prevId = id
+		id := <-idCh
+
+		// we expect that the id is not reused
+		// while the go routine is still alive
+		require.False(t, seen[id])
+
+		seen[id] = true
 	}
 }
 
 func TestGetMatchesFallback(t *testing.T) {
-	for range 1024 {
+	for range 1_000_000 {
 		var goid, stack Id
 
 		var wg sync.WaitGroup

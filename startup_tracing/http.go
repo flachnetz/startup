@@ -16,7 +16,9 @@ import (
 	"sync"
 	"sync/atomic"
 
+	gls "github.com/flachnetz/startup/v2/lib/tls"
 	"github.com/flachnetz/startup/v2/startup_http"
+	sl "github.com/flachnetz/startup/v2/startup_logging"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -71,6 +73,14 @@ func Tracing(service string, op string) startup_http.HttpMiddleware {
 					serverSpan.SetStatus(codes.Error, http.StatusText(rl.status))
 				}
 			}()
+
+			traceId := serverSpan.SpanContext().TraceID()
+
+			// you should typically propagate your trace via context, but for logging
+			// it might happen that someone calls slog.Warn instead of slog.WarnContext. In this case,
+			// we use goroutine local storage as a fallback to store the threadId.
+			gls.Put(sl.ThreadLocalTraceID(traceId))
+			defer gls.Clear[sl.ThreadLocalTraceID]()
 
 			handler.ServeHTTP(rl, req.WithContext(ctx))
 		})
