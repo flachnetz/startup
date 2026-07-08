@@ -20,11 +20,12 @@ func WithKey(ev Event, key string, headers ...EventHeader) *KafkaEvent {
 }
 
 func WithKeyAndTopic(ev Event, key, topic string, headers ...EventHeader) *KafkaEvent {
-	if msg, ok := ev.(*KafkaEvent); ok {
-		msg.Key = key
-		msg.Topic = topic
-		msg.Headers = append(msg.Headers, headers...)
-		return msg
+	// try to update the existing kafka event wrapper first
+	if ev, ok := asEventType[*KafkaEvent](ev); ok {
+		ev.Key = key
+		ev.Topic = topic
+		ev.Headers = append(ev.Headers, headers...)
+		return ev
 	}
 
 	return &KafkaEvent{

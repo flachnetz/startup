@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -16,7 +18,10 @@ import (
 	confluent "github.com/confluentinc/confluent-kafka-go/v2/schemaregistry"
 	"github.com/flachnetz/startup/v2/lib/events/avro"
 	sl "github.com/flachnetz/startup/v2/startup_logging"
+	"github.com/flachnetz/startup/v2/startup_tracing"
 	"github.com/jmoiron/sqlx"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type eventSender struct {
@@ -85,28 +90,40 @@ func NewInitializer(
 }
 
 func (ev *eventSender) SendAsync(ctx context.Context, event Event) {
+	if trace.SpanContextFromContext(ctx).IsValid() {
+		// This is a very short trace, just for "send this event"
+		_ = startup_tracing.Trace(ctx, "Send"+avro.EventTypeOf(event)+"Async", func(ctx context.Context, span trace.Span) error {
+			event = addTraceContextToEvent(ctx, event)
+			return nil
+		})
+	}
+
 	select {
 	case <-ctx.Done():
 	case ev.AsyncBufferCh <- event:
 	default:
-		log.Warn("Async event queue is full, discarding event", slog.String("event", eventToString(event)))
+		slog.Warn("Async event queue is full, discarding event", slog.String("event", eventToString(event)))
 	}
 }
 
 func (ev *eventSender) SendInTx(ctx context.Context, tx sqlx.ExecerContext, event Event) error {
-	if ev.NoAvro {
-		slog.WarnContext(ctx, "Will not write event to outbox, avro is disabled", slog.Any("event", event))
+	return startup_tracing.Trace(ctx, "Send"+avro.EventTypeOf(event), func(ctx context.Context, span trace.Span) error {
+		if ev.NoAvro {
+			slog.WarnContext(ctx, "Will not write event to outbox, avro is disabled", slog.Any("event", event))
 
-		// still serialize event to ensure it is well-defined
-		return event.Serialize(io.Discard)
-	}
+			// still serialize event to ensure it is well-defined
+			return event.Serialize(io.Discard)
+		}
 
-	meta, avro, err := ev.encodeAvro(event)
-	if err != nil {
-		return fmt.Errorf("encode event: %w", err)
-	}
+		event = addTraceContextToEvent(ctx, event)
 
-	return WriteToOutbox(ctx, tx, *meta, ev.OutboxTable, avro)
+		meta, avro, err := ev.encodeAvro(event)
+		if err != nil {
+			return fmt.Errorf("encode event: %w", err)
+		}
+
+		return WriteToOutbox(ctx, tx, *meta, ev.OutboxTable, avro)
+	})
 }
 
 func (ev *eventSender) Close() error {
@@ -125,7 +142,7 @@ func (ev *eventSender) launchAsyncTasks() {
 						break
 					}
 
-					log.Warn("Flush says there are still queued messages to be send.", slog.Int("count", count))
+					slog.Warn("Flush says there are still queued messages to be send.", slog.Int("count", count))
 				}
 
 				ev.KafkaSender.Close()
@@ -143,7 +160,7 @@ func (ev *eventSender) launchAsyncTasks() {
 				switch ev := e.(type) {
 				case *kafka.Message:
 					if ev.TopicPartition.Error != nil {
-						log.Warn(
+						slog.Warn(
 							"Event delivery failed",
 							slog.Any("topicPartition", ev.TopicPartition),
 							slog.String("key", string(ev.Key)),
@@ -160,19 +177,19 @@ func (ev *eventSender) doSendAsync(event Event) {
 	// ignore error as we're in the process of sending an async
 	if err := ev.writeToFile(event); err != nil {
 		eventType := avro.EventTypeOf(event)
-		log.Warn("Failed to write async event to file", slog.String("type", eventType), sl.Error(err))
+		slog.Warn("Failed to write async event to file", slog.String("type", eventType), sl.Error(err))
 	}
 
 	if err := ev.sendToKafka(event); err != nil {
 		eventType := avro.EventTypeOf(event)
-		log.Warn("Failed to send async event to kafka", slog.String("type", eventType), sl.Error(err))
+		slog.Warn("Failed to send async event to kafka", slog.String("type", eventType), sl.Error(err))
 	}
 
 	if ev.FileSender == nil && ev.KafkaSender == nil {
 		// serialize event just to check for the error
 		err := event.Serialize(io.Discard)
 		eventType := avro.EventTypeOf(event)
-		log.Warn("Failed to send async event to kafka", slog.String("type", eventType), sl.Error(err))
+		slog.Warn("Failed to send async event to kafka", slog.String("type", eventType), sl.Error(err))
 	}
 }
 
@@ -272,7 +289,46 @@ func eventToString(event Event) string {
 func byteSliceOf(value *string) []byte {
 	if value == nil {
 		return nil
-	} else {
-		return []byte(*value)
 	}
+
+	return []byte(*value)
+}
+
+type mapTextMapCarrier map[string]string
+
+func (m mapTextMapCarrier) Get(key string) string {
+	return m[key]
+}
+
+func (m mapTextMapCarrier) Set(key, value string) {
+	m[key] = value
+}
+
+func (m mapTextMapCarrier) Keys() []string {
+	return slices.Collect(maps.Keys(m))
+}
+
+type eventWithTraceContext struct {
+	TraceContext map[string]string
+	Event
+}
+
+func (e *eventWithTraceContext) Unwrap() Event {
+	return e.Event
+}
+
+func addTraceContextToEvent(ctx context.Context, event Event) Event {
+	// capture the trace context for propagation
+	carrier := mapTextMapCarrier{}
+	otel.GetTextMapPropagator().Inject(ctx, carrier)
+
+	if len(carrier) > 0 {
+		// update the event and add the context
+		event = &eventWithTraceContext{
+			TraceContext: carrier,
+			Event:        event,
+		}
+	}
+
+	return event
 }

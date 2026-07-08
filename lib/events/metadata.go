@@ -24,17 +24,26 @@ func (topics *NormalizedEventTypes) MetadataOf(event Event) (*EventMetadata, err
 	var headers EventHeaders
 	var topic string
 
-	if msg, ok := event.(*KafkaEvent); ok {
-		key = &msg.Key
-		headers = msg.Headers
-		topic = msg.Topic
+	if ev, ok := asEventType[*KafkaEvent](event); ok {
+		key = &ev.Key
+		headers = ev.Headers
+		topic = ev.Topic
 
 		// unwrap the actual event
-		event = msg.Event
+		event = ev.Event
+	}
+
+	if ev, ok := asEventType[*eventWithTraceContext](event); ok {
+		for key, value := range ev.TraceContext {
+			headers = append(headers, EventHeader{
+				Key:   key,
+				Value: value,
+			})
+		}
 	}
 
 	// now we can get the actual event type
-	eventType := derefEventType(reflect.TypeOf(event))
+	eventType := derefEventType(reflect.TypeOf(unwrap(event)))
 
 	if topic == "" {
 		var err error
@@ -55,6 +64,42 @@ func (topics *NormalizedEventTypes) MetadataOf(event Event) (*EventMetadata, err
 	}
 
 	return meta, nil
+}
+
+func unwrap(event Event) Event {
+	type unwrapper interface {
+		Unwrap() Event
+	}
+
+	for {
+		if unwrapper, ok := event.(unwrapper); ok {
+			event = unwrapper.Unwrap()
+			continue
+		}
+
+		return event
+	}
+}
+
+func asEventType[T Event](event Event) (T, bool) {
+	type unwrapper interface {
+		Unwrap() Event
+	}
+
+	for {
+		eventT, ok := event.(T)
+		if ok {
+			return eventT, true
+		}
+
+		if unwrapper, ok := event.(unwrapper); ok {
+			event = unwrapper.Unwrap()
+			continue
+		}
+
+		var tZero T
+		return tZero, false
+	}
 }
 
 type EventHeaders []EventHeader
