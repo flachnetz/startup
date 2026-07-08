@@ -169,7 +169,7 @@ func runWorker(ctx context.Context, w *partitionWorker, handle HandleMessage) {
 
 		err := startup_tracing.Trace(ctx, "kafka:consume", func(ctx context.Context, span trace.Span) (err error) {
 			for attempt := 1; attempt <= 3; attempt++ {
-				if err = handle(ctx, msg); err != nil {
+				if err = continueTrace(ctx, msg, handle); err != nil {
 					log.Error(
 						"Handle failed",
 						slog.Int64("offset", int64(offset)),
