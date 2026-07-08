@@ -90,10 +90,13 @@ func NewInitializer(
 }
 
 func (ev *eventSender) SendAsync(ctx context.Context, event Event) {
+	event = &eventWithContext{Context: ctx, Event: event}
+
 	if trace.SpanContextFromContext(ctx).IsValid() {
 		// This is a very short trace, just for "send this event"
 		_ = startup_tracing.Trace(ctx, "Send"+avro.EventTypeOf(event)+"Async", func(ctx context.Context, span trace.Span) error {
 			event = addTraceContextToEvent(ctx, event)
+			event = &eventWithContext{Context: ctx, Event: event}
 			return nil
 		})
 	}
@@ -102,7 +105,7 @@ func (ev *eventSender) SendAsync(ctx context.Context, event Event) {
 	case <-ctx.Done():
 	case ev.AsyncBufferCh <- event:
 	default:
-		slog.Warn("Async event queue is full, discarding event", slog.String("event", eventToString(event)))
+		slog.WarnContext(ctx, "Async event queue is full, discarding event", slog.String("event", eventToString(event)))
 	}
 }
 
@@ -116,6 +119,7 @@ func (ev *eventSender) SendInTx(ctx context.Context, tx sqlx.ExecerContext, even
 		}
 
 		event = addTraceContextToEvent(ctx, event)
+		event = &eventWithContext{Context: ctx, Event: event}
 
 		meta, avro, err := ev.encodeAvro(event)
 		if err != nil {
@@ -174,22 +178,24 @@ func (ev *eventSender) launchAsyncTasks() {
 }
 
 func (ev *eventSender) doSendAsync(event Event) {
+	var ctx = contextOf(event)
+
 	// ignore error as we're in the process of sending an async
 	if err := ev.writeToFile(event); err != nil {
 		eventType := avro.EventTypeOf(event)
-		slog.Warn("Failed to write async event to file", slog.String("type", eventType), sl.Error(err))
+		slog.WarnContext(ctx, "Failed to write async event to file", slog.String("type", eventType), sl.Error(err))
 	}
 
 	if err := ev.sendToKafka(event); err != nil {
 		eventType := avro.EventTypeOf(event)
-		slog.Warn("Failed to send async event to kafka", slog.String("type", eventType), sl.Error(err))
+		slog.WarnContext(ctx, "Failed to send async event to kafka", slog.String("type", eventType), sl.Error(err))
 	}
 
 	if ev.FileSender == nil && ev.KafkaSender == nil {
 		// serialize event just to check for the error
 		err := event.Serialize(io.Discard)
 		eventType := avro.EventTypeOf(event)
-		slog.Warn("Failed to send async event to kafka", slog.String("type", eventType), sl.Error(err))
+		slog.WarnContext(ctx, "Failed to send async event to kafka", slog.String("type", eventType), sl.Error(err))
 	}
 }
 
@@ -331,4 +337,22 @@ func addTraceContextToEvent(ctx context.Context, event Event) Event {
 	}
 
 	return event
+}
+
+type eventWithContext struct {
+	Context context.Context
+	Event
+}
+
+func (e *eventWithContext) Unwrap() Event {
+	return e.Event
+}
+
+func contextOf(event Event) context.Context {
+	ev, ok := asEventType[*eventWithContext](event)
+	if ok {
+		return ev.Context
+	}
+
+	return context.Background()
 }

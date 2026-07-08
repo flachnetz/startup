@@ -67,7 +67,7 @@ func kafkaWorker(ctx context.Context, producer *kafka.Producer, messagesCh chan 
 		case msg := <-messagesCh:
 			err := producer.Produce(msg, nil)
 			if err != nil {
-				slog.Error("Failed to produce message", sl.Error(err))
+				slog.ErrorContext(ctx, "Failed to produce message", sl.Error(err))
 			}
 
 		default:
@@ -95,12 +95,12 @@ func (k *Kafka) CreateTopic(name string, partitions int) {
 // TestConsumer creates a consumer subscribed to the given topic(s). The consumer is
 // closed automatically on test cleanup.
 func (k *Kafka) TestConsumer(topic string, moreTopics ...string) *KafkaConsumer {
-	slog.Info("Create test consumer")
+	slog.InfoContext(k.testing.Context(), "Create test consumer")
 	consumer := k.Consumer()
 
 	topics := append([]string{topic}, moreTopics...)
 
-	slog.Info("Subscribing to test topic", slog.Any("topics", topics))
+	slog.InfoContext(k.testing.Context(), "Subscribing to test topic", slog.Any("topics", topics))
 	err := consumer.SubscribeTopics(topics, nil)
 	require.NoErrorf(k.testing, err, "Subscribe to topic %q", topic)
 

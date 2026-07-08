@@ -66,7 +66,7 @@ func CreateOutbox(ctx context.Context, db *sql.DB) error {
 
 	if _, err := tx.ExecContext(ctx, createTable); err != nil {
 		if err := tx.Rollback(); err != nil {
-			slog.Warn("Failed to rollback create outbox table transaction", slog.String("error", err.Error()))
+			slog.WarnContext(ctx, "Failed to rollback create outbox table transaction", slog.String("error", err.Error()))
 		}
 
 		return fmt.Errorf("create table: %w", err)

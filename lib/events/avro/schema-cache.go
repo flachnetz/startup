@@ -1,6 +1,7 @@
 package avro
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -17,12 +18,12 @@ type SchemaCache struct {
 	cache sync.Map
 }
 
-func (r *SchemaCache) Get(schemaId uint32) (*goavro.Codec, error) {
+func (r *SchemaCache) Get(ctx context.Context, schemaId uint32) (*goavro.Codec, error) {
 	if codec, ok := r.cache.Load(schemaId); ok {
 		return codec.(*goavro.Codec), nil
 	}
 
-	slog.Info("Lookup schema",
+	slog.InfoContext(ctx, "Lookup schema",
 		slog.String("prefix", "schema"),
 		slog.Int("schemaId", int(schemaId)),
 	)
