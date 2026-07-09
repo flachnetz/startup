@@ -178,7 +178,7 @@ func (ev *eventSender) launchAsyncTasks() {
 }
 
 func (ev *eventSender) doSendAsync(event Event) {
-	var ctx = contextOf(event)
+	ctx := contextOf(event)
 
 	// ignore error as we're in the process of sending an async
 	if err := ev.writeToFile(event); err != nil {

@@ -153,7 +153,8 @@ func runWorker(ctx context.Context, w *partitionWorker, handle HandleMessage) {
 	// instead of leaving the other workers deadlocked.
 	defer func() {
 		if r := recover(); r != nil {
-			log.ErrorContext(ctx,
+			log.ErrorContext(
+				ctx,
 				"Worker panicked",
 				slog.Any("panic", r),
 				slog.String("stack", string(debug.Stack())),
@@ -170,7 +171,8 @@ func runWorker(ctx context.Context, w *partitionWorker, handle HandleMessage) {
 		err := startup_tracing.Trace(ctx, "kafka:consume", func(ctx context.Context, span trace.Span) (err error) {
 			for attempt := 1; attempt <= 3; attempt++ {
 				if err = continueTrace(ctx, msg, handle); err != nil {
-					log.ErrorContext(ctx,
+					log.ErrorContext(
+						ctx,
 						"Handle failed",
 						slog.Int64("offset", int64(offset)),
 						slog.Int("attempt", attempt),
@@ -234,7 +236,8 @@ func (p *partitionsWorkers) Get(ctx context.Context, topic string, partition int
 	w.handled.Store(-1)
 	p.Workers[partition] = w
 
-	slog.InfoContext(ctx,
+	slog.InfoContext(
+		ctx,
 		"Spawning worker",
 		slog.String("topic", topic),
 		slog.Int("partition", int(partition)),

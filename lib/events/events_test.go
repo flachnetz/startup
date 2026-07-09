@@ -27,6 +27,7 @@ type anotherEvent struct {
 }
 
 func (e *anotherEvent) Schema() string { return `{"type":"record","name":"anotherEvent","fields":[]}` }
+
 func (e *anotherEvent) Serialize(w io.Writer) error {
 	_, err := w.Write([]byte("another"))
 	return err
