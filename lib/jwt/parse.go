@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 
 	"github.com/lestrrat-go/jwx/v4/jwt"
 )
@@ -34,10 +35,7 @@ func ParseJWT[T any](ctx context.Context, verifier Verifier, rawToken string) (T
 func parseClaims[T any](token jwt.Token) (T, error) {
 	var tZero T
 
-	untypedClaims := map[string]any{}
-	for key, value := range token.Claims() {
-		untypedClaims[key] = value
-	}
+	untypedClaims = maps.Collect(token.Claims())
 
 	jsonClaims, err := json.Marshal(untypedClaims)
 	if err != nil {

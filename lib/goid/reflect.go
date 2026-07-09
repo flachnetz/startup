@@ -34,7 +34,7 @@ func typeByString(str string) reflect.Type {
 		s = "*" + s
 	}
 	// The typ is a struct iface{tab(ptr->reflect.Type), data(ptr->rtype)}
-	typ := reflect.TypeOf(0)
+	typ := reflect.TypeFor[int]()
 	face := (*iface)(unsafe.Pointer(&typ))
 	// Find the specified target through binary search algorithm
 	sections, offset := typelinks()
@@ -59,7 +59,7 @@ func typeByString(str string) reflect.Type {
 		// to do a linear scan anyway.
 		if i < len(offs) {
 			face.data = resolveTypeOff(section, offs[i])
-			if typ.Kind() == reflect.Ptr {
+			if typ.Kind() == reflect.Pointer {
 				if typ.String() == str {
 					return typ
 				}
