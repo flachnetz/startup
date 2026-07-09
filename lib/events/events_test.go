@@ -58,7 +58,7 @@ func TestEventTopics_Normalized(t *testing.T) {
 	// pointer type should be normalized to struct type
 	et := EventTopics{
 		EventTypes: map[reflect.Type]Topic{
-			reflect.TypeOf((*testEvent)(nil)): {Name: "topic-a"},
+			reflect.TypeFor[*testEvent](): {Name: "topic-a"},
 		},
 	}
 
@@ -72,7 +72,7 @@ func TestEventTopics_Normalized(t *testing.T) {
 func TestEventTopics_Normalized_RejectsNonEvent(t *testing.T) {
 	et := EventTopics{
 		EventTypes: map[reflect.Type]Topic{
-			reflect.TypeOf(""): {Name: "topic-a"},
+			reflect.TypeFor[string](): {Name: "topic-a"},
 		},
 	}
 
@@ -97,7 +97,7 @@ func TestNormalizedEventTypes_TopicForType(t *testing.T) {
 	assert.Equal(t, "my-topic", topic)
 
 	// pointer type should also resolve
-	topic, err = norm.TopicForType(reflect.TypeOf((*testEvent)(nil)))
+	topic, err = norm.TopicForType(reflect.TypeFor[*testEvent]())
 	require.NoError(t, err)
 	assert.Equal(t, "my-topic", topic)
 
@@ -280,19 +280,18 @@ func TestDerefEventType_Struct(t *testing.T) {
 }
 
 func TestDerefEventType_Pointer(t *testing.T) {
-	tp := derefEventType(reflect.TypeOf((*testEvent)(nil)))
+	tp := derefEventType(reflect.TypeFor[*testEvent]())
 	assert.Equal(t, reflect.TypeFor[testEvent](), tp)
 }
 
 func TestDerefEventType_DoublePointer(t *testing.T) {
-	var ev *testEvent
-	tp := derefEventType(reflect.TypeOf(&ev))
+	tp := derefEventType(reflect.TypeFor[**testEvent]())
 	assert.Equal(t, reflect.TypeFor[testEvent](), tp)
 }
 
 func TestDerefEventType_PanicsForNonEvent(t *testing.T) {
 	assert.Panics(t, func() {
-		derefEventType(reflect.TypeOf(""))
+		derefEventType(reflect.TypeFor[string]())
 	})
 }
 
