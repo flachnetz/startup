@@ -35,7 +35,7 @@ func ParseJWT[T any](ctx context.Context, verifier Verifier, rawToken string) (T
 func parseClaims[T any](token jwt.Token) (T, error) {
 	var tZero T
 
-	untypedClaims = maps.Collect(token.Claims())
+	untypedClaims := maps.Collect(token.Claims())
 
 	jsonClaims, err := json.Marshal(untypedClaims)
 	if err != nil {

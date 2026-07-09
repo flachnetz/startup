@@ -65,15 +65,17 @@ func (opts *KafkaOptions) Initialize(ctx context.Context) {
 func (opts *KafkaOptions) NewConsumer(overrideConfig kafka.ConfigMap) *kafka.Consumer {
 	configMap := opts.DefaultConfig(overrideConfig)
 
-	// Resolve the special RANDOM group into a unique group id once, so repeated
-	// calls keep using the same generated group.
-	consumerGroup := opts.KafkaConsumerGroup
-	if consumerGroup == "RANDOM" {
-		consumerGroup = fmt.Sprintf("golang-%d", time.Now().UnixNano())
-	}
+	if _, ok := overrideConfig["group.id"]; !ok {
+		// Resolve the special RANDOM group into a unique group id once, so repeated
+		// calls keep using the same generated group.
+		consumerGroup := opts.KafkaConsumerGroup
+		if consumerGroup == "RANDOM" {
+			consumerGroup = fmt.Sprintf("golang-%d", time.Now().UnixNano())
+		}
 
-	// set consumer group
-	configMap["group.id"] = consumerGroup
+		// set consumer group
+		configMap["group.id"] = consumerGroup
+	}
 
 	consumer, err := kafka.NewConsumer(new(configMap))
 	startup_base.FatalOnError(err, "create kafka consumer failed")

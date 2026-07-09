@@ -1,13 +1,12 @@
 package startup_base
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"os"
 	"path"
 	"strings"
-	"sync"
+	"sync/atomic"
 
 	"github.com/flachnetz/startup/v2/lib/clock"
 	"github.com/flachnetz/startup/v2/startup_base/tint"
@@ -24,15 +23,17 @@ var (
 
 var LogLevel slog.LevelVar
 
-var handlerVar slog.Handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{AddSource: true})
-
-var (
-	lock        sync.RWMutex
-	baseOptions BaseOptions
+var handlerVar slog.Handler = slog.NewTextHandler(
+	os.Stderr,
+	&slog.HandlerOptions{AddSource: true},
 )
 
+var baseOptions atomic.Pointer[BaseOptions]
+
 func init() {
-	lazy := &LazyHandler{
+	baseOptions.Store(new(BaseOptions))
+
+	lazy := &lazyHandler{
 		Delegate: func() slog.Handler {
 			return handlerVar
 		},
@@ -83,7 +84,7 @@ func (opts *BaseOptions) Initialize() {
 		}
 	} else {
 		// discard logging
-		handler = nilhandler{}
+		handler = nilHandler{}
 	}
 
 	handler = sl.Wrap(handler, sl.WithTraceId)
@@ -109,95 +110,35 @@ func (opts *BaseOptions) Initialize() {
 			opts.Environment = "development"
 		}
 	}
+
 	logger.Info("Environment: " + opts.Environment)
-	lock.Lock()
-	baseOptions = *opts
-	lock.Unlock()
+	baseOptions.Store(opts)
 }
 
 func IsVerboseLoggingEnabled() bool {
-	lock.RLock()
-	enabled := baseOptions.Verbose
-	lock.RUnlock()
-	return enabled
+	return baseOptions.Load().Verbose
 }
 
 func GetEnvironment() string {
-	lock.RLock()
-	defer lock.RUnlock()
-	return baseOptions.Environment
+	return baseOptions.Load().Environment
 }
 
 func IsDevelopment() bool {
-	lock.RLock()
-	environment := strings.ToLower(baseOptions.Environment)
-	lock.RUnlock()
+	environment := strings.ToLower(baseOptions.Load().Environment)
 	return environment == "development" || environment == "dev"
 }
 
 func IsTesting() bool {
-	lock.RLock()
-	environment := strings.ToLower(baseOptions.Environment)
-	lock.RUnlock()
+	environment := strings.ToLower(baseOptions.Load().Environment)
 	return environment == "testing" || environment == "test"
 }
 
 func IsStaging() bool {
-	lock.RLock()
-	environment := strings.ToLower(baseOptions.Environment)
-	lock.RUnlock()
+	environment := strings.ToLower(baseOptions.Load().Environment)
 	return environment == "staging" || environment == "stage"
 }
 
 func IsProduction() bool {
-	lock.RLock()
-	environment := strings.ToLower(baseOptions.Environment)
-	lock.RUnlock()
+	environment := strings.ToLower(baseOptions.Load().Environment)
 	return environment == "production" || environment == "prod" || environment == "live"
-}
-
-type nilhandler struct{}
-
-func (n nilhandler) Enabled(ctx context.Context, level slog.Level) bool {
-	return false
-}
-
-func (n nilhandler) Handle(ctx context.Context, record slog.Record) error {
-	return nil
-}
-
-func (n nilhandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	return n
-}
-
-func (n nilhandler) WithGroup(name string) slog.Handler {
-	return n
-}
-
-type LazyHandler struct {
-	Delegate func() slog.Handler
-}
-
-func (v *LazyHandler) Enabled(ctx context.Context, level slog.Level) bool {
-	return true
-}
-
-func (v *LazyHandler) Handle(ctx context.Context, record slog.Record) error {
-	return v.Delegate().Handle(ctx, record)
-}
-
-func (v *LazyHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	return &LazyHandler{
-		Delegate: func() slog.Handler {
-			return v.Delegate().WithAttrs(attrs)
-		},
-	}
-}
-
-func (v *LazyHandler) WithGroup(name string) slog.Handler {
-	return &LazyHandler{
-		Delegate: func() slog.Handler {
-			return v.Delegate().WithGroup(name)
-		},
-	}
 }
