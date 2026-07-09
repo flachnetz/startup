@@ -135,24 +135,6 @@ func (e Error) Unwrap() error {
 	return e.Cause
 }
 
-// toErrorResponse converts a structured Error into an ErrorResponse,
-// falling back to a 500 status code if the error carries an out-of-range HTTP
-// status code.
-func (e Error) toErrorResponse() ErrorResponse {
-	statusCode := e.HttpStatusCode
-	if statusCode < 400 || statusCode >= 600 {
-		// invalid, use default
-		statusCode = http.StatusInternalServerError
-	}
-
-	return ErrorResponse{
-		Code:        e.Code,
-		Description: e.Description,
-		Attributes:  e.Attributes,
-		StatusCode:  statusCode,
-	}
-}
-
 // Errorf builds an Error with the given code and a formatted description.
 //
 // Any error passed as an argument is kept as the Cause (via the standard %w

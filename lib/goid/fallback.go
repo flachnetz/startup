@@ -32,7 +32,7 @@ func getViaStack() Id {
 	// Parse the 4707 out of "goroutine 4707 ["
 	i := bytes.IndexByte(b, ' ')
 	if i < 0 {
-		var bClone = slices.Clone(b)
+		bClone := slices.Clone(b)
 		panic(fmt.Sprintf("No space found in %q", bClone))
 	}
 
@@ -40,7 +40,7 @@ func getViaStack() Id {
 
 	n, err := strconv.ParseUint(str, 10, 64)
 	if err != nil {
-		var bClone = slices.Clone(b)
+		bClone := slices.Clone(b)
 		panic(fmt.Sprintf("Failed to parse goroutine ID out of %q: %v", bClone, err))
 	}
 	return Id(n)

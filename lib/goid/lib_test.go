@@ -17,11 +17,11 @@ func TestGetIsStable(t *testing.T) {
 func TestGetIsChanging(t *testing.T) {
 	seen := make(map[Id]bool, 1_000_000)
 
-	var closeCh = make(chan struct{})
+	closeCh := make(chan struct{})
 	defer close(closeCh)
 
 	for range 1_000_000 {
-		var idCh = make(chan Id)
+		idCh := make(chan Id)
 
 		go func() {
 			idCh <- Get()

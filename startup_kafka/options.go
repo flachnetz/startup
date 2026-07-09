@@ -191,7 +191,8 @@ func CreateTopics(ctx context.Context, adminClient *kafka.AdminClient, topics To
 			slog.Info(
 				"Kafka topic already exists",
 				slog.String("topic", metaTopic.Topic),
-				slog.Int("partitionCount", partitionCount))
+				slog.Int("partitionCount", partitionCount),
+			)
 
 			continue
 		}

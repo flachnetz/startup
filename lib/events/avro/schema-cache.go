@@ -23,7 +23,8 @@ func (r *SchemaCache) Get(ctx context.Context, schemaId uint32) (*goavro.Codec, 
 		return codec.(*goavro.Codec), nil
 	}
 
-	slog.InfoContext(ctx, "Lookup schema",
+	slog.InfoContext(
+		ctx, "Lookup schema",
 		slog.String("prefix", "schema"),
 		slog.Int("schemaId", int(schemaId)),
 	)
