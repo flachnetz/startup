@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"log/syslog"
 	"maps"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -239,12 +241,35 @@ type kafkaClient interface {
 	Logs() chan kafka.LogEvent
 }
 
+var rePropertyType = regexp.MustCompile(`is a \S+ property and will be ignored by this \S+ instance`)
+
 func logClient(log *slog.Logger, client kafkaClient) {
 	for l := range client.Logs() {
-		if l.Level <= 3 {
-			log.Error(l.Message, slog.String("name", l.Name), slog.String("tag", l.Tag))
-		} else {
-			log.Info(l.Message, slog.String("name", l.Name), slog.String("tag", l.Tag))
+		var level = syslog.Priority(l.Level & 0x07)
+
+		if rePropertyType.MatchString(l.Message) {
+			level = syslog.LOG_DEBUG
 		}
+
+		var levelSlog slog.Level
+
+		switch {
+		case level <= syslog.LOG_ERR:
+			levelSlog = slog.LevelError
+
+		case level == syslog.LOG_WARNING:
+			levelSlog = slog.LevelWarn
+
+		case level == syslog.LOG_NOTICE, level == syslog.LOG_INFO:
+			levelSlog = slog.LevelInfo
+
+		default:
+			levelSlog = slog.LevelDebug
+		}
+
+		ctx := context.Background()
+		log.Log(ctx, levelSlog, l.Message,
+			slog.String("name", l.Name),
+			slog.String("tag", l.Tag))
 	}
 }
