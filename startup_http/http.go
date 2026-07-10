@@ -9,12 +9,12 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	tracing "github.com/flachnetz/startup/v2/startup_tracing"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/flachnetz/go-admin"
@@ -43,7 +43,7 @@ type Config struct {
 	UseMiddleware HttpMiddleware
 }
 
-type HttpMiddleware func(http.Handler) http.Handler
+type HttpMiddleware = func(http.Handler) http.Handler
 
 type HTTPOptions struct {
 	Address string `long:"http-address" env:"HTTP_ADDRESS" default:":3080" description:"Address to listen on."`
@@ -59,13 +59,32 @@ type HTTPOptions struct {
 	AccessLog            string `long:"http-access-log" env:"HTTP_ACCESS_LOG" description:"Write http access log to a file. Defaults to stdout."`
 	AccessLogAdminRoute  bool   `long:"http-access-log-admin-route" env:"HTTP_ACCESS_LOG_ADMIN_ROUTE" description:"If enabled, admin route requests will also be logged."`
 	AdminPageShowEnvVars bool   `long:"http-admin-show-env-vars" env:"HTTP_ADMIN_SHOW_ENV_VARS" description:"Show environment variables on the admin page."`
+
+	inputs     startup_base.Inputs
+	hasTracing bool
 }
 
-func (opts HTTPOptions) Serve(config Config) {
+func (opts *HTTPOptions) Initialize(base startup_base.BaseOptions, tracingOpts *tracing.TracingOptions) {
+	opts.inputs = base.Inputs
+	opts.hasTracing = tracingOpts != nil
+}
+
+func (opts *HTTPOptions) ServeHandler(handler http.Handler) {
+	opts.Serve(Config{
+		Routing: func(mux *http.ServeMux) http.Handler { return handler },
+	})
+}
+
+func (opts *HTTPOptions) Serve(config Config) {
 	// guess the app name
 	appName := config.Name
 	if appName == "" {
-		appName = path.Base(os.Args[0])
+		appName = opts.inputs.ServiceName
+	}
+
+	if config.UseMiddleware == nil && opts.hasTracing {
+		slog.Info("Setup tracing http middleware")
+		config.UseMiddleware = tracing.Tracing(opts.inputs.ServiceName, "serve")
 	}
 
 	// add basic handlers

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"log/slog"
 	"net"
 	"net/url"
@@ -38,6 +39,8 @@ func ParseCommandLineWithOptions(ctx context.Context, opts any, options flags.Op
 	if reflect.ValueOf(opts).Kind() != reflect.Pointer {
 		return errors.New("options parameter must be pointer")
 	}
+
+	propagateInputs(opts)
 
 	envFile := os.Getenv("ENV_FILE")
 	if envFile == "" {
@@ -84,7 +87,7 @@ func ParseCommandLineWithOptions(ctx context.Context, opts any, options flags.Op
 
 	// now do the initialization for all fields
 	value := reflect.ValueOf(opts).Elem()
-	for _, fieldValue := range value.Fields() {
+	for fieldValue := range fieldsIter(value) {
 		if fieldValue.Kind() != reflect.Struct {
 			continue
 		}
@@ -138,6 +141,44 @@ func ParseCommandLineWithOptions(ctx context.Context, opts any, options flags.Op
 	}
 
 	return nil
+}
+
+func propagateInputs(opts any) {
+	type propagateInputs interface {
+		PropagateInputs()
+	}
+
+	if p, ok := opts.(propagateInputs); ok {
+		p.PropagateInputs()
+	}
+}
+
+func fieldsIter(value reflect.Value) iter.Seq[reflect.Value] {
+	return func(yield func(reflect.Value) bool) {
+		if value.Kind() != reflect.Struct {
+			return
+		}
+
+		for sf, field := range value.Fields() {
+			if sf.PkgPath != "" {
+				// field is not exported
+				continue
+			}
+
+			if !yield(field) {
+				return
+			}
+
+			if sf.Anonymous {
+				// this is an embedded field, recurse
+				for sub := range fieldsIter(field) {
+					if !yield(sub) {
+						return
+					}
+				}
+			}
+		}
+	}
 }
 
 func findInitializerMethod(v reflect.Value) reflect.Value {

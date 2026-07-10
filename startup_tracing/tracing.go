@@ -19,11 +19,6 @@ var log = slog.With(slog.String("prefix", "tracing"))
 type TracingOptions struct {
 	HttpEndpoint string `long:"otlp-trace-endpoint-http" env:"OTLP_TRACE_ENDPOINT_HTTP" validate:"omitempty" description:"OTLP HTTP endpoint for traces, e.g. localhost:4318"`
 
-	Inputs struct {
-		// The service name of your application
-		ServiceName string `validate:"required"`
-	}
-
 	once sync.Once
 }
 
@@ -31,7 +26,7 @@ func (opts *TracingOptions) IsActive() bool {
 	return opts.HttpEndpoint != ""
 }
 
-func (opts *TracingOptions) Initialize() {
+func (opts *TracingOptions) Initialize(base startup_base.BaseOptions) {
 	if !opts.IsActive() {
 		return
 	}
@@ -42,7 +37,7 @@ func (opts *TracingOptions) Initialize() {
 		res, err := resource.New(
 			ctx,
 			resource.WithAttributes(
-				semconv.ServiceName(opts.Inputs.ServiceName),
+				semconv.ServiceName(base.ServiceName),
 			),
 		)
 		startup_base.PanicOnError(err, "Unable to create otel resource")

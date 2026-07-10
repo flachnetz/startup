@@ -31,7 +31,6 @@ type KafkaOptions struct {
 	}
 
 	KafkaAddresses        []string `long:"kafka-address" env:"KAFKA_ADDRESS" validate:"dive,hostport" description:"Address of kafka server to use. Can be specified multiple times to connect to multiple brokers."`
-	KafkaConsumerGroup    string   `long:"kafka-consumer-group" env:"KAFKA_CONSUMER_GROUP" description:"Consumer group of kafka messages. Set to RANDOM to get a unique consumer group each time."`
 	KafkaOffsetReset      string   `long:"kafka-offset-reset" env:"KAFKA_OFFSET_RESET" default:"smallest" description:"Offset reset for kafka topic" choice:"smallest" choice:"largest"`
 	KafkaReplication      int16    `long:"kafka-replication" env:"KAFKA_REPLICATION" default:"3" description:"Default kafka replication for new topics." validate:"gt=0"`
 	KafkaSecurityProtocol string   `long:"kafka-security-protocol" env:"KAFKA_SECURITY_PROTOCOL" default:"ssl" description:"Security protocol" choice:"ssl" choice:"plaintext"`
@@ -62,20 +61,17 @@ func (opts *KafkaOptions) Initialize(ctx context.Context) {
 
 // NewConsumer creates a kafka consumer using DefaultConfig, with the given
 // overrides applied on top of the defaults.
-func (opts *KafkaOptions) NewConsumer(overrideConfig kafka.ConfigMap) *kafka.Consumer {
+func (opts *KafkaOptions) NewConsumer(consumerGroup string, overrideConfig kafka.ConfigMap) *kafka.Consumer {
 	configMap := opts.DefaultConfig(overrideConfig)
 
-	if _, ok := overrideConfig["group.id"]; !ok {
-		// Resolve the special RANDOM group into a unique group id once, so repeated
-		// calls keep using the same generated group.
-		consumerGroup := opts.KafkaConsumerGroup
-		if consumerGroup == "RANDOM" {
-			consumerGroup = fmt.Sprintf("golang-%d", time.Now().UnixNano())
-		}
-
-		// set consumer group
-		configMap["group.id"] = consumerGroup
+	// Resolve the special RANDOM group into a unique group id once, so repeated
+	// calls keep using the same generated group.
+	if consumerGroup == "RANDOM" {
+		consumerGroup = fmt.Sprintf("golang-%d", time.Now().UnixNano())
 	}
+
+	// set consumer group
+	configMap["group.id"] = consumerGroup
 
 	consumer, err := kafka.NewConsumer(new(configMap))
 	startup_base.FatalOnError(err, "create kafka consumer failed")
