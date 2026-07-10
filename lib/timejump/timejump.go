@@ -20,7 +20,7 @@ import (
 )
 
 type Options struct {
-	Enabled      bool   `long:"timejump-enabled" env:"TIMEJUMP_ENABLED" description:"Set true if you want timejumps to be nabled"`
+	Enabled      bool   `long:"timejump-enabled" env:"TIMEJUMP_ENABLED" description:"Set true if you want timejumps to be enabled"`
 	Namespace    string `long:"timejump-namespace" env:"TIMEJUMP_NAMESPACE" default:"default" description:"Namespace to look for the timejump config, defaults to default"`
 	ResourceName string `long:"timejump-resource-name" env:"TIMEJUMP_RESOURCE_NAME" default:"timejump" description:"Name of the configmap that contains timejump configuration"`
 }

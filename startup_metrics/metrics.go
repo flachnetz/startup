@@ -25,30 +25,21 @@ type MetricsPrefix string
 type MetricsOptions struct {
 	PrometheusConfig PrometheusConfig
 
-	Inputs struct {
-		// Prefix to apply to all metrics. This must not be empty.
-		MetricsPrefix string `validate:"required"`
-	}
-
 	once sync.Once
 	mp   *sdkmetric.MeterProvider
 }
 
-func (opts *MetricsOptions) Initialize() {
+func (opts *MetricsOptions) Initialize(base startup_base.BaseOptions) {
 	opts.once.Do(func() {
-		prefix := opts.Inputs.MetricsPrefix
-		if prefix == "" {
-			startup_base.Panicf("Metrics prefix must be set")
-			return
-		}
+		prefix := base.ServiceName
 
 		log.Debug("Initializing metrics with OTel", slog.String("prefix", prefix))
 
 		res, err := opts.createResource(prefix)
-		startup_base.PanicOnError(err, "Failed to create OTel resource")
+		startup_base.FatalOnError(err, "Failed to create OTel resource")
 
 		promExporter, err := prometheus.New()
-		startup_base.PanicOnError(err, "Failed to create Prometheus exporter")
+		startup_base.FatalOnError(err, "Failed to create Prometheus exporter")
 
 		opts.mp = sdkmetric.NewMeterProvider(
 			sdkmetric.WithResource(res),
@@ -87,7 +78,7 @@ func (opts *MetricsOptions) createResource(serviceName string) (*resource.Resour
 func (opts *MetricsOptions) captureRuntimeMetrics() {
 	log.Debug("Start capturing of golang runtime metrics")
 	err := runtime.Start(runtime.WithMinimumReadMemStatsInterval(5 * time.Second))
-	startup_base.PanicOnError(err, "Failed to start runtime metrics collection")
+	startup_base.FatalOnError(err, "Failed to start runtime metrics collection")
 }
 
 func (opts *MetricsOptions) Shutdown() error {

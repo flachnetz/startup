@@ -17,7 +17,6 @@ import (
 	"sync/atomic"
 
 	gls "github.com/flachnetz/startup/v2/lib/tls"
-	"github.com/flachnetz/startup/v2/startup_http"
 	sl "github.com/flachnetz/startup/v2/startup_logging"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -33,8 +32,10 @@ var (
 	reUUID   = regexp.MustCompile(`/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}`)
 )
 
+type Middleware func(http.Handler) http.Handler
+
 // Tracing returns a middleware that adds tracing to an http handler.
-func Tracing(service string, op string) startup_http.HttpMiddleware {
+func Tracing(service string, op string) Middleware {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			tracer := otel.Tracer(service)

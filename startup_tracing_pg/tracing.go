@@ -3,6 +3,7 @@ package startup_tracing_pg
 import (
 	"sync"
 
+	"github.com/flachnetz/startup/v2/startup_base"
 	pt "github.com/flachnetz/startup/v2/startup_postgres"
 	"github.com/flachnetz/startup/v2/startup_tracing"
 )
@@ -17,16 +18,16 @@ type PostgresTracingOptions struct {
 	once sync.Once
 }
 
-func (opts *PostgresTracingOptions) Initialize(tops *startup_tracing.TracingOptions) {
+func (opts *PostgresTracingOptions) Initialize(base startup_base.BaseOptions, tracingOpts *startup_tracing.TracingOptions) {
 	opts.once.Do(func() {
-		if tops.IsActive() {
+		if tracingOpts != nil && tracingOpts.IsActive() {
 			skipFunction := opts.Inputs.SkipFrameworkMethod
 			if skipFunction == nil {
 				skipFunction = func(name string) bool { return false }
 			}
 
 			pt.InstallTracer(&tracer{
-				ServiceName:         tops.Inputs.ServiceName + "-db",
+				ServiceName:         base.ServiceName + "-db",
 				SkipFrameworkMethod: skipFunction,
 			})
 		}

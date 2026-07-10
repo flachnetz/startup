@@ -43,7 +43,22 @@ func init() {
 	slog.SetDefault(slog.New(lazy))
 }
 
+type Inputs struct {
+	ServiceName string `validate:"required"`
+	TablePrefix string
+}
+
+func (i Inputs) TableName(suffix string) string {
+	if i.TablePrefix == "" {
+		return suffix
+	}
+
+	return i.TablePrefix + "_" + suffix
+}
+
 type BaseOptions struct {
+	Inputs
+
 	Logfile                string `long:"log-file" env:"LOG_FILE" description:"Write logs to a different file. Defaults to stdout."`
 	ForceColor             bool   `long:"log-color" env:"LOG_COLOR" description:"Forces colored output even on non TTYs."`
 	JSONFormatter          bool   `long:"log-json" env:"LOG_JSON" description:"Log using the logrus json formatter."`
