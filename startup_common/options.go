@@ -36,14 +36,20 @@ type Options struct {
 
 func (o *Options) PropagateInputs() {
 
-	// automatically apply migrations on startup
-	o.Postgres.Inputs.Initializer = pg.DefaultMigration(o.Base.TableName("schema"))
+	if o.Postgres.Inputs.Initializer == nil {
+		// automatically apply migrations on startup
+		o.Postgres.Inputs.Initializer = pg.DefaultMigration(o.Base.TableName("schema"))
+	}
 
-	// configure event sending
-	o.Events.Inputs.OutboxTable = o.Base.TableName("outbox")
+	if o.Events.Inputs.OutboxTable == "" {
+		// configure event sending
+		o.Events.Inputs.OutboxTable = o.Base.TableName("outbox")
+	}
 
-	o.Kafka.Inputs.DefaultConfig = kafka.ConfigMap{
-		"client.id": o.Base.ServiceName,
+	if o.Kafka.Inputs.DefaultConfig == nil {
+		o.Kafka.Inputs.DefaultConfig = kafka.ConfigMap{
+			"client.id": o.Base.ServiceName,
+		}
 	}
 }
 
