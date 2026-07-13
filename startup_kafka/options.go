@@ -247,10 +247,6 @@ func logClient(log *slog.Logger, client kafkaClient) {
 	for l := range client.Logs() {
 		var level = syslog.Priority(l.Level & 0x07)
 
-		if rePropertyType.MatchString(l.Message) {
-			level = syslog.LOG_DEBUG
-		}
-
 		var levelSlog slog.Level
 
 		switch {
@@ -265,6 +261,10 @@ func logClient(log *slog.Logger, client kafkaClient) {
 
 		default:
 			levelSlog = slog.LevelDebug
+		}
+
+		if rePropertyType.MatchString(l.Message) {
+			level = syslog.LOG_DEBUG
 		}
 
 		ctx := context.Background()
