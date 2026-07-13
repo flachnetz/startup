@@ -165,10 +165,6 @@ func fieldsIter(value reflect.Value) iter.Seq[reflect.Value] {
 				continue
 			}
 
-			if !yield(field) {
-				return
-			}
-
 			if sf.Anonymous {
 				// this is an embedded field, recurse
 				for sub := range fieldsIter(field) {
@@ -176,6 +172,10 @@ func fieldsIter(value reflect.Value) iter.Seq[reflect.Value] {
 						return
 					}
 				}
+			}
+
+			if !yield(field) {
+				return
 			}
 		}
 	}
@@ -185,6 +185,30 @@ func findInitializerMethod(v reflect.Value) reflect.Value {
 	m := v.MethodByName("Initialize")
 	if !m.IsValid() && v.CanAddr() {
 		m = v.Addr().MethodByName("Initialize")
+	}
+
+	if !m.IsValid() {
+		return m
+	}
+
+	// Check if this method is merely promoted from an embedded field.
+	// If so, skip it here — it will be found when we visit the embedded field directly.
+	// We compare function pointers: if the method on the struct is the same as on
+	// the embedded field, it's promoted. If the struct defines its own, it shadows
+	// the embedded one and should still be called.
+	if v.Kind() == reflect.Struct {
+		for sf, field := range v.Fields() {
+			if !sf.Anonymous {
+				continue
+			}
+			em := field.MethodByName("Initialize")
+			if !em.IsValid() && field.CanAddr() {
+				em = field.Addr().MethodByName("Initialize")
+			}
+			if em.IsValid() && m.Pointer() == em.Pointer() {
+				return reflect.Value{}
+			}
+		}
 	}
 
 	return m
