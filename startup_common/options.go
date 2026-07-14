@@ -1,8 +1,6 @@
 package startup_common
 
 import (
-	"context"
-
 	"github.com/flachnetz/startup/v2/lib/timejump"
 	sb "github.com/flachnetz/startup/v2/startup_base"
 	"github.com/flachnetz/startup/v2/startup_events"
@@ -11,6 +9,7 @@ import (
 	"github.com/flachnetz/startup/v2/startup_kafka"
 	"github.com/flachnetz/startup/v2/startup_kube"
 	metrics "github.com/flachnetz/startup/v2/startup_metrics"
+	"github.com/flachnetz/startup/v2/startup_outburst"
 	pg "github.com/flachnetz/startup/v2/startup_postgres"
 	tracing "github.com/flachnetz/startup/v2/startup_tracing"
 	tracing_pg "github.com/flachnetz/startup/v2/startup_tracing_pg"
@@ -28,6 +27,7 @@ type Options struct {
 	Unleash         startup_unleash.Unleash           `group:"Unleash feature flags"`
 	Kafka           startup_kafka.KafkaOptions        `group:"Kafka options"`
 	Events          startup_events.EventOptions       `group:"Event sending"`
+	Outburst        startup_outburst.Options          `group:"Outburst outbox pattern"`
 	Kubernetes      startup_kube.KubernetesOptions    `group:"Kubernetes options"`
 	History         startup_history.HistoryOptions    `group:"History options"`
 	Timejump        timejump.Options                  `group:"Timejump options"`
@@ -45,6 +45,6 @@ func (o *Options) PropagateInputs() {
 	}
 }
 
-func (o *Options) Initialize(ctx context.Context) {
+func (o *Options) Initialize() {
 	o.Events.EventSender()
 }
