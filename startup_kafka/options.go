@@ -38,15 +38,36 @@ type KafkaOptions struct {
 	KafkaSecurityProtocol string   `long:"kafka-security-protocol" env:"KAFKA_SECURITY_PROTOCOL" default:"ssl" description:"Security protocol" choice:"ssl" choice:"plaintext"`
 	KafkaProperties       []string `long:"kafka-property" env:"KAFKA_PROPERTY" description:"Rdkafka properties in key=value format"`
 
+	DefaultConsumerGroup string `long:"kafka-default-consumer-group" env:"KAFKA_DEFAULT_CONSUMER_GROUP" description:"Set default consumer group. Can be set to RANDOM."`
+
 	// schema registry is not really kafka, but it is only used with kafka,
 	// so I guess it is okay to put it here.
 	ConfluentURL string `long:"confluent-url" default:"http://confluent-registry.shared.svc.cluster.local" env:"EVENT_SENDER_CONFLUENT_URL" description:"Confluent schema registry url."`
+
+	clientId string
 }
 
 // Initialize creates the configured topics on startup. It is a no-op unless
 // Inputs.Topics was set, so applications that only consume or produce do not
 // need an admin connection.
-func (opts *KafkaOptions) Initialize(ctx context.Context) {
+func (opts *KafkaOptions) Initialize(ctx context.Context, base startup_base.BaseOptions) {
+	// Resolve the special RANDOM group into a unique group id once, so repeated
+	// calls keep using the same generated group.
+	if opts.DefaultConsumerGroup == "RANDOM" {
+		opts.DefaultConsumerGroup = fmt.Sprintf("golang-%d", time.Now().UnixNano())
+	}
+
+	// if no default was specified, we use the service name
+	if opts.DefaultConsumerGroup == "" {
+		opts.DefaultConsumerGroup = base.ServiceName
+	}
+
+	opts.clientId = base.ServiceName
+
+	opts.createTopics(ctx)
+}
+
+func (opts *KafkaOptions) createTopics(ctx context.Context) {
 	if opts.Inputs.Topics == nil {
 		return
 	}
@@ -63,17 +84,8 @@ func (opts *KafkaOptions) Initialize(ctx context.Context) {
 
 // NewConsumer creates a kafka consumer using DefaultConfig, with the given
 // overrides applied on top of the defaults.
-func (opts *KafkaOptions) NewConsumer(consumerGroup string, overrideConfig kafka.ConfigMap) *kafka.Consumer {
+func (opts *KafkaOptions) NewConsumer(overrideConfig kafka.ConfigMap) *kafka.Consumer {
 	configMap := opts.DefaultConfig(overrideConfig)
-
-	// Resolve the special RANDOM group into a unique group id once, so repeated
-	// calls keep using the same generated group.
-	if consumerGroup == "RANDOM" {
-		consumerGroup = fmt.Sprintf("golang-%d", time.Now().UnixNano())
-	}
-
-	// set consumer group
-	configMap["group.id"] = consumerGroup
 
 	consumer, err := kafka.NewConsumer(new(configMap))
 	startup_base.FatalOnError(err, "create kafka consumer failed")
@@ -101,6 +113,8 @@ func (opts *KafkaOptions) NewProducer(overrideConfig kafka.ConfigMap) *kafka.Pro
 // flags are applied last so they always win.
 func (opts *KafkaOptions) DefaultConfig(overrideConfig kafka.ConfigMap) kafka.ConfigMap {
 	config := kafka.ConfigMap{
+		"client.id": opts.clientId,
+
 		"bootstrap.servers": strings.Join(opts.KafkaAddresses, ","),
 		"auto.offset.reset": opts.KafkaOffsetReset,
 		"security.protocol": opts.KafkaSecurityProtocol,

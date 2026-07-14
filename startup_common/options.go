@@ -3,7 +3,6 @@ package startup_common
 import (
 	"context"
 
-	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/flachnetz/startup/v2/lib/timejump"
 	sb "github.com/flachnetz/startup/v2/startup_base"
 	"github.com/flachnetz/startup/v2/startup_events"
@@ -44,12 +43,6 @@ func (o *Options) PropagateInputs() {
 	if o.Events.Inputs.OutboxTable == "" {
 		// configure event sending
 		o.Events.Inputs.OutboxTable = o.Base.TableName("outbox")
-	}
-
-	if o.Kafka.Inputs.DefaultConfig == nil {
-		o.Kafka.Inputs.DefaultConfig = kafka.ConfigMap{
-			"client.id": o.Base.ServiceName,
-		}
 	}
 }
 
