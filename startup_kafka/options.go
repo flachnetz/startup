@@ -262,7 +262,7 @@ var rePropertyType = regexp.MustCompile(`is a \S+ property and will be ignored b
 
 func logClient(log *slog.Logger, client kafkaClient) {
 	for l := range client.Logs() {
-		var level = syslog.Priority(l.Level & 0x07)
+		level := syslog.Priority(l.Level & 0x07)
 
 		var levelSlog slog.Level
 

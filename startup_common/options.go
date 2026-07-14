@@ -34,7 +34,6 @@ type Options struct {
 }
 
 func (o *Options) PropagateInputs() {
-
 	if o.Postgres.Inputs.Initializer == nil {
 		// automatically apply migrations on startup
 		o.Postgres.Inputs.Initializer = pg.DefaultMigration(o.Base.TableName("schema"))
