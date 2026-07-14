@@ -54,7 +54,7 @@ func (opts *KafkaOptions) Initialize(ctx context.Context, base startup_base.Base
 	// Resolve the special RANDOM group into a unique group id once, so repeated
 	// calls keep using the same generated group.
 	if opts.DefaultConsumerGroup == "RANDOM" {
-		opts.DefaultConsumerGroup = fmt.Sprintf("golang-%d", time.Now().UnixNano())
+		opts.DefaultConsumerGroup = fmt.Sprintf("%s-%d", base.ServiceName, time.Now().UnixNano())
 	}
 
 	// if no default was specified, we use the service name
@@ -86,6 +86,9 @@ func (opts *KafkaOptions) createTopics(ctx context.Context) {
 // overrides applied on top of the defaults.
 func (opts *KafkaOptions) NewConsumer(overrideConfig kafka.ConfigMap) *kafka.Consumer {
 	configMap := opts.DefaultConfig(overrideConfig)
+	if groupId, ok := configMap["group.id"]; !ok || groupId == "" {
+		configMap["group.id"] = opts.DefaultConsumerGroup
+	}
 
 	consumer, err := kafka.NewConsumer(new(configMap))
 	startup_base.FatalOnError(err, "create kafka consumer failed")
