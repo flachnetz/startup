@@ -47,7 +47,5 @@ func (o *Options) PropagateInputs() {
 }
 
 func (o *Options) Initialize(ctx context.Context) {
-	// initialize event sender & create topics
-	eventSender := o.Events.EventSender()
-	defer sb.Close(eventSender, "Stop event sender")
+	o.Events.EventSender()
 }
