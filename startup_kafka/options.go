@@ -86,6 +86,9 @@ func (opts *KafkaOptions) createTopics(ctx context.Context) {
 // overrides applied on top of the defaults.
 func (opts *KafkaOptions) NewConsumer(overrideConfig kafka.ConfigMap) *kafka.Consumer {
 	configMap := opts.DefaultConfig(overrideConfig)
+	for _, k := range producerOnlyKeys {
+		delete(configMap, k)
+	}
 	if groupId, ok := configMap["group.id"]; !ok || groupId == "" {
 		configMap["group.id"] = opts.DefaultConsumerGroup
 	}
@@ -102,6 +105,9 @@ func (opts *KafkaOptions) NewConsumer(overrideConfig kafka.ConfigMap) *kafka.Con
 // overrides applied on top of the defaults.
 func (opts *KafkaOptions) NewProducer(overrideConfig kafka.ConfigMap) *kafka.Producer {
 	configMap := opts.DefaultConfig(overrideConfig)
+	for _, k := range consumerOnlyKeys {
+		delete(configMap, k)
+	}
 
 	producer, err := kafka.NewProducer(new(configMap))
 	startup_base.FatalOnError(err, "create kafka producer failed")
@@ -109,6 +115,27 @@ func (opts *KafkaOptions) NewProducer(overrideConfig kafka.ConfigMap) *kafka.Pro
 	go logClient(slog.With(slog.String("kafka", "producer")), producer)
 
 	return producer
+}
+
+// producerOnlyKeys are rdkafka properties that only apply to producers.
+// They live in the shared DefaultConfig, so strip them when building a
+// consumer to avoid CONFWARN log noise.
+var producerOnlyKeys = []string{
+	"compression.codec",
+	"compression.level",
+	"queue.buffering.max.ms",
+	"queue.buffering.max.messages",
+	"queue.buffering.max.kbytes",
+	"partitioner",
+}
+
+// consumerOnlyKeys are rdkafka properties that only apply to consumers.
+var consumerOnlyKeys = []string{
+	"auto.offset.reset",
+	"queued.max.messages.kbytes",
+	"enable.auto.commit",
+	"enable.auto.offset.store",
+	"group.id",
 }
 
 // DefaultConfig builds the rdkafka config map from the parsed options. The
@@ -281,7 +308,7 @@ func logClient(log *slog.Logger, client kafkaClient) {
 		}
 
 		if rePropertyType.MatchString(l.Message) {
-			level = syslog.LOG_DEBUG
+			levelSlog = slog.LevelDebug
 		}
 
 		ctx := context.Background()
