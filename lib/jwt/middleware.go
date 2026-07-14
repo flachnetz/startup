@@ -20,17 +20,28 @@ var ErrUnauthorized = echo.NewHTTPError(http.StatusUnauthorized, "unauthorized")
 // ErrNoToken unwraps to ErrUnauthorized
 var ErrNoToken = ErrUnauthorized.Wrap(errors.New("no token"))
 
+type ExtractToken func(r *echo.Context) string
+
 type MiddlewareOptions[Claims any] struct {
 	TokenVerifier Verifier
+
+	// ExtractToken extracts the raw token from the request.
+	// If not defined, it will fall back to ExtractTokenFromAuthorizationHeader
+	ExtractToken ExtractToken
+
 	UpdateContext func(c *echo.Context, token jwt.Token, claims Claims) error
 }
 
 func Middleware[Claims any](opts MiddlewareOptions[Claims]) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
-			rawToken := reAuthBearer.ReplaceAllLiteralString(
-				c.Request().Header.Get("authorization"), "",
-			)
+			var rawToken string
+
+			if extract := opts.ExtractToken; extract != nil {
+				rawToken = extract(c)
+			} else {
+				rawToken = ExtractTokenFromAuthorizationHeader(c)
+			}
 
 			if rawToken == "" {
 				return ErrNoToken
@@ -60,5 +71,22 @@ func Middleware[Claims any](opts MiddlewareOptions[Claims]) echo.MiddlewareFunc 
 
 			return next(c)
 		}
+	}
+}
+
+func ExtractTokenFromAuthorizationHeader(c *echo.Context) string {
+	return reAuthBearer.ReplaceAllLiteralString(
+		c.Request().Header.Get("authorization"), "",
+	)
+}
+
+func ExtractTokenFromCookie(name string) ExtractToken {
+	return func(r *echo.Context) string {
+		cookie, _ := r.Cookie(name)
+		if cookie == nil {
+			return ""
+		}
+
+		return cookie.Value
 	}
 }
