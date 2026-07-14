@@ -26,6 +26,11 @@ func MustParseCommandLine(ctx context.Context, opts any) {
 func MustParseCommandLineWithOptions(ctx context.Context, opts any, options flags.Options) {
 	if err := ParseCommandLineWithOptions(ctx, opts, options); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
+		if flagError, ok := errors.AsType[*flags.Error](err); ok && errors.Is(flagError.Type, flags.ErrUnknownFlag) {
+			p := flags.NewParser(opts, options)
+			p.NamespaceDelimiter = "-"
+			p.WriteHelp(os.Stderr)
+		}
 		os.Exit(1)
 	}
 }
