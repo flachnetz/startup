@@ -194,8 +194,11 @@ func (ev *eventSender) doSendAsync(event Event) {
 	if ev.FileSender == nil && ev.KafkaSender == nil {
 		// serialize event just to check for the error
 		err := event.Serialize(io.Discard)
-		eventType := avro.EventTypeOf(event)
-		slog.WarnContext(ctx, "Failed to send async event to kafka", slog.String("type", eventType), sl.Error(err))
+
+		if err != nil {
+			eventType := avro.EventTypeOf(event)
+			slog.WarnContext(ctx, "Failed to send async event to kafka", slog.String("type", eventType), sl.Error(err))
+		}
 	}
 }
 
