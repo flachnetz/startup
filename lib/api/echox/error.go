@@ -21,15 +21,11 @@ func ErrorHandler(mapper ErrorMapper) echo.HTTPErrorHandler {
 		ctx := c.Request().Context()
 
 		if isCommitted(c) {
-			// the response is already written,
-			// we can not really handle the error here.
-			slog.ErrorContext(
-				ctx, "An error occurred, response already written",
-				slog.String("method", c.Request().Method),
-				slog.String("path", c.Request().URL.Path),
-				sl.Error(err),
-			)
-
+			// The response is already written and the error already
+			// handled+logged. This happens by design when the request
+			// logger middleware runs us via HandleError=true and then
+			// returns the same error, which echo core forwards to us a
+			// second time. The framework contract is to return silently.
 			return
 		}
 
