@@ -39,7 +39,7 @@
         <div>
             <p class="step">{{ .Step }}</p>
             <p>{{ .Description }}</p>
-            <p class="meta">{{ formatTime .Timestamp }} · TraceId: {{ .RequestTraceId }} · EventSender: {{ .EventSender }}{{ if .EventSenderVersion }} ({{ .EventSenderVersion }}){{ end }}</p>
+            <p class="meta">{{ formatTime .Timestamp }} · TraceId: {{ .RequestTraceId }} · EventSender: {{ .EventSender }}{{ if .EventSenderVersion }} ({{ .EventSenderVersion }}){{ end }}{{ if .Trigger.Display }} · Source: {{ .Trigger.Display }}{{ end }}</p>
             <details>
                 <summary>payload</summary>
                 <pre><code class="language-json">{{ .JSON }}</code></pre>
