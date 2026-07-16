@@ -37,6 +37,7 @@ type Record struct {
 	Step           string          `db:"step"`
 	Description    string          `db:"description"`
 	Payload        json.RawMessage `db:"payload"`
+	Trigger        Trigger         `db:"trigger"`
 
 	// Optional field that might indicate the sender of an event. This is useful if the
 	// event comes from an external source, e.g. athena.
@@ -153,6 +154,7 @@ func (h *Service) Track(ctx context.Context, groupId GroupId, item Item) {
 		GroupId:        groupId,
 		Timestamp:      clock.GlobalClock.Now(),
 		RequestTraceId: requestTraceIdOf(ctx),
+		Trigger:        triggerOf(ctx),
 		Step:           reflect.Indirect(reflect.ValueOf(item)).Type().Name(),
 		Description:    item.HistoryString(),
 		Payload:        encoded,
@@ -204,7 +206,7 @@ func (h *Service) Records(ctx ql.TxContext, groupId GroupId) ([]Record, error) {
 	}
 
 	query := fmt.Sprintf(
-		"SELECT timestamp, COALESCE(request_trace_id, '00') as request_trace_id, step, description, payload FROM %s WHERE group_id=$1",
+		"SELECT timestamp, COALESCE(request_trace_id, '00') as request_trace_id, step, description, payload, \"trigger\" FROM %s WHERE group_id=$1",
 		h.table.Sanitize(),
 	)
 
@@ -279,7 +281,7 @@ func (h *Service) trackAsyncEvent(ctx context.Context, rec RecordToSend) {
 
 func (h *Service) trackInTx(ctx ql.TxContext, rec RecordToSend) error {
 	stmt := fmt.Sprintf(
-		`INSERT INTO %s ("timestamp", group_id, request_trace_id, step, description, payload) VALUES ($1, $2, $3, $4, $5, $6)`,
+		`INSERT INTO %s ("timestamp", group_id, request_trace_id, step, description, payload, "trigger") VALUES ($1, $2, $3, $4, $5, $6, $7)`,
 		h.table.Sanitize(),
 	)
 
@@ -288,7 +290,7 @@ func (h *Service) trackInTx(ctx ql.TxContext, rec RecordToSend) error {
 	// store in local table
 	err := ql.Exec(ctx, stmt, rec.Timestamp,
 		rec.GroupId.String(), rec.RequestTraceId, rec.Step, rec.Description,
-		[]byte(rec.Payload))
+		[]byte(rec.Payload), rec.Trigger)
 
 	result = errors.Join(result, err)
 
@@ -323,6 +325,7 @@ type RecordToSend struct {
 	Description    string
 	Payload        json.RawMessage
 	RequestTraceId RequestTraceId
+	Trigger        Trigger
 }
 
 // CreateTable creates the history table with the given name together with the indexes
@@ -335,12 +338,19 @@ func CreateTable(ctx ql.TxContext, name string) error {
 		    step             TEXT      NOT NULL,
 		    description      TEXT      NOT NULL,
 		    request_trace_id TEXT      NULL,
-		    payload          JSON      NOT NULL
+		    payload          JSON      NOT NULL,
+		    "trigger"        TEXT      NULL
 		)
 	`, name)
 
 	if err := ql.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("create table: %w", err)
+	}
+
+	// self-migrate tables created before the trigger column existed.
+	sql = fmt.Sprintf(`ALTER TABLE %s ADD COLUMN IF NOT EXISTS "trigger" TEXT NULL`, name)
+	if err := ql.Exec(ctx, sql); err != nil {
+		return fmt.Errorf("add trigger column: %w", err)
 	}
 
 	sql = fmt.Sprintf(`CREATE INDEX IF NOT EXISTS %s_group_id_idx ON %s (group_id)`, name, name)

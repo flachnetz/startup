@@ -183,9 +183,10 @@ func (q AthenaQuery) Records(ctx context.Context) ([]Record, error) {
 		var timestamp time.Time
 		var historyId, step, description, payload, eventSender, eventSenderVersion string
 		var requestTraceId RequestTraceId
+		var trSource, trDetail, trRefType, trRef string
 
 		// scan values into variables
-		if err := rows.Scan(&timestamp, &historyId, &requestTraceId, &step, &description, &payload, &eventSender, &eventSenderVersion); err != nil {
+		if err := rows.Scan(&timestamp, &historyId, &requestTraceId, &step, &description, &payload, &eventSender, &eventSenderVersion, &trSource, &trDetail, &trRefType, &trRef); err != nil {
 			return nil, fmt.Errorf("scan row: %w", err)
 		}
 
@@ -195,6 +196,7 @@ func (q AthenaQuery) Records(ctx context.Context) ([]Record, error) {
 			Step:               step,
 			Description:        description,
 			Payload:            json.RawMessage(payload),
+			Trigger:            Trigger{Source: trSource, Detail: trDetail, RefType: trRefType, Ref: trRef},
 			EventSender:        eventSender,
 			EventSenderVersion: eventSenderVersion,
 		})
@@ -205,7 +207,8 @@ func (q AthenaQuery) Records(ctx context.Context) ([]Record, error) {
 
 func queryOf(table string, historyId string, minTimestamp, maxTimestamp *time.Time) string {
 	query := fmt.Sprintf(`
-		SELECT timestamp, historyId, COALESCE(requesttraceid, '00'), step, description, payload, eventsender, eventsenderversion
+		SELECT timestamp, historyId, COALESCE(requesttraceid, '00'), step, description, payload, eventsender, eventsenderversion,
+		       COALESCE("trigger".source, ''), COALESCE("trigger".detail, ''), COALESCE("trigger".reftype, ''), COALESCE("trigger".ref, '')
 		FROM %s
 		WHERE groupid='%s'
 	`, table, escapeAthenaLiteral(historyId))
