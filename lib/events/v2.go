@@ -47,6 +47,9 @@ type eventSender struct {
 
 	// wait group to wait for pending background tasks on close
 	wg sync.WaitGroup
+
+	// guards Close so it is idempotent (close(chan) panics if called twice)
+	closeOnce sync.Once
 }
 
 func NewInitializer(
@@ -131,8 +134,10 @@ func (ev *eventSender) SendInTx(ctx context.Context, tx sqlx.ExecerContext, even
 }
 
 func (ev *eventSender) Close() error {
-	close(ev.AsyncBufferCh)
-	ev.wg.Wait()
+	ev.closeOnce.Do(func() {
+		close(ev.AsyncBufferCh)
+		ev.wg.Wait()
+	})
 	return nil
 }
 
