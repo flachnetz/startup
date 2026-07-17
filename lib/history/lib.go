@@ -13,6 +13,7 @@ import (
 	"github.com/flachnetz/startup/v2/lib/clock"
 	"github.com/flachnetz/startup/v2/lib/events"
 	"github.com/flachnetz/startup/v2/lib/ql"
+	"github.com/flachnetz/startup/v2/startup_base"
 	sl "github.com/flachnetz/startup/v2/startup_logging"
 	"github.com/jackc/pgx/v5"
 )
@@ -27,6 +28,16 @@ func (g GroupId) LogValue() slog.Value {
 }
 
 func (g GroupId) String() string {
+	return string(g)
+}
+
+// GroupType is the logical type of a tracked object (e.g. "order", "player").
+// It disambiguates a GroupId so different object types can reuse the same id
+// space without colliding. The stored group_type is qualified with the service
+// name (see Service.qualifiedType).
+type GroupType string
+
+func (g GroupType) String() string {
 	return string(g)
 }
 
@@ -82,8 +93,18 @@ type Service struct {
 	eventSending *EventSending
 	athena       *AthenaConfig
 
+	// serviceName qualifies the stored group_type so types never collide across
+	// services sharing a history table. Resolved in New.
+	serviceName string
+
 	// record to send out async
 	queue chan RecordToSend
+}
+
+// qualifiedType returns the value stored in the group_type column:
+// serviceName + ":" + groupType.
+func (h *Service) qualifiedType(groupType GroupType) string {
+	return h.serviceName + ":" + string(groupType)
 }
 
 // Option customizes a Service created with New.
@@ -132,6 +153,15 @@ func New(txStarter ql.TxStarter, table pgx.Identifier, eventSending *EventSendin
 		table:        table,
 		eventSending: eventSending,
 	}
+
+	// resolve the service name used to qualify group_type: prefer the explicit
+	// EventSending.ServiceId, fall back to the global base options.
+	if eventSending != nil && eventSending.ServiceId != "" {
+		s.serviceName = eventSending.ServiceId
+	} else {
+		s.serviceName = startup_base.ServiceName()
+	}
+
 	for _, opt := range opts {
 		opt(s)
 	}
@@ -145,12 +175,13 @@ func New(txStarter ql.TxStarter, table pgx.Identifier, eventSending *EventSendin
 // If the context carries a transaction, the record is written within it. Otherwise a new
 // transaction is opened, unless async sending was enabled via Service.SendAsync, in which case
 // the record is queued without blocking.
-func (h *Service) Track(ctx context.Context, groupId GroupId, item Item) {
+func (h *Service) Track(ctx context.Context, groupType GroupType, groupId GroupId, item Item) {
 	ctx = context.WithoutCancel(ctx)
 
 	encoded, _ := json.Marshal(item)
 
 	rec := RecordToSend{
+		GroupType:      h.qualifiedType(groupType),
 		GroupId:        groupId,
 		Timestamp:      clock.GlobalClock.Now(),
 		RequestTraceId: requestTraceIdOf(ctx),
@@ -197,20 +228,20 @@ func (h *Service) Track(ctx context.Context, groupId GroupId, item Item) {
 	}
 }
 
-// Records returns all local events for the given groupId.
+// Records returns all local events for the given groupType and groupId.
 // This method does not guarantee any ordering between the records returned.
-func (h *Service) Records(ctx ql.TxContext, groupId GroupId) ([]Record, error) {
+func (h *Service) Records(ctx ql.TxContext, groupType GroupType, groupId GroupId) ([]Record, error) {
 	if h.table == nil {
 		// no table is configured, tracing is probably done only via events.
 		return nil, ErrNoTable
 	}
 
 	query := fmt.Sprintf(
-		"SELECT timestamp, COALESCE(request_trace_id, '00') as request_trace_id, step, description, payload, \"trigger\" FROM %s WHERE group_id=$1",
+		"SELECT timestamp, COALESCE(request_trace_id, '00') as request_trace_id, step, description, payload, \"trigger\" FROM %s WHERE group_type=$1 AND group_id=$2",
 		h.table.Sanitize(),
 	)
 
-	records, err := ql.Select[Record](ctx, query, groupId)
+	records, err := ql.Select[Record](ctx, query, h.qualifiedType(groupType), groupId)
 	if err != nil {
 		return nil, fmt.Errorf("query records: %w", err)
 	}
@@ -281,7 +312,7 @@ func (h *Service) trackAsyncEvent(ctx context.Context, rec RecordToSend) {
 
 func (h *Service) trackInTx(ctx ql.TxContext, rec RecordToSend) error {
 	stmt := fmt.Sprintf(
-		`INSERT INTO %s ("timestamp", group_id, request_trace_id, step, description, payload, "trigger") VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		`INSERT INTO %s ("timestamp", group_type, group_id, request_trace_id, step, description, payload, "trigger") VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
 		h.table.Sanitize(),
 	)
 
@@ -289,7 +320,7 @@ func (h *Service) trackInTx(ctx ql.TxContext, rec RecordToSend) error {
 
 	// store in local table
 	err := ql.Exec(ctx, stmt, rec.Timestamp,
-		rec.GroupId.String(), rec.RequestTraceId, rec.Step, rec.Description,
+		rec.GroupType, rec.GroupId.String(), rec.RequestTraceId, rec.Step, rec.Description,
 		[]byte(rec.Payload), rec.Trigger)
 
 	result = errors.Join(result, err)
@@ -319,6 +350,9 @@ type EventCreator func(serviceId, serviceVersion string, rec RecordToSend) event
 // RecordToSend is a single tracked record, ready to be written to the history table
 // and/or converted into an event.
 type RecordToSend struct {
+	// GroupType is the qualified group type stored in the group_type column
+	// (serviceName + ":" + userType).
+	GroupType      string
 	GroupId        GroupId
 	Timestamp      time.Time
 	Step           string
@@ -329,11 +363,14 @@ type RecordToSend struct {
 }
 
 // CreateTable creates the history table with the given name together with the indexes
-// used by Records and Cleanup, unless they already exist.
-func CreateTable(ctx ql.TxContext, name string) error {
+// used by Records and Cleanup, unless they already exist. serviceName is used to
+// backfill the group_type of rows that predate the column (legacy rows are tagged
+// "serviceName:").
+func CreateTable(ctx ql.TxContext, name string, serviceName string) error {
 	sql := fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
 		    timestamp        TIMESTAMP NOT NULL,
+		    group_type       TEXT      NOT NULL,
 		    group_id         TEXT      NOT NULL,
 		    step             TEXT      NOT NULL,
 		    description      TEXT      NOT NULL,
@@ -351,6 +388,30 @@ func CreateTable(ctx ql.TxContext, name string) error {
 	sql = fmt.Sprintf(`ALTER TABLE %s ADD COLUMN IF NOT EXISTS "trigger" TEXT NULL`, name)
 	if err := ql.Exec(ctx, sql); err != nil {
 		return fmt.Errorf("add trigger column: %w", err)
+	}
+
+	// self-migrate tables created before the group_type column existed: add it
+	// nullable, backfill legacy rows with "serviceName:" (unknown type for this
+	// service), then enforce NOT NULL. No permanent default so future inserts must
+	// supply the value.
+	sql = fmt.Sprintf(`ALTER TABLE %s ADD COLUMN IF NOT EXISTS group_type TEXT`, name)
+	if err := ql.Exec(ctx, sql); err != nil {
+		return fmt.Errorf("add group_type column: %w", err)
+	}
+
+	sql = fmt.Sprintf(`UPDATE %s SET group_type = $1 WHERE group_type IS NULL`, name)
+	if err := ql.Exec(ctx, sql, serviceName+":"); err != nil {
+		return fmt.Errorf("backfill group_type: %w", err)
+	}
+
+	sql = fmt.Sprintf(`ALTER TABLE %s ALTER COLUMN group_type SET NOT NULL`, name)
+	if err := ql.Exec(ctx, sql); err != nil {
+		return fmt.Errorf("set group_type not null: %w", err)
+	}
+
+	sql = fmt.Sprintf(`CREATE INDEX IF NOT EXISTS %s_group_type_idx ON %s (group_type)`, name, name)
+	if err := ql.Exec(ctx, sql); err != nil {
+		return fmt.Errorf("create group_type index: %w", err)
 	}
 
 	sql = fmt.Sprintf(`CREATE INDEX IF NOT EXISTS %s_group_id_idx ON %s (group_id)`, name, name)

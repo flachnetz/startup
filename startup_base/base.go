@@ -134,6 +134,11 @@ func IsVerboseLoggingEnabled() bool {
 	return baseOptions.Load().Verbose
 }
 
+// ServiceName returns the service name from the globally stored BaseOptions.
+func ServiceName() string {
+	return baseOptions.Load().ServiceName
+}
+
 func GetEnvironment() string {
 	return baseOptions.Load().Environment
 }

@@ -64,6 +64,7 @@ type RecordView struct {
 // PageModel is the template model for the generic history page.
 type PageModel struct {
 	Title        string
+	GroupType    string
 	GroupId      string
 	ErrorMessage string
 	Summary      []SummaryItem
@@ -84,31 +85,31 @@ type SummaryItem struct {
 //
 // ponytail: payload is rendered as pretty JSON only; add a key/value table when
 // an item needs structured display.
-func (h *Service) RenderPage(ctx context.Context, w io.Writer, groupId GroupId, title string) error {
-	return h.RenderPageSummary(ctx, w, groupId, title, nil)
+func (h *Service) RenderPage(ctx context.Context, w io.Writer, groupType GroupType, groupId GroupId, title string) error {
+	return h.RenderPageSummary(ctx, w, groupType, groupId, title, nil)
 }
 
 // RenderPageAt is RenderPage with an Athena fallback: records are loaded via
 // RecordsAt using createdTime to decide between the local table and Athena.
-func (h *Service) RenderPageAt(ctx context.Context, w io.Writer, groupId GroupId, title string, createdTime time.Time) error {
-	return h.renderPage(ctx, w, groupId, title, nil, createdTime)
+func (h *Service) RenderPageAt(ctx context.Context, w io.Writer, groupType GroupType, groupId GroupId, title string, createdTime time.Time) error {
+	return h.renderPage(ctx, w, groupType, groupId, title, nil, createdTime)
 }
 
 // RenderPageSummary is RenderPage with an extra current-state summary rendered
 // above the ledger.
-func (h *Service) RenderPageSummary(ctx context.Context, w io.Writer, groupId GroupId, title string, summary []SummaryItem) error {
+func (h *Service) RenderPageSummary(ctx context.Context, w io.Writer, groupType GroupType, groupId GroupId, title string, summary []SummaryItem) error {
 	// zero time: RecordsAt always reads the local table.
-	return h.renderPage(ctx, w, groupId, title, summary, time.Time{})
+	return h.renderPage(ctx, w, groupType, groupId, title, summary, time.Time{})
 }
 
 // RenderPageSummaryAt is RenderPageSummary with the Athena fallback (see RenderPageAt).
-func (h *Service) RenderPageSummaryAt(ctx context.Context, w io.Writer, groupId GroupId, title string, summary []SummaryItem, createdTime time.Time) error {
-	return h.renderPage(ctx, w, groupId, title, summary, createdTime)
+func (h *Service) RenderPageSummaryAt(ctx context.Context, w io.Writer, groupType GroupType, groupId GroupId, title string, summary []SummaryItem, createdTime time.Time) error {
+	return h.renderPage(ctx, w, groupType, groupId, title, summary, createdTime)
 }
 
-func (h *Service) renderPage(ctx context.Context, w io.Writer, groupId GroupId, title string, summary []SummaryItem, createdTime time.Time) error {
+func (h *Service) renderPage(ctx context.Context, w io.Writer, groupType GroupType, groupId GroupId, title string, summary []SummaryItem, createdTime time.Time) error {
 	records, err := ql.InNewTransactionWithResult(ctx, h.txStarter, func(ctx ql.TxContext) ([]Record, error) {
-		return h.RecordsAt(ctx, groupId, createdTime)
+		return h.RecordsAt(ctx, groupType, groupId, createdTime)
 	})
 	if err != nil {
 		return fmt.Errorf("load records: %w", err)
@@ -135,9 +136,10 @@ func (h *Service) renderPage(ctx context.Context, w io.Writer, groupId GroupId, 
 	}
 
 	return pageTemplate.Execute(w, PageModel{
-		Title:   title,
-		GroupId: groupId.String(),
-		Summary: summary,
-		Records: views,
+		Title:     title,
+		GroupType: groupType.String(),
+		GroupId:   groupId.String(),
+		Summary:   summary,
+		Records:   views,
 	})
 }
