@@ -89,7 +89,7 @@ func TestTrackCreatesAndSendsEvent(t *testing.T) {
 
 	require.Equal(t, "test-service", event.serviceId)
 	require.Equal(t, "1.2.3", event.serviceVersion)
-	require.Equal(t, []GroupId{{"order", "group-1"}}, event.rec.GroupIds)
+	require.Equal(t, GroupIds{{"order", "group-1"}}, event.rec.GroupIds)
 	require.Equal(t, "item", event.rec.Step)
 	require.Equal(t, "trace string", event.rec.Description)
 	require.JSONEq(t, `{"value":"hello"}`, string(event.rec.Payload))
@@ -127,7 +127,7 @@ func TestTrackSendsEventAsyncOnCommit(t *testing.T) {
 
 	// and the event is sent out on commit.
 	event := testx.MockEventsGetSingle[dummyEvent](t, captured)
-	require.Equal(t, []GroupId{{"order", "group-1"}}, event.rec.GroupIds)
+	require.Equal(t, GroupIds{{"order", "group-1"}}, event.rec.GroupIds)
 	require.Equal(t, "test-service", event.serviceId)
 }
 
@@ -150,7 +150,7 @@ func TestTrackWithoutTableOnlySendsEvent(t *testing.T) {
 	})
 
 	event := testx.MockEventsGetSingle[dummyEvent](t, captured)
-	require.Equal(t, []GroupId{{"order", "group-1"}}, event.rec.GroupIds)
+	require.Equal(t, GroupIds{{"order", "group-1"}}, event.rec.GroupIds)
 
 	// without a table there is nothing to read back.
 	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
@@ -192,7 +192,7 @@ func TestTrackAsyncFlushesQueuedRecords(t *testing.T) {
 	require.Eventually(t, hasEvent, 3*time.Second, 50*time.Millisecond)
 
 	event := testx.MockEventsGetSingle[dummyEvent](t, captured)
-	require.Equal(t, []GroupId{{"order", "group-1"}}, event.rec.GroupIds)
+	require.Equal(t, GroupIds{{"order", "group-1"}}, event.rec.GroupIds)
 
 	// the flushed record is also persisted to the history table.
 	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
@@ -267,7 +267,7 @@ func TestTrackMultipleGroupIds(t *testing.T) {
 	})
 
 	// the record is found when searching by either group id
-	for _, gid := range []GroupId{order, player} {
+	for _, gid := range (GroupIds{order, player}) {
 		t.Run("lookup by "+gid.String(), func(t *testing.T) {
 			testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
 				records, err := service.Records(ctx, gid)
