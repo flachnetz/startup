@@ -345,13 +345,37 @@ type EventCreator func(serviceId, serviceVersion string, rec RecordToSend) event
 // RecordToSend is a single tracked record, ready to be written to the history table
 // and/or converted into an event.
 type RecordToSend struct {
-	GroupIds       []GroupId
+	GroupIds       GroupIds
 	Timestamp      time.Time
 	Step           string
 	Description    string
 	Payload        json.RawMessage
 	RequestTraceId RequestTraceId
 	Trigger        Trigger
+}
+
+type GroupIds []GroupId
+
+// FirstOf returns the first group id that has a specific Type,
+// or an empty GroupId, if no id was found
+func (ids GroupIds) FirstOf(ty string) GroupId {
+	for _, id := range ids {
+		if id.Type == ty {
+			return id
+		}
+	}
+
+	return GroupId{}
+}
+
+// Strings returns all GroupId values mapped to strings
+func (ids GroupIds) Strings() []string {
+	var strings []string
+	for _, groupId := range ids {
+		strings = append(strings, groupId.String())
+	}
+
+	return strings
 }
 
 // CreateTable creates the history table with the given name together with the indexes
