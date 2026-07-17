@@ -39,17 +39,17 @@ func TestTrackWritesToHistoryTable(t *testing.T) {
 	db := testx.NewConnection(t, "history_migrations")
 
 	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
-		return CreateTable(ctx, "history", "test-service")
+		return CreateTable(ctx, "history")
 	})
 
 	service := New(db, pgx.Identifier{"history"}, nil)
 
 	testx.MustTransact(t, db, func(ctx ql.TxContext) {
-		service.Track(ctx, GroupType("order"), GroupId("group-1"), item{Value: "hello"})
+		service.Track(ctx, item{Value: "hello"}, GroupId{"order", "group-1"})
 	})
 
 	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
-		records, err := service.Records(ctx, GroupType("order"), GroupId("group-1"))
+		records, err := service.Records(ctx, GroupId{"order", "group-1"})
 		require.NoError(t, err)
 		require.Len(t, records, 1)
 
@@ -66,7 +66,7 @@ func TestTrackCreatesAndSendsEvent(t *testing.T) {
 	db := testx.NewConnection(t, "history_migrations")
 
 	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
-		return CreateTable(ctx, "history", "test-service")
+		return CreateTable(ctx, "history")
 	})
 
 	captured := testx.CaptureEvents(t)
@@ -80,7 +80,7 @@ func TestTrackCreatesAndSendsEvent(t *testing.T) {
 	})
 
 	testx.MustTransact(t, db, func(ctx ql.TxContext) {
-		service.Track(ctx, GroupType("order"), GroupId("group-1"), item{Value: "hello"})
+		service.Track(ctx, item{Value: "hello"}, GroupId{"order", "group-1"})
 	})
 
 	// the EventCreator should have been used to build exactly one event, and it
@@ -89,7 +89,7 @@ func TestTrackCreatesAndSendsEvent(t *testing.T) {
 
 	require.Equal(t, "test-service", event.serviceId)
 	require.Equal(t, "1.2.3", event.serviceVersion)
-	require.Equal(t, GroupId("group-1"), event.rec.GroupId)
+	require.Equal(t, []GroupId{{"order", "group-1"}}, event.rec.GroupIds)
 	require.Equal(t, "item", event.rec.Step)
 	require.Equal(t, "trace string", event.rec.Description)
 	require.JSONEq(t, `{"value":"hello"}`, string(event.rec.Payload))
@@ -99,7 +99,7 @@ func TestTrackSendsEventAsyncOnCommit(t *testing.T) {
 	db := testx.NewConnection(t, "history_migrations")
 
 	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
-		return CreateTable(ctx, "history", "test-service")
+		return CreateTable(ctx, "history")
 	})
 
 	captured := testx.CaptureEvents(t)
@@ -114,12 +114,12 @@ func TestTrackSendsEventAsyncOnCommit(t *testing.T) {
 	})
 
 	testx.MustTransact(t, db, func(ctx ql.TxContext) {
-		service.Track(ctx, GroupType("order"), GroupId("group-1"), item{Value: "hello"})
+		service.Track(ctx, item{Value: "hello"}, GroupId{"order", "group-1"})
 	})
 
 	// the history row is written as part of the transaction.
 	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
-		records, err := service.Records(ctx, GroupType("order"), GroupId("group-1"))
+		records, err := service.Records(ctx, GroupId{"order", "group-1"})
 		require.NoError(t, err)
 		require.Len(t, records, 1)
 		return nil
@@ -127,7 +127,7 @@ func TestTrackSendsEventAsyncOnCommit(t *testing.T) {
 
 	// and the event is sent out on commit.
 	event := testx.MockEventsGetSingle[dummyEvent](t, captured)
-	require.Equal(t, GroupId("group-1"), event.rec.GroupId)
+	require.Equal(t, []GroupId{{"order", "group-1"}}, event.rec.GroupIds)
 	require.Equal(t, "test-service", event.serviceId)
 }
 
@@ -146,15 +146,15 @@ func TestTrackWithoutTableOnlySendsEvent(t *testing.T) {
 	})
 
 	testx.MustTransact(t, db, func(ctx ql.TxContext) {
-		service.Track(ctx, GroupType("order"), GroupId("group-1"), item{Value: "hello"})
+		service.Track(ctx, item{Value: "hello"}, GroupId{"order", "group-1"})
 	})
 
 	event := testx.MockEventsGetSingle[dummyEvent](t, captured)
-	require.Equal(t, GroupId("group-1"), event.rec.GroupId)
+	require.Equal(t, []GroupId{{"order", "group-1"}}, event.rec.GroupIds)
 
 	// without a table there is nothing to read back.
 	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
-		_, err := service.Records(ctx, GroupType("order"), GroupId("group-1"))
+		_, err := service.Records(ctx, GroupId{"order", "group-1"})
 		require.ErrorIs(t, err, ErrNoTable)
 		return nil
 	})
@@ -164,7 +164,7 @@ func TestTrackAsyncFlushesQueuedRecords(t *testing.T) {
 	db := testx.NewConnection(t, "history_migrations")
 
 	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
-		return CreateTable(ctx, "history", "test-service")
+		return CreateTable(ctx, "history")
 	})
 
 	captured := testx.CaptureEvents(t)
@@ -184,7 +184,7 @@ func TestTrackAsyncFlushesQueuedRecords(t *testing.T) {
 	service.SendAsync(ctx)
 
 	// tracking outside a transaction enqueues the record to be flushed later.
-	service.Track(context.Background(), GroupType("order"), GroupId("group-1"), item{Value: "hello"})
+	service.Track(context.Background(), item{Value: "hello"}, GroupId{"order", "group-1"})
 
 	// the background task flushes the queued record in its own transaction and
 	// sends the event out.
@@ -192,11 +192,11 @@ func TestTrackAsyncFlushesQueuedRecords(t *testing.T) {
 	require.Eventually(t, hasEvent, 3*time.Second, 50*time.Millisecond)
 
 	event := testx.MockEventsGetSingle[dummyEvent](t, captured)
-	require.Equal(t, GroupId("group-1"), event.rec.GroupId)
+	require.Equal(t, []GroupId{{"order", "group-1"}}, event.rec.GroupIds)
 
 	// the flushed record is also persisted to the history table.
 	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
-		records, err := service.Records(ctx, GroupType("order"), GroupId("group-1"))
+		records, err := service.Records(ctx, GroupId{"order", "group-1"})
 		require.NoError(t, err)
 		require.Len(t, records, 1)
 		return nil
@@ -212,12 +212,12 @@ func TestRecordsAtRoutesToLocal(t *testing.T) {
 	db := testx.NewConnection(t, "history_migrations")
 
 	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
-		return CreateTable(ctx, "history", "test-service")
+		return CreateTable(ctx, "history")
 	})
 
 	testx.MustTransact(t, db, func(ctx ql.TxContext) {
 		New(db, pgx.Identifier{"history"}, nil).
-			Track(ctx, GroupType("order"), GroupId("group-1"), item{Value: "hello"})
+			Track(ctx, item{Value: "hello"}, GroupId{"order", "group-1"})
 	})
 
 	athenaCfg := AthenaConfig{Database: "db", Table: "t", WorkGroup: "wg", OutputLocation: "s3://bucket/out/"}
@@ -236,7 +236,7 @@ func TestRecordsAtRoutesToLocal(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			service := New(db, pgx.Identifier{"history"}, nil, tc.opts...)
 			testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
-				records, err := service.RecordsAt(ctx, GroupType("order"), GroupId("group-1"), tc.createdTime)
+				records, err := service.RecordsAt(ctx, GroupId{"order", "group-1"}, tc.createdTime)
 				require.NoError(t, err)
 				require.Len(t, records, 1)
 				require.Equal(t, "hello", func() string {
@@ -248,4 +248,42 @@ func TestRecordsAtRoutesToLocal(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestTrackMultipleGroupIds(t *testing.T) {
+	db := testx.NewConnection(t, "history_migrations")
+
+	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
+		return CreateTable(ctx, "history")
+	})
+
+	service := New(db, pgx.Identifier{"history"}, nil)
+
+	order := GroupId{"order", "ord-1"}
+	player := GroupId{"player", "pl-42"}
+
+	testx.MustTransact(t, db, func(ctx ql.TxContext) {
+		service.Track(ctx, item{Value: "multi"}, order, player)
+	})
+
+	// the record is found when searching by either group id
+	for _, gid := range []GroupId{order, player} {
+		t.Run("lookup by "+gid.String(), func(t *testing.T) {
+			testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
+				records, err := service.Records(ctx, gid)
+				require.NoError(t, err)
+				require.Len(t, records, 1)
+				require.Equal(t, "trace string", records[0].Description)
+				return nil
+			})
+		})
+	}
+
+	// a group id that was not tracked returns no results
+	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
+		records, err := service.Records(ctx, GroupId{"order", "unknown"})
+		require.NoError(t, err)
+		require.Empty(t, records)
+		return nil
+	})
 }
