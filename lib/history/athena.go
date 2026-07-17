@@ -57,10 +57,10 @@ type AthenaConfig struct {
 //     table are still found.
 //
 // Any Athena failure is logged and never fails the read.
-func (h *Service) RecordsAt(ctx ql.TxContext, groupType GroupType, groupId GroupId, createdTime time.Time) ([]Record, error) {
+func (h *Service) RecordsAt(ctx ql.TxContext, groupId GroupId, createdTime time.Time) ([]Record, error) {
 	cfg := h.athena
 	if cfg == nil {
-		return h.Records(ctx, groupType, groupId)
+		return h.Records(ctx, groupId)
 	}
 
 	threshold := cfg.LookupThreshold
@@ -70,13 +70,13 @@ func (h *Service) RecordsAt(ctx ql.TxContext, groupType GroupType, groupId Group
 
 	knownOld := !createdTime.IsZero() && clock.GlobalClock.Now().Sub(createdTime) > threshold
 	if knownOld {
-		if records, ok := h.recordsFromAthena(ctx, cfg, groupType, groupId, createdTime); ok {
+		if records, ok := h.recordsFromAthena(ctx, cfg, groupId, createdTime); ok {
 			return records, nil
 		}
-		return h.Records(ctx, groupType, groupId)
+		return h.Records(ctx, groupId)
 	}
 
-	records, err := h.Records(ctx, groupType, groupId)
+	records, err := h.Records(ctx, groupId)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func (h *Service) RecordsAt(ctx ql.TxContext, groupType GroupType, groupId Group
 	// (aged out, or never existed). Fine for the rare history-page render; pass
 	// createdTime when the caller knows it to skip this probe.
 	if len(records) == 0 && createdTime.IsZero() {
-		if athenaRecords, ok := h.recordsFromAthena(ctx, cfg, groupType, groupId, time.Time{}); ok {
+		if athenaRecords, ok := h.recordsFromAthena(ctx, cfg, groupId, time.Time{}); ok {
 			return athenaRecords, nil
 		}
 	}
@@ -97,7 +97,7 @@ func (h *Service) RecordsAt(ctx ql.TxContext, groupType GroupType, groupId Group
 // bounds the scan to createdTime-LookbackMargin; a zero createdTime means no
 // lower bound (full scan). ok is false when Athena is misconfigured or errored,
 // signalling the caller to fall back to the local table.
-func (h *Service) recordsFromAthena(ctx ql.TxContext, cfg *AthenaConfig, groupType GroupType, groupId GroupId, createdTime time.Time) (_ []Record, ok bool) {
+func (h *Service) recordsFromAthena(ctx ql.TxContext, cfg *AthenaConfig, groupId GroupId, createdTime time.Time) (_ []Record, ok bool) {
 	loc, err := url.Parse(cfg.OutputLocation)
 	if err != nil {
 		sl.LoggerOf(ctx).WarnContext(ctx, "invalid athena output location, using local history", sl.Error(err))
@@ -114,7 +114,6 @@ func (h *Service) recordsFromAthena(ctx ql.TxContext, cfg *AthenaConfig, groupTy
 	}
 
 	query := AthenaQuery{
-		GroupType:      h.qualifiedType(groupType),
 		GroupId:        groupId,
 		Database:       cfg.Database,
 		Table:          cfg.Table,
@@ -137,8 +136,7 @@ func (h *Service) recordsFromAthena(ctx ql.TxContext, cfg *AthenaConfig, groupTy
 }
 
 type AthenaQuery struct {
-	GroupType string
-	GroupId   GroupId
+	GroupId GroupId
 
 	// required athena configuration
 	Database       string
@@ -174,7 +172,7 @@ func (q AthenaQuery) Records(ctx context.Context) ([]Record, error) {
 	var records []Record
 
 	// run the athena query
-	rows, err := db.QueryContext(ctx, queryOf(q.Table, q.GroupType, q.GroupId.String(), q.MinTimestamp, q.MaxTimestamp))
+	rows, err := db.QueryContext(ctx, queryOf(q.Table, q.GroupId, q.MinTimestamp, q.MaxTimestamp))
 	if err != nil {
 		return nil, fmt.Errorf("start query: %w", err)
 	}
@@ -207,13 +205,13 @@ func (q AthenaQuery) Records(ctx context.Context) ([]Record, error) {
 	return records, nil
 }
 
-func queryOf(table string, groupType string, historyId string, minTimestamp, maxTimestamp *time.Time) string {
+func queryOf(table string, groupId GroupId, minTimestamp, maxTimestamp *time.Time) string {
 	query := fmt.Sprintf(`
 		SELECT timestamp, historyId, COALESCE(requesttraceid, '00'), step, description, payload, eventsender, eventsenderversion,
 		       COALESCE("trigger".source, ''), COALESCE("trigger".detail, ''), COALESCE("trigger".reftype, ''), COALESCE("trigger".ref, '')
 		FROM %s
-		WHERE grouptype='%s' AND groupid='%s'
-	`, table, escapeAthenaLiteral(groupType), escapeAthenaLiteral(historyId))
+		WHERE groupid='%s'
+	`, table, escapeAthenaLiteral(groupId.String()))
 
 	if minTimestamp != nil {
 		formatted := minTimestamp.In(time.UTC).Format("2006-01-02 15:04:05")

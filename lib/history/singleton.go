@@ -39,7 +39,7 @@ var instance *Service
 // that sends records tracked outside of a transaction.
 func InitializeGlobal(ctx context.Context, opts Options) error {
 	err := ql.InNewTransaction(ctx, opts.DB, func(ctx ql.TxContext) error {
-		return CreateTable(ctx, opts.HistoryTable, opts.ServiceId)
+		return CreateTable(ctx, opts.HistoryTable)
 	})
 	if err != nil {
 		return fmt.Errorf("create history table: %w", err)
@@ -67,62 +67,65 @@ func InitializeGlobal(ctx context.Context, opts Options) error {
 
 // Track uses the global history singleton.
 // You need to initialize it using InitializeGlobal first.
-func Track[T ~string](ctx context.Context, groupType GroupType, groupId T, item Item) {
+func Track(ctx context.Context, item Item, groupId GroupId, groupIds ...GroupId) {
 	if instance == nil {
+		allGroupIds := append([]GroupId{groupId}, groupIds...)
 		// not initialized: just log the event instead of tracking it.
-		slog.WarnContext(ctx, "Tracking event", slog.String("event", item.HistoryString()))
+		slog.WarnContext(ctx, "Tracking event",
+			slog.String("event", item.HistoryString()),
+			slog.Any("groupIds", allGroupIds))
 		return
 	}
 
-	instance.Track(ctx, groupType, GroupId(groupId), item)
+	instance.Track(ctx, item, groupId, groupIds...)
 }
 
 // RenderPage uses the global history singleton to render the history page for
 // groupId. You need to initialize it using InitializeGlobal first.
-func RenderPage[T ~string](ctx context.Context, w io.Writer, groupType GroupType, groupId T, title string) error {
+func RenderPage(ctx context.Context, w io.Writer, groupId GroupId, title string) error {
 	if instance == nil {
 		return errors.New("history: global instance not initialized")
 	}
 
-	return instance.RenderPage(ctx, w, groupType, GroupId(groupId), title)
+	return instance.RenderPage(ctx, w, groupId, title)
 }
 
 // RenderPageAt is RenderPage with the Athena fallback: createdTime decides
 // whether records are read from the local table or from Athena.
-func RenderPageAt[T ~string](ctx context.Context, w io.Writer, groupType GroupType, groupId T, title string, createdTime time.Time) error {
+func RenderPageAt(ctx context.Context, w io.Writer, groupId GroupId, title string, createdTime time.Time) error {
 	if instance == nil {
 		return errors.New("history: global instance not initialized")
 	}
 
-	return instance.RenderPageAt(ctx, w, groupType, GroupId(groupId), title, createdTime)
+	return instance.RenderPageAt(ctx, w, groupId, title, createdTime)
 }
 
 // RenderPageSummary is RenderPage with a current-state summary above the ledger.
-func RenderPageSummary[T ~string](ctx context.Context, w io.Writer, groupType GroupType, groupId T, title string, summary []SummaryItem) error {
+func RenderPageSummary(ctx context.Context, w io.Writer, groupId GroupId, title string, summary []SummaryItem) error {
 	if instance == nil {
 		return errors.New("history: global instance not initialized")
 	}
 
-	return instance.RenderPageSummary(ctx, w, groupType, GroupId(groupId), title, summary)
+	return instance.RenderPageSummary(ctx, w, groupId, title, summary)
 }
 
 // RenderPageSummaryAt is RenderPageSummary with the Athena fallback (see RenderPageAt).
-func RenderPageSummaryAt[T ~string](ctx context.Context, w io.Writer, groupType GroupType, groupId T, title string, summary []SummaryItem, createdTime time.Time) error {
+func RenderPageSummaryAt(ctx context.Context, w io.Writer, groupId GroupId, title string, summary []SummaryItem, createdTime time.Time) error {
 	if instance == nil {
 		return errors.New("history: global instance not initialized")
 	}
 
-	return instance.RenderPageSummaryAt(ctx, w, groupType, GroupId(groupId), title, summary, createdTime)
+	return instance.RenderPageSummaryAt(ctx, w, groupId, title, summary, createdTime)
 }
 
 // RecordsAt uses the global history singleton to load records for groupId with
 // the Athena fallback (see Service.RecordsAt).
-func RecordsAt[T ~string](ctx ql.TxContext, groupType GroupType, groupId T, createdTime time.Time) ([]Record, error) {
+func RecordsAt(ctx ql.TxContext, groupId GroupId, createdTime time.Time) ([]Record, error) {
 	if instance == nil {
 		return nil, errors.New("history: global instance not initialized")
 	}
 
-	return instance.RecordsAt(ctx, groupType, GroupId(groupId), createdTime)
+	return instance.RecordsAt(ctx, groupId, createdTime)
 }
 
 type forwardSender struct{}
