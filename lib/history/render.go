@@ -61,6 +61,28 @@ type RecordView struct {
 	ShowSeparator bool
 }
 
+// Action is one row in the actions table on the history detail page. When
+// StatusText is non-empty the row renders a static label instead of a button
+// (e.g. "Cancelled"); otherwise a clickable button that fires an HTTP request
+// to Endpoint is shown.
+type Action struct {
+	Description    string // e.g. "Cancel item Sword-Pack"
+	ButtonText     string // e.g. "Cancel"
+	Method         string // HTTP method, default POST
+	Endpoint       string // e.g. "/internal/v1/orders/123/items/1/cancel"
+	ConfirmMessage string // optional confirm() prompt; empty = no confirmation
+	StatusText     string // non-empty = show label instead of button
+}
+
+// PageConfig bundles all optional display elements for a history detail page.
+// Use with RenderPageWithConfig to avoid the combinatorial explosion of
+// RenderPage* method variants.
+type PageConfig struct {
+	Summary   []SummaryItem
+	Actions   []Action
+	CreatedAt time.Time // zero = local-only, non-zero = Athena fallback
+}
+
 // PageModel is the template model for the generic history page.
 type PageModel struct {
 	Title        string
@@ -68,6 +90,7 @@ type PageModel struct {
 	GroupId      string
 	ErrorMessage string
 	Summary      []SummaryItem
+	Actions      []Action
 	Records      []RecordView
 }
 
@@ -92,22 +115,28 @@ func (h *Service) RenderPage(ctx context.Context, w io.Writer, groupId GroupId, 
 // RenderPageAt is RenderPage with an Athena fallback: records are loaded via
 // RecordsAt using createdTime to decide between the local table and Athena.
 func (h *Service) RenderPageAt(ctx context.Context, w io.Writer, groupId GroupId, title string, createdTime time.Time) error {
-	return h.renderPage(ctx, w, groupId, title, nil, createdTime)
+	return h.renderPage(ctx, w, groupId, title, nil, nil, createdTime)
 }
 
 // RenderPageSummary is RenderPage with an extra current-state summary rendered
 // above the ledger.
 func (h *Service) RenderPageSummary(ctx context.Context, w io.Writer, groupId GroupId, title string, summary []SummaryItem) error {
 	// zero time: RecordsAt always reads the local table.
-	return h.renderPage(ctx, w, groupId, title, summary, time.Time{})
+	return h.renderPage(ctx, w, groupId, title, summary, nil, time.Time{})
 }
 
 // RenderPageSummaryAt is RenderPageSummary with the Athena fallback (see RenderPageAt).
 func (h *Service) RenderPageSummaryAt(ctx context.Context, w io.Writer, groupId GroupId, title string, summary []SummaryItem, createdTime time.Time) error {
-	return h.renderPage(ctx, w, groupId, title, summary, createdTime)
+	return h.renderPage(ctx, w, groupId, title, summary, nil, createdTime)
 }
 
-func (h *Service) renderPage(ctx context.Context, w io.Writer, groupId GroupId, title string, summary []SummaryItem, createdTime time.Time) error {
+// RenderPageWithConfig renders the history page using PageConfig for all
+// optional display elements (summary, actions, Athena fallback).
+func (h *Service) RenderPageWithConfig(ctx context.Context, w io.Writer, groupId GroupId, title string, cfg PageConfig) error {
+	return h.renderPage(ctx, w, groupId, title, cfg.Summary, cfg.Actions, cfg.CreatedAt)
+}
+
+func (h *Service) renderPage(ctx context.Context, w io.Writer, groupId GroupId, title string, summary []SummaryItem, actions []Action, createdTime time.Time) error {
 	records, err := ql.InNewTransactionWithResult(ctx, h.txStarter, func(ctx ql.TxContext) ([]Record, error) {
 		return h.RecordsAt(ctx, groupId, createdTime)
 	})
@@ -140,6 +169,7 @@ func (h *Service) renderPage(ctx context.Context, w io.Writer, groupId GroupId, 
 		GroupType: groupId.Type,
 		GroupId:   groupId.String(),
 		Summary:   summary,
+		Actions:   actions,
 		Records:   views,
 	})
 }

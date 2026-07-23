@@ -118,6 +118,16 @@ func RenderPageSummaryAt(ctx context.Context, w io.Writer, groupId GroupId, titl
 	return instance.RenderPageSummaryAt(ctx, w, groupId, title, summary, createdTime)
 }
 
+// RenderPageWithConfig renders the history page using PageConfig for all
+// optional display elements (summary, actions, Athena fallback).
+func RenderPageWithConfig(ctx context.Context, w io.Writer, groupId GroupId, title string, cfg PageConfig) error {
+	if instance == nil {
+		return errors.New("history: global instance not initialized")
+	}
+
+	return instance.RenderPageWithConfig(ctx, w, groupId, title, cfg)
+}
+
 // RecordsAt uses the global history singleton to load records for groupId with
 // the Athena fallback (see Service.RecordsAt).
 func RecordsAt(ctx ql.TxContext, groupId GroupId, createdTime time.Time) ([]Record, error) {
