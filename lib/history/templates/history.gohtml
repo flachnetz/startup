@@ -33,6 +33,30 @@
 </div>
 {{ end }}
 {{ if .ErrorMessage }}<p style="color:red">{{ .ErrorMessage }}</p>{{ end }}
+{{ if .Actions }}
+<h2>Actions</h2>
+<table>
+    <thead><tr><th>Description</th><th>Action</th></tr></thead>
+    <tbody>
+    {{ range .Actions }}
+    <tr>
+        <td>{{ .Description }}</td>
+        <td>
+            {{ if .StatusText }}
+                <span>{{ .StatusText }}</span>
+            {{ else }}
+                <button type="button"
+                    data-method="{{ or .Method "POST" }}"
+                    data-endpoint="{{ .Endpoint }}"
+                    data-confirm="{{ .ConfirmMessage }}"
+                    onclick="doAction(this)">{{ .ButtonText }}</button>
+            {{ end }}
+        </td>
+    </tr>
+    {{ end }}
+    </tbody>
+</table>
+{{ end }}
 <div class="ledger">
     {{ range .Records }}
         {{ if .ShowSeparator }}<hr>{{ end }}
@@ -51,5 +75,29 @@
 </div>
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release/build/highlight.min.js"></script>
 <script>hljs.highlightAll();</script>
+<script>
+function doAction(btn) {
+    var msg = btn.getAttribute('data-confirm');
+    if (msg && !confirm(msg)) return;
+    btn.disabled = true;
+    btn.textContent = '...';
+    fetch(btn.getAttribute('data-endpoint'), {
+        method: btn.getAttribute('data-method') || 'POST',
+    }).then(function(resp) {
+        if (resp.ok) {
+            btn.textContent = 'Done';
+            setTimeout(function() { location.reload(); }, 800);
+        } else {
+            resp.text().then(function(t) { alert('Error ' + resp.status + ': ' + t); });
+            btn.disabled = false;
+            btn.textContent = btn.getAttribute('data-original') || 'Retry';
+        }
+    }).catch(function(err) {
+        alert('Request failed: ' + err);
+        btn.disabled = false;
+        btn.textContent = 'Retry';
+    });
+}
+</script>
 </body>
 </html>
