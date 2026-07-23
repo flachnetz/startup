@@ -54,18 +54,46 @@ type partitionWorker struct {
 //
 // Offsets are stored only after a message was handled successfully and are
 // flushed to the broker roughly every five seconds (and once more on
-// shutdown). Consume blocks until ctx is canceled or a worker fails (because
-// its handler exhausted its retries or panicked), in which case it shuts the
-// workers down and returns an error.
+// shutdown). On a rebalance all workers are drained and their offsets are
+// committed synchronously before partition ownership changes, so worker state
+// never survives an assignment change. Consume blocks until ctx is canceled
+// or a worker fails (because its handler exhausted its retries or panicked),
+// in which case it shuts the workers down and returns an error.
 func (c *PartitionConsumer) Consume(ctx context.Context, handle HandleMessage) error {
-	if err := c.Consumer.SubscribeTopics(c.Topics, nil); err != nil {
+	workers := partitionsWorkers{
+		Consumer: c.Consumer,
+		Workers:  map[topicPartition]*partitionWorker{},
+	}
+
+	// The rebalance callback is invoked from within ReadMessage on this
+	// goroutine, so it is safe to touch the workers map here. Worker state
+	// must never survive an assignment change: on revoke we drain all workers
+	// and store their offsets. We do NOT call Commit() here — the broker
+	// rejects explicit commits during a rebalance. Instead, StoreOffsets marks
+	// them in librdkafka's internal state, and the library automatically
+	// commits stored offsets as part of the rebalance protocol.
+	rebalanceCb := func(consumer *kafka.Consumer, event kafka.Event) error {
+		slog.InfoContext(ctx, "Rebalance event", slog.String("event", event.String()))
+
+		switch event.(type) {
+		case kafka.RevokedPartitions:
+			workers.DrainAll()
+
+		case kafka.AssignedPartitions:
+			// Should already be empty after the preceding revoke, but drain
+			// defensively in case an assignment arrives without one.
+			workers.DrainAll()
+		}
+
+		return nil
+	}
+
+	if err := c.Consumer.SubscribeTopics(c.Topics, rebalanceCb); err != nil {
 		return fmt.Errorf("subscribe to %v: %w", c.Topics, err)
 	}
 
-	workers := partitionsWorkers{
-		Consumer: c.Consumer,
-		Workers:  map[int32]*partitionWorker{},
-	}
+	// try to cleanup a little by unsubscribing in the end
+	defer c.Consumer.Unsubscribe()
 
 	defer workers.Shutdown()
 
@@ -79,11 +107,23 @@ func (c *PartitionConsumer) Consume(ctx context.Context, handle HandleMessage) e
 			return fmt.Errorf("context: %w", err)
 		}
 
-		// check all workers for done or errors
+		// check all workers for done or errors, including workers that
+		// failed while being drained during a rebalance
+		if err := workers.Failure(); err != nil {
+			return err
+		}
+
 		for _, w := range workers.Workers {
 			if err := w.stopped(); err != nil {
 				return err
 			}
+		}
+
+		// store offsets periodically. This runs before ReadMessage so offsets
+		// are also stored while the topic is idle.
+		if time.Since(lastStored) >= 5*time.Second {
+			workers.StoreOffsets()
+			lastStored = time.Now()
 		}
 
 		msg, err := c.Consumer.ReadMessage(DefaultPollTimeout)
@@ -98,11 +138,6 @@ func (c *PartitionConsumer) Consume(ctx context.Context, handle HandleMessage) e
 			}
 			slog.WarnContext(ctx, "Error reading message", slog.Any("error", err))
 			continue
-		}
-
-		if time.Since(lastStored) >= 5*time.Second {
-			workers.StoreOffsets()
-			lastStored = time.Now()
 		}
 
 		w := workers.Get(ctx, *msg.TopicPartition.Topic, msg.TopicPartition.Partition, handle)
@@ -203,23 +238,35 @@ func runWorker(ctx context.Context, w *partitionWorker, handle HandleMessage) {
 	log.InfoContext(ctx, "Worker exiting", slog.Int64("lastHandled", w.handled.Load()))
 }
 
+type topicPartition struct {
+	topic     string
+	partition int32
+}
+
 type partitionsWorkers struct {
 	Consumer *kafka.Consumer
-	Workers  map[int32]*partitionWorker
+	Workers  map[topicPartition]*partitionWorker
+
+	// first error observed while draining workers
+	err error
 }
 
 func (p *partitionsWorkers) StoreOffsets() {
 	for _, w := range p.Workers {
 		if h := w.handled.Load(); h >= 0 {
 			_, _ = p.Consumer.StoreOffsets([]kafka.TopicPartition{{
-				Topic: &w.topic, Partition: w.partition, Offset: kafka.Offset(h + 1),
+				Topic:     &w.topic,
+				Partition: w.partition,
+				Offset:    kafka.Offset(h + 1),
 			}})
 		}
 	}
 }
 
 func (p *partitionsWorkers) Get(ctx context.Context, topic string, partition int32, handle HandleMessage) *partitionWorker {
-	if w, ok := p.Workers[partition]; ok {
+	key := topicPartition{topic, partition}
+
+	if w, ok := p.Workers[key]; ok {
 		return w
 	}
 
@@ -234,7 +281,7 @@ func (p *partitionsWorkers) Get(ctx context.Context, topic string, partition int
 	}
 
 	w.handled.Store(-1)
-	p.Workers[partition] = w
+	p.Workers[key] = w
 
 	slog.InfoContext(
 		ctx,
@@ -248,18 +295,53 @@ func (p *partitionsWorkers) Get(ctx context.Context, topic string, partition int
 	return w
 }
 
-func (p *partitionsWorkers) Shutdown() {
-	// close each worker and wait for it to finish
-	for _, w := range p.Workers {
+// DrainAll stops all workers, waits for them to finish, stores their offsets
+// and removes them from the map. All worker errors are joined and reported
+// via Failure.
+func (p *partitionsWorkers) DrainAll() {
+	for key, w := range p.Workers {
 		close(w.msgs)
 		<-w.done
+
+		// done is always closed after a drain, so only a concrete error on
+		// errCh indicates a failure here.
+		select {
+		case err := <-w.errCh:
+			p.err = errors.Join(p.err, fmt.Errorf("worker for partition %d died with error: %w", w.partition, err))
+		default:
+		}
+
+		if h := w.handled.Load(); h >= 0 {
+			_, _ = p.Consumer.StoreOffsets([]kafka.TopicPartition{{
+				Topic:     &w.topic,
+				Partition: w.partition,
+				Offset:    kafka.Offset(h + 1),
+			}})
+		}
+
+		delete(p.Workers, key)
 	}
+}
 
-	// store the latest offsets
-	p.StoreOffsets()
+// Failure returns the first error observed while draining workers, if any.
+func (p *partitionsWorkers) Failure() error {
+	return p.err
+}
 
-	// and commit them to kafka
+// Commit synchronously commits all stored offsets. A commit without any
+// stored offsets is not an error.
+func (p *partitionsWorkers) Commit() {
+	slog.Debug("Comitting offsets now")
 	if _, err := p.Consumer.Commit(); err != nil {
-		slog.Error("Final commit failed", slog.Any("error", err))
+		if ke, ok := errors.AsType[kafka.Error](err); ok && ke.Code() == kafka.ErrNoOffset {
+			return
+		}
+
+		slog.Error("Commit failed", sl.Error(err))
 	}
+}
+
+func (p *partitionsWorkers) Shutdown() {
+	p.DrainAll()
+	p.Commit()
 }
