@@ -60,13 +60,15 @@ type HTTPOptions struct {
 	AccessLogAdminRoute  bool   `long:"http-access-log-admin-route" env:"HTTP_ACCESS_LOG_ADMIN_ROUTE" description:"If enabled, admin route requests will also be logged."`
 	AdminPageShowEnvVars bool   `long:"http-admin-show-env-vars" env:"HTTP_ADMIN_SHOW_ENV_VARS" description:"Show environment variables on the admin page."`
 
-	inputs     startup_base.Inputs
-	hasTracing bool
+	inputs        startup_base.Inputs
+	hasTracing    bool
+	cancelContext context.Context
 }
 
-func (opts *HTTPOptions) Initialize(base startup_base.BaseOptions, tracingOpts *tracing.TracingOptions) {
+func (opts *HTTPOptions) Initialize(ctx context.Context, base startup_base.BaseOptions, tracingOpts *tracing.TracingOptions) {
 	opts.inputs = base.Inputs
 	opts.hasTracing = tracingOpts != nil
+	opts.cancelContext = ctx
 }
 
 func (opts *HTTPOptions) ServeHandler(handler http.Handler) {
@@ -201,7 +203,7 @@ func (opts *HTTPOptions) Serve(config Config) {
 
 	registerSignalHandler := config.RegisterSignalHandlerForServer
 	if registerSignalHandler == nil {
-		registerSignalHandler = RegisterSignalHandlerForServer
+		registerSignalHandler = buildSignalHandlerForServer(opts.cancelContext)
 	}
 
 	waitCh := registerSignalHandler(server)
@@ -250,29 +252,36 @@ func access(ctx context.Context, attrs []slog.Attr) {
 	slog.DebugContext(ctx, "access", args...)
 }
 
-func RegisterSignalHandlerForServer(server *http.Server) <-chan struct{} {
-	waitCh := make(chan struct{})
+func buildSignalHandlerForServer(ctx context.Context) func(*http.Server) <-chan struct{} {
+	return func(server *http.Server) <-chan struct{} {
+		waitCh := make(chan struct{})
 
-	signalCh := make(chan os.Signal, 1)
+		signalCh := make(chan os.Signal, 1)
 
-	go func() {
-		signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM)
-		defer signal.Stop(signalCh)
+		go func() {
+			signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM)
+			defer signal.Stop(signalCh)
 
-		// wait for signal
-		<-signalCh
+			select {
+			// wait for signal
+			case <-signalCh:
 
-		slog.Info("Signal received, shutting down", slog.String("prefix", "httpd"))
+			// wait for context cancellation
+			case <-ctx.Done():
+			}
 
-		err := server.Shutdown(context.Background())
-		if err != nil {
-			slog.Warn("Server shutdown", slog.String("prefix", "httpd"))
-		}
+			slog.InfoContext(ctx, "Signal received, shutting down", slog.String("prefix", "httpd"))
 
-		close(waitCh)
-	}()
+			err := server.Shutdown(context.Background())
+			if err != nil {
+				slog.WarnContext(ctx, "Server shutdown", slog.String("prefix", "httpd"))
+			}
 
-	return waitCh
+			close(waitCh)
+		}()
+
+		return waitCh
+	}
 }
 
 func tryRegisterAdminHandlerRedirect(router *http.ServeMux) {
