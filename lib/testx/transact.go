@@ -38,3 +38,17 @@ func MustTransactErr(t *testing.T, db *sqlx.DB, fn func(ctx ql.TxContext) error)
 
 	require.NoError(t, err)
 }
+
+// MustTransactWithResult runs fn inside a new transaction bound to the test context
+// and fails the test if fn returns an error. On success the transaction is committed
+// and the result is returned.
+func MustTransactWithResult[R any](t *testing.T, db *sqlx.DB, fn func(ctx ql.TxContext) (R, error)) R {
+	t.Helper()
+
+	result, err := ql.InNewTransactionWithResult(t.Context(), db, func(ctx ql.TxContext) (R, error) {
+		return fn(ctx)
+	})
+
+	require.NoError(t, err)
+	return result
+}
