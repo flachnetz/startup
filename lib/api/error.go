@@ -135,6 +135,21 @@ func (e Error) Unwrap() error {
 	return e.Cause
 }
 
+// Is implements errors.Is. This is necessary because Error contains a map field
+// (Attributes) which makes the struct non-comparable with ==.
+func (e Error) Is(target error) bool {
+	var t Error
+	if !errors.As(target, &t) {
+		return false
+	}
+
+	return e.Code == t.Code &&
+		e.Description == t.Description &&
+		e.HttpStatusCode == t.HttpStatusCode &&
+		maps.Equal(e.Attributes, t.Attributes) &&
+		errors.Is(e.Cause, t.Cause)
+}
+
 // Errorf builds an Error with the given code and a formatted description.
 //
 // Any error passed as an argument is kept as the Cause (via the standard %w
