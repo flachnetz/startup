@@ -29,7 +29,7 @@
 <p class="meta">GroupId: {{ .GroupId }}</p>
 {{ if .Summary }}
 <div class="summary">
-    {{ range .Summary }}<div><span class="k">{{ .Label }}</span><span class="v">{{ .Value }}</span></div>{{ end }}
+    {{ range .Summary }}<div><span class="k">{{ .Label }}</span><span class="v">{{ if .Link }}<a href="{{ .Link }}">{{ .Value }}</a>{{ else }}{{ .Value }}{{ end }}</span></div>{{ end }}
 </div>
 {{ end }}
 {{ if .ErrorMessage }}<p style="color:red">{{ .ErrorMessage }}</p>{{ end }}

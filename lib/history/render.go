@@ -100,6 +100,10 @@ type PageModel struct {
 type SummaryItem struct {
 	Label string
 	Value string
+	// Link, when non-empty, renders Value as an <a href> to this URL instead of
+	// plain text - e.g. a cross-service backoffice link to the page that owns the
+	// referenced entity (a payment or draw history page behind the api-gateway).
+	Link string
 }
 
 // RenderPage writes a standalone HTML history page for groupId to w. Records are
