@@ -12,21 +12,24 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-func Trace(ctx context.Context, op string, fn func(ctx context.Context, span trace.Span) error) (err error) {
+func Trace(ctx context.Context, op string, fn func(ctx context.Context, span trace.Span) error, opts ...trace.SpanStartOption) (err error) {
 	_, err = TraceWithResult(ctx, op, func(ctx context.Context, span trace.Span) (any, error) {
 		return nil, fn(ctx, span)
-	})
+	}, opts...)
 
 	return err
 }
 
 // TraceWithResult traces a child call while propagating the span using the context.
-func TraceWithResult[T any](ctx context.Context, op string, fn func(ctx context.Context, span trace.Span) (T, error)) (result T, err error) {
-	ctx, span := otel.Tracer("").Start(
-		ctx, op,
+// DEV-NOTE: span kind defaults to client; pass trace.WithSpanKind(...) via opts to
+// override it (kafka producers use SpanKindProducer).
+func TraceWithResult[T any](ctx context.Context, op string, fn func(ctx context.Context, span trace.Span) (T, error), opts ...trace.SpanStartOption) (result T, err error) {
+	startOpts := append([]trace.SpanStartOption{
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(TagsFromContext(ctx)...),
-	)
+	}, opts...)
+
+	ctx, span := otel.Tracer("").Start(ctx, op, startOpts...)
 
 	defer func() {
 		if err != nil && isNotErrNoRows(err) {

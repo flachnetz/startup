@@ -7,9 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"maps"
 	"reflect"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +19,7 @@ import (
 	"github.com/flachnetz/startup/v2/startup_tracing"
 	"github.com/jmoiron/sqlx"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -101,7 +100,7 @@ func (ev *eventSender) SendAsync(ctx context.Context, event Event) {
 			event = addTraceContextToEvent(ctx, event)
 			event = &eventWithContext{Context: ctx, Event: event}
 			return nil
-		})
+		}, trace.WithSpanKind(trace.SpanKindProducer))
 	}
 
 	select {
@@ -130,7 +129,7 @@ func (ev *eventSender) SendInTx(ctx context.Context, tx sqlx.ExecerContext, even
 		}
 
 		return WriteToOutbox(ctx, tx, *meta, ev.OutboxTable, avro)
-	})
+	}, trace.WithSpanKind(trace.SpanKindProducer))
 }
 
 func (ev *eventSender) Close() error {
@@ -307,20 +306,6 @@ func byteSliceOf(value *string) []byte {
 	return []byte(*value)
 }
 
-type mapTextMapCarrier map[string]string
-
-func (m mapTextMapCarrier) Get(key string) string {
-	return m[key]
-}
-
-func (m mapTextMapCarrier) Set(key, value string) {
-	m[key] = value
-}
-
-func (m mapTextMapCarrier) Keys() []string {
-	return slices.Collect(maps.Keys(m))
-}
-
 type eventWithTraceContext struct {
 	TraceContext map[string]string
 	Event
@@ -332,7 +317,7 @@ func (e *eventWithTraceContext) Unwrap() Event {
 
 func addTraceContextToEvent(ctx context.Context, event Event) Event {
 	// capture the trace context for propagation
-	carrier := mapTextMapCarrier{}
+	carrier := propagation.MapCarrier{}
 	otel.GetTextMapPropagator().Inject(ctx, carrier)
 
 	if len(carrier) > 0 {
