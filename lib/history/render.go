@@ -72,6 +72,10 @@ type Action struct {
 	Endpoint       string // e.g. "/internal/v1/orders/123/items/1/cancel"
 	ConfirmMessage string // optional confirm() prompt; empty = no confirmation
 	StatusText     string // non-empty = show label instead of button
+
+	// true render a link to Endpoint instead of a button.
+	// Ignores Method and ConfirmMessage
+	Link bool
 }
 
 // PageConfig bundles all optional display elements for a history detail page.
