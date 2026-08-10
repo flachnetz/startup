@@ -44,6 +44,8 @@
         <td>
             {{ if .StatusText }}
                 <span>{{ .StatusText }}</span>
+            {{ else if .Link }}
+                <a href="{{ .Endpoint }}">{{ .ButtonText }}</a>
             {{ else }}
                 <button type="button"
                     data-method="{{ or .Method "POST" }}"
@@ -76,27 +78,29 @@
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release/build/highlight.min.js"></script>
 <script>hljs.highlightAll();</script>
 <script>
-function doAction(btn) {
-    var msg = btn.getAttribute('data-confirm');
+async function doAction(btn) {
+    const msg = btn.getAttribute('data-confirm');
     if (msg && !confirm(msg)) return;
     btn.disabled = true;
     btn.textContent = '...';
-    fetch(btn.getAttribute('data-endpoint'), {
-        method: btn.getAttribute('data-method') || 'POST',
-    }).then(function(resp) {
+    try {
+        const resp = await fetch(btn.getAttribute('data-endpoint'), {
+            method: btn.getAttribute('data-method') || 'POST',
+        });
         if (resp.ok) {
             btn.textContent = 'Done';
             setTimeout(function() { location.reload(); }, 800);
         } else {
-            resp.text().then(function(t) { alert('Error ' + resp.status + ': ' + t); });
+            const t = await resp.text();
+            alert('Error ' + resp.status + ': ' + t);
             btn.disabled = false;
             btn.textContent = btn.getAttribute('data-original') || 'Retry';
         }
-    }).catch(function(err) {
+    } catch (err) {
         alert('Request failed: ' + err);
         btn.disabled = false;
         btn.textContent = 'Retry';
-    });
+    }
 }
 </script>
 </body>
