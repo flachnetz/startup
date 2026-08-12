@@ -9,6 +9,7 @@ import (
 	"github.com/flachnetz/startup/v2/lib/actor"
 	"github.com/flachnetz/startup/v2/lib/jwt"
 	"github.com/flachnetz/startup/v2/lib/jwtest"
+	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/require"
 )
@@ -177,4 +178,75 @@ func TestIdentity_HasRoleHierarchy(t *testing.T) {
 	require.True(t, jwt.Identity{Roles: []string{"refund-approver"}}.HasRole("refund-approver"))
 
 	require.False(t, jwt.Identity{}.HasRole(jwt.RoleRead))
+}
+
+// callWith is protectedRoute's request helper, plus a header/cookie hook so the
+// dev-actor path can be exercised.
+func callWith(t *testing.T, roles []string, set func(*http.Request)) *httptest.ResponseRecorder {
+	t.Helper()
+	store := jwtest.Store()
+	jwks := jwtest.Serve(t, store)
+	verifier, err := jwt.NewTokenVerifier(t.Context(), jwks.URL)
+	require.NoError(t, err)
+	t.Cleanup(verifier.Close)
+
+	e := echo.New()
+	e.GET("/protected", func(c *echo.Context) error {
+		id, _ := jwt.IdentityFrom(c.Request().Context())
+		who, _ := actor.FromContext(c.Request().Context())
+		return c.JSON(http.StatusOK, map[string]any{
+			"subject": id.Subject, "roles": id.Roles,
+			"actorType": string(who.Type), "actorText": who.Label,
+		})
+	}, jwt.KeycloakRoleMiddleware(verifier, testAudience, roles...))
+
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	if set != nil {
+		set(req)
+	}
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+	return rec
+}
+
+// In development a Dev-Actor header stands in as a full-access staff member with
+// no token, and the value becomes the audit actor label.
+func TestKeycloakRoleMiddleware_DevActorHeaderInDevelopment(t *testing.T) {
+	startup_base.SetEnvironment("development")
+	t.Cleanup(func() { startup_base.SetEnvironment("") })
+
+	rec := callWith(t, []string{jwt.RoleWrite}, func(r *http.Request) {
+		r.Header.Set(jwt.DevActorName, "anna@example.com")
+	})
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), "dev-actor:anna@example.com")
+	require.Contains(t, rec.Body.String(), "anna@example.com")
+	require.Contains(t, rec.Body.String(), `"actorType":"user"`)
+}
+
+// A browser can set it as a cookie once.
+func TestKeycloakRoleMiddleware_DevActorCookieInDevelopment(t *testing.T) {
+	startup_base.SetEnvironment("dev")
+	t.Cleanup(func() { startup_base.SetEnvironment("") })
+
+	rec := callWith(t, []string{jwt.RoleAdmin}, func(r *http.Request) {
+		r.AddCookie(&http.Cookie{Name: jwt.DevActorName, Value: "bob@example.com"})
+	})
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), "bob@example.com")
+}
+
+// Outside development the dev actor is ignored entirely: the request is rejected
+// exactly as if the header were not there. This is the safety property.
+func TestKeycloakRoleMiddleware_DevActorIgnoredOutsideDevelopment(t *testing.T) {
+	for _, env := range []string{"staging", "production", ""} {
+		startup_base.SetEnvironment(env)
+		rec := callWith(t, []string{jwt.RoleRead}, func(r *http.Request) {
+			r.Header.Set(jwt.DevActorName, "attacker@example.com")
+		})
+		require.Equal(t, http.StatusUnauthorized, rec.Code, "env=%q", env)
+	}
+	startup_base.SetEnvironment("")
 }

@@ -143,6 +143,15 @@ func GetEnvironment() string {
 	return baseOptions.Load().Environment
 }
 
+// SetEnvironment overrides the running environment. Normal services get it from
+// --environment / STAGE through Initialize; this exists for tests and for
+// embedders that configure the environment themselves.
+func SetEnvironment(environment string) {
+	opts := *baseOptions.Load()
+	opts.Environment = environment
+	baseOptions.Store(&opts)
+}
+
 func IsDevelopment() bool {
 	environment := strings.ToLower(baseOptions.Load().Environment)
 	return environment == "development" || environment == "dev"
