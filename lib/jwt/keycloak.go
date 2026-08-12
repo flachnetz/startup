@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/flachnetz/startup/v2/lib/actor"
+	"github.com/flachnetz/startup/v2/startup_base"
 	"github.com/labstack/echo/v5"
 )
 
@@ -130,7 +131,7 @@ func IdentityFrom(ctx context.Context) (Identity, bool) {
 // job, authorization is this middleware's; the audience check is what stops a
 // token minted for another service from being replayed here.
 func KeycloakRoleMiddleware(verifier Verifier, audience string, roles ...string) echo.MiddlewareFunc {
-	return Middleware(MiddlewareOptions[KeycloakClaims]{
+	verified := Middleware(MiddlewareOptions[KeycloakClaims]{
 		TokenVerifier: verifier,
 		UpdateContext: func(c *echo.Context, token Token, claims KeycloakClaims) error {
 			audiences, _ := token.Audience()
@@ -160,4 +161,64 @@ func KeycloakRoleMiddleware(verifier Verifier, audience string, roles ...string)
 			return nil
 		},
 	})
+
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		chained := verified(next)
+		return func(c *echo.Context) error {
+			if identity, ok := devIdentity(c, audience); ok {
+				ctx := WithIdentity(c.Request().Context(), identity)
+				ctx = actor.WithActor(ctx, identity.Actor())
+				c.SetRequest(c.Request().WithContext(ctx))
+				return next(c)
+			}
+			return chained(c)
+		}
+	}
+}
+
+// DevActorName is the header and cookie a developer sets to stand in as a staff
+// member without a Keycloak login. Its value is the label that appears as the
+// audit actor, so use your own email.
+const DevActorName = "Dev-Actor"
+
+// devIdentity returns a full-access staff identity for audience when the request
+// carries a Dev-Actor header or cookie AND the service runs in development. It is
+// impossible to use anywhere else: the environment gate is checked here, on the
+// server, so a forged cookie in staging or production does nothing.
+//
+// The point is to load and debug backoffice pages without the OIDC dance. It
+// grants read+write+admin on the requested audience, which is why it is dev only
+// and never hierarchical about it: a debugging session wants every button.
+func devIdentity(c *echo.Context, audience string) (Identity, bool) {
+	if !startup_base.IsDevelopment() {
+		return Identity{}, false
+	}
+
+	value := devActorValue(c)
+	if value == "" {
+		return Identity{}, false
+	}
+
+	return Identity{
+		// The dev-actor: prefix keeps these rows recognisable in the audit trail
+		// and cannot collide with a real Keycloak subject.
+		Subject:  "dev-actor:" + value,
+		Email:    value,
+		Audience: audience,
+		Roles:    []string{RoleRead, RoleWrite, RoleAdmin},
+	}, true
+}
+
+// devActorValue reads the dev actor from a header first (so a backoffice fragment
+// fetch can forward it) then a cookie (so a browser can set it once).
+func devActorValue(c *echo.Context) string {
+	if header := strings.TrimSpace(c.Request().Header.Get(DevActorName)); header != "" {
+		return header
+	}
+
+	if cookie, err := c.Request().Cookie(DevActorName); err == nil {
+		return strings.TrimSpace(cookie.Value)
+	}
+
+	return ""
 }
