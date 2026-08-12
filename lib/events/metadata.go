@@ -42,6 +42,10 @@ func (topics *NormalizedEventTypes) MetadataOf(event Event) (*EventMetadata, err
 		}
 	}
 
+	if ev, ok := asEventType[*eventWithActor](event); ok {
+		headers = append(headers, actorHeaders(ev.Actor)...)
+	}
+
 	// now we can get the actual event type
 	eventType := derefEventType(reflect.TypeOf(unwrap(event)))
 
