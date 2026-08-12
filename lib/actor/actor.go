@@ -35,15 +35,15 @@ const (
 // Actor is the principal that caused a request or an event. An anonymous
 // visitor has no Actor at all; the request id is the only provenance there.
 type Actor struct {
-	Type Type
+	Type Type `json:"type,omitempty"`
 
 	// Id is stable per principal: playerId, Keycloak subject, client id, or
 	// service id depending on Type.
-	Id string
+	Id string `json:"id,omitempty"`
 
 	// Label is a human-readable hint for support, e.g. a staff email. It is
 	// display only and may be empty.
-	Label string
+	Label string `json:"label,omitempty"`
 }
 
 // Zero reports whether the actor carries no principal.
