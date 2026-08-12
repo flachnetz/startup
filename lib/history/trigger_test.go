@@ -53,6 +53,16 @@ func TestTriggerActorRoundTripAndDisplay(t *testing.T) {
 
 	assert.Equal(t, "http: POST /refund (requestId=req_1) by user sub-1 (staff@example.com)", tr.Display())
 
+	// The persisted JSON is an audit column people grep: every key lowerCamel,
+	// the actor included. Go-cased actor keys were shipped briefly and rows
+	// written then lose their actor on Scan, which is accepted - the column is
+	// display-only provenance, and re-reading old rows leniently would mean
+	// carrying both spellings forever.
+	assert.Equal(t,
+		`{"source":"http","detail":"POST /refund","refType":"requestId","ref":"req_1",`+
+			`"actor":{"type":"user","id":"sub-1","label":"staff@example.com"}}`,
+		tr.JSON())
+
 	// A trigger without an actor is unchanged, and omitzero keeps the key out.
 	plain := Trigger{Source: "scheduler"}
 	assert.Equal(t, "scheduler", plain.Display())
