@@ -238,10 +238,11 @@ func TestKeycloakRoleMiddleware_DevActorCookieInDevelopment(t *testing.T) {
 	require.Contains(t, rec.Body.String(), "bob@example.com")
 }
 
-// In production the dev actor is ignored entirely: the request is rejected
-// exactly as if the header were not there. This is the safety property.
+// In production, or when the environment is unset, the dev actor is ignored
+// entirely: the request is rejected exactly as if the header were not there.
+// This is the safety property.
 func TestKeycloakRoleMiddleware_DevActorIgnoredInProduction(t *testing.T) {
-	for _, env := range []string{"production", "prod", "live"} {
+	for _, env := range []string{"production", "prod", "live", "", "  "} {
 		startup_base.SetEnvironment(env)
 		rec := callWith(t, []string{jwt.RoleRead}, func(r *http.Request) {
 			r.Header.Set(jwt.DevActorName, "attacker@example.com")

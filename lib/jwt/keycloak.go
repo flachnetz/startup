@@ -182,9 +182,10 @@ func KeycloakRoleMiddleware(verifier Verifier, audience string, roles ...string)
 const DevActorName = "Dev-Actor"
 
 // devIdentity returns a full-access staff identity for audience when the request
-// carries a Dev-Actor header or cookie AND the service does NOT run in
-// production. It is impossible to use in production: the environment gate is
-// checked here, on the server, so a forged cookie against a prod service does
+// carries a Dev-Actor header or cookie AND the service runs in an explicitly
+// non-production environment. It is impossible to use in production, and equally
+// impossible when the environment is unset: the gate is checked here, on the
+// server, so a forged cookie against a prod (or misconfigured) service does
 // nothing.
 //
 // The point is to load and debug backoffice pages without the OIDC dance, in dev
@@ -193,11 +194,12 @@ const DevActorName = "Dev-Actor"
 // it is barred from production and never hierarchical about it: a debugging
 // session wants every button.
 //
-// SECURITY: the gate is !IsProduction, so it is fail-open. A service that never
-// sets ENVIRONMENT defaults to "development" and enables this. Production MUST
-// declare ENVIRONMENT=production (or prod/live) for the gate to close.
+// The environment must be POSITIVELY declared: an empty ENVIRONMENT closes the
+// gate rather than opening it, so a service that forgot to set it does not
+// silently enable the bypass.
 func devIdentity(c *echo.Context, audience string) (Identity, bool) {
-	if startup_base.IsProduction() {
+	environment := strings.TrimSpace(startup_base.GetEnvironment())
+	if environment == "" || startup_base.IsProduction() {
 		return Identity{}, false
 	}
 
