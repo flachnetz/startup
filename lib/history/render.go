@@ -9,8 +9,10 @@ import (
 	"html/template"
 	"io"
 	"sort"
+	"strings"
 	"time"
 
+	"github.com/flachnetz/startup/v2/lib/jwt"
 	"github.com/flachnetz/startup/v2/lib/ql"
 )
 
@@ -76,6 +78,13 @@ type Action struct {
 	// true render a link to Endpoint instead of a button.
 	// Ignores Method and ConfirmMessage
 	Link bool
+
+	// RequiredRole gates the whole action: "write" or "admin" means that role on
+	// this service's own audience, "payment-service:admin" names another
+	// audience. Empty means always shown. A viewer who may not perform the action
+	// does not see it at all - a disabled button still tells a read-only user
+	// which endpoint to curl.
+	RequiredRole string
 }
 
 // PageConfig bundles all optional display elements for a history detail page.
@@ -85,6 +94,12 @@ type PageConfig struct {
 	Summary   []SummaryItem
 	Actions   []Action
 	CreatedAt time.Time // zero = local-only, non-zero = Athena fallback
+
+	// Viewer overrides the identity used for RequiredRole gating. Normally the
+	// identity comes from the request context; set this when rendering outside a
+	// request (a test, a report). No viewer at all means every gated element is
+	// omitted - fail closed.
+	Viewer *jwt.Identity
 }
 
 // PageModel is the template model for the generic history page.
@@ -108,6 +123,81 @@ type SummaryItem struct {
 	// plain text - e.g. a cross-service backoffice link to the page that owns the
 	// referenced entity (a payment or draw history page behind the api-gateway).
 	Link string
+
+	// RequiredRole gates the Link only, in the same notation as
+	// Action.RequiredRole. A denied item still shows Label and Value, just not as
+	// an anchor: the value itself is not the secret, the page behind it is.
+	RequiredRole string
+}
+
+// mayPerform reports whether viewer satisfies required. An empty required is
+// ungated; no viewer denies everything gated.
+//
+// ponytail: a role qualified with a foreign audience is denied unless the viewer
+// was issued for that audience. Cross-audience display via the advisory
+// Actor-Roles header is only worth building when a page actually mixes services.
+func mayPerform(viewer *jwt.Identity, required string) bool {
+	if required == "" {
+		return true
+	}
+
+	if viewer == nil {
+		return false
+	}
+
+	audience, role := "", required
+	if idx := strings.IndexByte(required, ':'); idx >= 0 {
+		audience, role = required[:idx], required[idx+1:]
+	}
+
+	if audience != "" && audience != viewer.Audience {
+		return false
+	}
+
+	return viewer.HasRole(role)
+}
+
+// gate drops the actions the viewer may not perform and demotes denied summary
+// links to plain values.
+func gate(viewer *jwt.Identity, summary []SummaryItem, actions []Action) ([]SummaryItem, []Action) {
+	gatedSummary := make([]SummaryItem, 0, len(summary))
+	for _, item := range summary {
+		if item.Link != "" && !mayPerform(viewer, item.RequiredRole) {
+			item.Link = ""
+		}
+		gatedSummary = append(gatedSummary, item)
+	}
+
+	gatedActions := make([]Action, 0, len(actions))
+	for _, action := range actions {
+		if mayPerform(viewer, action.RequiredRole) {
+			gatedActions = append(gatedActions, action)
+		}
+	}
+
+	if len(summary) == 0 {
+		gatedSummary = nil
+	}
+
+	if len(gatedActions) == 0 {
+		gatedActions = nil
+	}
+
+	return gatedSummary, gatedActions
+}
+
+// viewerOf returns the identity used for gating: the explicit override, else the
+// verified identity of the request, else nil.
+func viewerOf(ctx context.Context, override *jwt.Identity) *jwt.Identity {
+	if override != nil {
+		return override
+	}
+
+	if identity, ok := jwt.IdentityFrom(ctx); ok {
+		return &identity
+	}
+
+	return nil
 }
 
 // RenderPage writes a standalone HTML history page for groupId to w. Records are
@@ -123,30 +213,32 @@ func (h *Service) RenderPage(ctx context.Context, w io.Writer, groupId GroupId, 
 // RenderPageAt is RenderPage with an Athena fallback: records are loaded via
 // RecordsAt using createdTime to decide between the local table and Athena.
 func (h *Service) RenderPageAt(ctx context.Context, w io.Writer, groupId GroupId, title string, createdTime time.Time) error {
-	return h.renderPage(ctx, w, groupId, title, nil, nil, createdTime)
+	return h.renderPage(ctx, w, groupId, title, PageConfig{CreatedAt: createdTime})
 }
 
 // RenderPageSummary is RenderPage with an extra current-state summary rendered
 // above the ledger.
 func (h *Service) RenderPageSummary(ctx context.Context, w io.Writer, groupId GroupId, title string, summary []SummaryItem) error {
 	// zero time: RecordsAt always reads the local table.
-	return h.renderPage(ctx, w, groupId, title, summary, nil, time.Time{})
+	return h.renderPage(ctx, w, groupId, title, PageConfig{Summary: summary})
 }
 
 // RenderPageSummaryAt is RenderPageSummary with the Athena fallback (see RenderPageAt).
 func (h *Service) RenderPageSummaryAt(ctx context.Context, w io.Writer, groupId GroupId, title string, summary []SummaryItem, createdTime time.Time) error {
-	return h.renderPage(ctx, w, groupId, title, summary, nil, createdTime)
+	return h.renderPage(ctx, w, groupId, title, PageConfig{Summary: summary, CreatedAt: createdTime})
 }
 
 // RenderPageWithConfig renders the history page using PageConfig for all
 // optional display elements (summary, actions, Athena fallback).
 func (h *Service) RenderPageWithConfig(ctx context.Context, w io.Writer, groupId GroupId, title string, cfg PageConfig) error {
-	return h.renderPage(ctx, w, groupId, title, cfg.Summary, cfg.Actions, cfg.CreatedAt)
+	return h.renderPage(ctx, w, groupId, title, cfg)
 }
 
-func (h *Service) renderPage(ctx context.Context, w io.Writer, groupId GroupId, title string, summary []SummaryItem, actions []Action, createdTime time.Time) error {
+func (h *Service) renderPage(ctx context.Context, w io.Writer, groupId GroupId, title string, cfg PageConfig) error {
+	summary, actions := gate(viewerOf(ctx, cfg.Viewer), cfg.Summary, cfg.Actions)
+
 	records, err := ql.InNewTransactionWithResult(ctx, h.txStarter, func(ctx ql.TxContext) ([]Record, error) {
-		return h.RecordsAt(ctx, groupId, createdTime)
+		return h.RecordsAt(ctx, groupId, cfg.CreatedAt)
 	})
 	if err != nil {
 		return fmt.Errorf("load records: %w", err)

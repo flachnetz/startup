@@ -5,6 +5,8 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+
+	"github.com/flachnetz/startup/v2/lib/actor"
 )
 
 // Trigger records what caused a history entry: the transport it arrived on and,
@@ -16,6 +18,11 @@ type Trigger struct {
 	Detail  string `json:"detail,omitempty"`  // e.g. "POST /checkout", "topic payment_captured"
 	RefType string `json:"refType,omitempty"` // kind of the source id, e.g. requestId, kafkaEventId
 	Ref     string `json:"ref,omitempty"`     // the source id value (request/event this entry came from)
+
+	// Actor is who initiated the work, filled from the context by triggerOf when
+	// the caller did not set it. No migration: trigger is a JSON column and the
+	// event field is a JSON string, so an older reader just ignores the key.
+	Actor actor.Actor `json:"actor,omitzero"`
 }
 
 // IsZero reports whether no provenance was set.
@@ -24,7 +31,7 @@ func (t Trigger) IsZero() bool { return t == Trigger{} }
 // Display renders the trigger for the history page, e.g.
 // "message-broker: topic payment_captured (kafkaEventId=evt_1)".
 func (t Trigger) Display() string {
-	if t.Source == "" {
+	if t.IsZero() {
 		return ""
 	}
 	s := t.Source
@@ -37,6 +44,17 @@ func (t Trigger) Display() string {
 			ref = t.RefType + "=" + ref
 		}
 		s += " (" + ref + ")"
+	}
+	if !t.Actor.Zero() {
+		actorText := string(t.Actor.Type) + " " + t.Actor.Id
+		if t.Actor.Label != "" {
+			actorText += " (" + t.Actor.Label + ")"
+		}
+		if s == "" {
+			s = actorText
+		} else {
+			s += " by " + actorText
+		}
 	}
 	return s
 }
@@ -98,8 +116,17 @@ func WithTrigger(ctx context.Context, t Trigger) context.Context {
 	return context.WithValue(ctx, triggerKey{}, t)
 }
 
-// triggerOf returns the trigger set by WithTrigger, or the zero value.
+// triggerOf returns the trigger set by WithTrigger, or the zero value. The actor
+// is taken from the context when the trigger carries none, so every entry point
+// that authenticates a caller records who acted without setting it twice.
 func triggerOf(ctx context.Context) Trigger {
 	t, _ := ctx.Value(triggerKey{}).(Trigger)
+
+	if t.Actor.Zero() {
+		if a, ok := actor.FromContext(ctx); ok {
+			t.Actor = a
+		}
+	}
+
 	return t
 }
