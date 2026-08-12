@@ -92,6 +92,7 @@ func NewInitializer(
 }
 
 func (ev *eventSender) SendAsync(ctx context.Context, event Event) {
+	event = addActorToEvent(ctx, event)
 	event = &eventWithContext{Context: ctx, Event: event}
 
 	if trace.SpanContextFromContext(ctx).IsValid() {
@@ -120,6 +121,7 @@ func (ev *eventSender) SendInTx(ctx context.Context, tx sqlx.ExecerContext, even
 			return event.Serialize(io.Discard)
 		}
 
+		event = addActorToEvent(ctx, event)
 		event = addTraceContextToEvent(ctx, event)
 		event = &eventWithContext{Context: ctx, Event: event}
 
