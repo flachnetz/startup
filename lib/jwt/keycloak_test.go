@@ -209,10 +209,10 @@ func callWith(t *testing.T, roles []string, set func(*http.Request)) *httptest.R
 	return rec
 }
 
-// In development a Dev-Actor header stands in as a full-access staff member with
-// no token, and the value becomes the audit actor label.
-func TestKeycloakRoleMiddleware_DevActorHeaderInDevelopment(t *testing.T) {
-	startup_base.SetEnvironment("development")
+// In staging (not production) a Dev-Actor header stands in as a full-access staff
+// member with no token, and the value becomes the audit actor label.
+func TestKeycloakRoleMiddleware_DevActorHeaderInStaging(t *testing.T) {
+	startup_base.SetEnvironment("staging")
 	t.Cleanup(func() { startup_base.SetEnvironment("") })
 
 	rec := callWith(t, []string{jwt.RoleWrite}, func(r *http.Request) {
@@ -238,10 +238,10 @@ func TestKeycloakRoleMiddleware_DevActorCookieInDevelopment(t *testing.T) {
 	require.Contains(t, rec.Body.String(), "bob@example.com")
 }
 
-// Outside development the dev actor is ignored entirely: the request is rejected
+// In production the dev actor is ignored entirely: the request is rejected
 // exactly as if the header were not there. This is the safety property.
-func TestKeycloakRoleMiddleware_DevActorIgnoredOutsideDevelopment(t *testing.T) {
-	for _, env := range []string{"staging", "production", ""} {
+func TestKeycloakRoleMiddleware_DevActorIgnoredInProduction(t *testing.T) {
+	for _, env := range []string{"production", "prod", "live"} {
 		startup_base.SetEnvironment(env)
 		rec := callWith(t, []string{jwt.RoleRead}, func(r *http.Request) {
 			r.Header.Set(jwt.DevActorName, "attacker@example.com")
