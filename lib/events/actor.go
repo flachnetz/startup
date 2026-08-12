@@ -3,6 +3,8 @@ package events
 import (
 	"context"
 
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+
 	"github.com/flachnetz/startup/v2/lib/actor"
 )
 
@@ -55,4 +57,33 @@ func actorHeaders(a actor.Actor) EventHeaders {
 	}
 
 	return headers
+}
+
+// ActorFromKafkaHeaders reads the actor a producer put on a message, so a
+// consumer's ledger entries say who caused the command instead of appearing out
+// of nowhere. It is the read half of the headers addActorToEvent writes.
+//
+// This is audit provenance and nothing else: any producer can write any value,
+// so a consumer must never branch on it. A half-written actor (a type with no
+// id) names nobody and is returned as the zero Actor rather than being recorded
+// as "user " in a ledger.
+func ActorFromKafkaHeaders(headers []kafka.Header) actor.Actor {
+	var a actor.Actor
+
+	for _, header := range headers {
+		switch header.Key {
+		case HeaderActorType:
+			a.Type = actor.Type(string(header.Value))
+		case HeaderActorId:
+			a.Id = string(header.Value)
+		case HeaderActorLabel:
+			a.Label = string(header.Value)
+		}
+	}
+
+	if a.Id == "" {
+		return actor.Actor{}
+	}
+
+	return a
 }
