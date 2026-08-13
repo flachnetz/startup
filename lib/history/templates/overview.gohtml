@@ -36,8 +36,11 @@
             </thead>
             <tbody class="font-monospace small">
             {{ range .Rows }}
-            <tr role="button" onclick="location='{{ .Link }}'">
-                {{ range .Cells }}<td>{{ . }}</td>{{ end }}
+            {{ $link := .Link }}
+            <tr>
+                {{ range .Cells }}
+                <td>{{ if $link }}<a class="d-block text-reset text-decoration-none" href="{{ $link }}">{{ . }}</a>{{ else }}{{ . }}{{ end }}</td>
+                {{ end }}
             </tr>
             {{ else }}
             <tr><td colspan="{{ len .Headers }}" class="text-body-secondary">No records.</td></tr>
