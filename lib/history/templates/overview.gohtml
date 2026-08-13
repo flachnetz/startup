@@ -14,11 +14,24 @@
     {{ if .Filters }}
     <form method="GET" class="row row-cols-lg-auto g-2 align-items-end mb-3">
         {{ range .Filters }}
+        {{ if .Hidden }}
+        <input type="hidden" name="{{ .Name }}" value="{{ .Value }}">
+        {{ else }}
         <div class="col-12">
             <label class="form-label mb-1" for="filter-{{ .Name }}">{{ .Label }}</label>
-            <input class="form-control form-control-sm" type="text" id="filter-{{ .Name }}"
+            {{ if .Options }}
+            <select class="form-select form-select-sm" id="filter-{{ .Name }}" name="{{ .Name }}">
+                {{ $selected := .Value }}
+                {{ range .Options }}
+                <option value="{{ .Value }}"{{ if eq .Value $selected }} selected{{ end }}>{{ .Label }}</option>
+                {{ end }}
+            </select>
+            {{ else }}
+            <input class="form-control form-control-sm" type="{{ .InputType }}" id="filter-{{ .Name }}"
                    name="{{ .Name }}" value="{{ .Value }}" placeholder="{{ .Placeholder }}">
+            {{ end }}
         </div>
+        {{ end }}
         {{ end }}
         <div class="col-12">
             <button class="btn btn-sm btn-primary" type="submit">Filter</button>
@@ -48,6 +61,15 @@
             </tbody>
         </table>
     </div>
+    {{ if or .PrevLink .NextLink }}
+    <nav class="d-flex gap-2 align-items-center">
+        {{ if .PrevLink }}<a class="btn btn-sm btn-outline-secondary" href="{{ .PrevLink }}">Previous</a>
+        {{ else }}<span class="btn btn-sm btn-outline-secondary disabled">Previous</span>{{ end }}
+        <span class="text-body-secondary small">Page {{ .Page }}</span>
+        {{ if .NextLink }}<a class="btn btn-sm btn-outline-secondary" href="{{ .NextLink }}">Next</a>
+        {{ else }}<span class="btn btn-sm btn-outline-secondary disabled">Next</span>{{ end }}
+    </nav>
+    {{ end }}
 </div>
 </body>
 </html>

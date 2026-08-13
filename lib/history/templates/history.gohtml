@@ -87,7 +87,7 @@
                 <p class="text-body-secondary small font-monospace mb-1">{{ formatTime .Timestamp }} &middot; TraceId: {{ .RequestTraceId }} &middot; EventSender: {{ .EventSender }}{{ if .EventSenderVersion }} ({{ .EventSenderVersion }}){{ end }}{{ if .Trigger.Display }} &middot; Source: {{ .Trigger.Display }}{{ end }}</p>
                 <details>
                     <summary class="small">payload</summary>
-                    <pre class="bg-body-tertiary border rounded p-2 mb-0 small"><code>{{ .JSON }}</code></pre>
+                    <pre class="bg-body-tertiary border rounded p-2 mb-0 small"><code>{{ .JSONHTML }}</code></pre>
                 </details>
             </div>
         {{ else }}

@@ -8,7 +8,10 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"net/url"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,15 +49,46 @@ type OverviewModel struct {
 	// "operator bmh-audio-pt, all shops"), so the viewer sees why the list is
 	// short.
 	ScopeNote string
+
+	// Page is the 1-based page currently shown; PrevLink/NextLink are empty when
+	// there is no such page.
+	Page     int
+	PrevLink string
+	NextLink string
 }
 
-// OverviewFilter is one text input of the overview filter form. Value is the
+// OverviewFilter is one field of the overview filter form. Value is the
 // currently applied value, echoed back so the form stays sticky.
 type OverviewFilter struct {
 	Label       string
 	Name        string
 	Value       string
 	Placeholder string
+	// Type is the HTML input type; empty means "text". "date" gets the browser's
+	// own date picker, no JavaScript needed.
+	Type string
+	// Options, when non-empty, renders a <select> instead of an input. The empty
+	// value must be part of the list to allow "no filter".
+	Options []FilterOption
+	// Hidden keeps the value in the form and in the pagination links without
+	// showing a control - for a filter the page receives from elsewhere (a deep
+	// link carrying a player id) rather than one the viewer types.
+	Hidden bool
+}
+
+// FilterOption is one entry of an OverviewFilter dropdown.
+type FilterOption struct {
+	Value string
+	Label string
+}
+
+// InputType is the type attribute of a text-ish filter input.
+func (f OverviewFilter) InputType() string {
+	if f.Type == "" {
+		return "text"
+	}
+
+	return f.Type
 }
 
 // OverviewConfig bundles everything the overview page renders. Mirrors
@@ -66,6 +100,36 @@ type OverviewConfig struct {
 	Rows      []OverviewRow
 	Filters   []OverviewFilter
 	ScopeNote string
+
+	// Page is the 1-based page number shown; 0 and 1 both mean the first page.
+	// HasNext tells the pager that another page exists - the caller knows this by
+	// loading one row more than it displays, so no count query is needed.
+	Page    int
+	HasNext bool
+}
+
+// PageParam is the query parameter the overview pager pages with.
+const PageParam = "page"
+
+// pageLink builds the URL of another page of the same filtered list. Filters are
+// carried over, so paging never silently widens the list.
+func pageLink(filters []OverviewFilter, page int) string {
+	query := url.Values{}
+	for _, f := range filters {
+		if f.Value != "" {
+			query.Set(f.Name, f.Value)
+		}
+	}
+
+	if page > 1 {
+		query.Set(PageParam, strconv.Itoa(page))
+	}
+
+	if len(query) == 0 {
+		return "?"
+	}
+
+	return "?" + query.Encode()
 }
 
 // OverviewRow is one list entry; Cells aligns with OverviewModel.Headers and
@@ -83,12 +147,23 @@ func RenderOverview(w io.Writer, title string, headers []string, rows []Overview
 // RenderOverviewWithConfig is RenderOverview with the optional display elements
 // (filter form, scope note).
 func RenderOverviewWithConfig(w io.Writer, cfg OverviewConfig) error {
+	page := max(cfg.Page, 1)
+
 	model := OverviewModel{
 		Title:     cfg.Title,
 		Headers:   cfg.Headers,
 		Rows:      cfg.Rows,
 		Filters:   cfg.Filters,
 		ScopeNote: cfg.ScopeNote,
+		Page:      page,
+	}
+
+	if page > 1 {
+		model.PrevLink = pageLink(cfg.Filters, page-1)
+	}
+
+	if cfg.HasNext {
+		model.NextLink = pageLink(cfg.Filters, page+1)
 	}
 	if err := overviewTemplate.Execute(w, model); err != nil {
 		return fmt.Errorf("render overview: %w", err)
@@ -103,6 +178,42 @@ type RecordView struct {
 	JSON string
 	// ShowSeparator is true when this record starts a new RequestTraceId group.
 	ShowSeparator bool
+}
+
+// jsonToken matches one JSON string (optionally an object key, i.e. followed by
+// a colon), literal or number in already-indented JSON.
+var jsonToken = regexp.MustCompile(`"(?:\\.|[^"\\])*"\s*:?|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?`)
+
+// payloadEscaper escapes exactly what is unsafe in element text. Quotes stay
+// intact so the highlighter can still see JSON strings.
+var payloadEscaper = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
+
+// JSONHTML is the payload colourised with Bootstrap text-colour utilities. Those
+// classes come from the stylesheet the page already has - server-side because a
+// client-side highlighter would be dropped together with the <head> when the
+// page is embedded as a backoffice fragment.
+func (v RecordView) JSONHTML() template.HTML {
+	return template.HTML(highlightJSON(v.JSON)) //nolint:gosec // highlightJSON escapes its input
+}
+
+func highlightJSON(payload string) string {
+	escaped := payloadEscaper.Replace(payload)
+
+	return jsonToken.ReplaceAllStringFunc(escaped, func(token string) string {
+		var class string
+		switch {
+		case strings.HasSuffix(token, ":"):
+			class = "text-primary"
+		case strings.HasPrefix(token, `"`):
+			class = "text-success"
+		case token == "true" || token == "false" || token == "null":
+			class = "text-body-secondary fst-italic"
+		default:
+			class = "text-danger"
+		}
+
+		return `<span class="` + class + `">` + token + `</span>`
+	})
 }
 
 // Action is one row in the actions table on the history detail page. When

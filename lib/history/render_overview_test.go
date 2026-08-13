@@ -140,3 +140,103 @@ func TestRenderPageConfirmationWrapsTheFormInAModal(t *testing.T) {
 		}
 	}
 }
+
+// A dropdown filter renders a select with the applied value preselected, a date
+// filter uses the browser's own date input, and a hidden filter keeps its value
+// without offering a control.
+func TestRenderOverviewFilterKinds(t *testing.T) {
+	var buf bytes.Buffer
+	err := RenderOverviewWithConfig(&buf, OverviewConfig{
+		Title:   "t",
+		Headers: []string{"ID"},
+		Filters: []OverviewFilter{
+			{Label: "Status", Name: "status", Value: "PAID", Options: []FilterOption{
+				{Value: "", Label: "any"}, {Value: "PAID", Label: "PAID"}, {Value: "REFUNDED", Label: "REFUNDED"},
+			}},
+			{Label: "From", Name: "from", Value: "2026-08-01", Type: "date"},
+			{Label: "Player ID", Name: "player_id", Value: "player-1", Hidden: true},
+		},
+	})
+	if err != nil {
+		t.Fatalf("render overview: %v", err)
+	}
+	out := buf.String()
+
+	for _, want := range []string{
+		`<select class="form-select form-select-sm" id="filter-status" name="status">`,
+		`<option value="PAID" selected>PAID</option>`,
+		`type="date" id="filter-from"`,
+		`<input type="hidden" name="player_id" value="player-1">`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %s:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, `for="filter-player_id"`) {
+		t.Errorf("hidden filter rendered a control:\n%s", out)
+	}
+}
+
+// Paging carries every applied filter, including hidden ones, so page 2 of a
+// filtered list is not page 2 of everything.
+func TestRenderOverviewPaginationKeepsFilters(t *testing.T) {
+	filters := []OverviewFilter{
+		{Name: "status", Value: "PAID"},
+		{Name: "player_id", Value: "player-1", Hidden: true},
+		{Name: "order_id", Value: ""},
+	}
+
+	var buf bytes.Buffer
+	err := RenderOverviewWithConfig(&buf, OverviewConfig{
+		Title: "t", Headers: []string{"ID"}, Filters: filters, Page: 2, HasNext: true,
+	})
+	if err != nil {
+		t.Fatalf("render overview: %v", err)
+	}
+	out := buf.String()
+
+	if !strings.Contains(out, `href="?player_id=player-1&amp;status=PAID"`) {
+		t.Errorf("previous link lost filters or page:\n%s", out)
+	}
+	if !strings.Contains(out, `href="?page=3&amp;player_id=player-1&amp;status=PAID"`) {
+		t.Errorf("next link lost filters or page:\n%s", out)
+	}
+	if strings.Contains(out, "order_id=") {
+		t.Errorf("empty filter leaked into the page links:\n%s", out)
+	}
+
+	// First page and no further rows: no pager links at all.
+	var single bytes.Buffer
+	if err := RenderOverviewWithConfig(&single, OverviewConfig{Title: "t", Headers: []string{"ID"}}); err != nil {
+		t.Fatalf("render overview: %v", err)
+	}
+	if strings.Contains(single.String(), "Previous") {
+		t.Errorf("pager rendered for a single page:\n%s", single.String())
+	}
+}
+
+// The payload is coloured server-side: a fragment loses the <head>, so a
+// client-side highlighter would never run when the page is embedded.
+func TestHighlightJSONColoursTokensAndEscapes(t *testing.T) {
+	out := highlightJSON(`{
+  "name": "<b>x</b>",
+  "count": -12.5,
+  "ok": true,
+  "gone": null
+}`)
+
+	for _, want := range []string{
+		`<span class="text-primary">"name":</span>`,
+		`<span class="text-success">"&lt;b&gt;x&lt;/b&gt;"</span>`,
+		`<span class="text-danger">-12.5</span>`,
+		`<span class="text-body-secondary fst-italic">true</span>`,
+		`<span class="text-body-secondary fst-italic">null</span>`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %s:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "<b>x</b>") {
+		t.Errorf("payload markup was not escaped:\n%s", out)
+	}
+}
