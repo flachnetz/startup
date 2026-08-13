@@ -121,8 +121,8 @@ type Action struct {
 	ConfirmMessage string // optional confirmation prompt; empty = submit immediately
 	StatusText     string // non-empty = show label instead of button
 
-	// true render a link to Endpoint instead of a button.
-	// Ignores Method and ConfirmMessage
+	// true renders a link to Endpoint instead of a form, for an action that only
+	// navigates. Ignores ConfirmMessage.
 	Link bool
 
 	// RequiredRole gates the whole action: "write" or "admin" means that role on
