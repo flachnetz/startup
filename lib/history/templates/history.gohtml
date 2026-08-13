@@ -4,104 +4,80 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ .Title }}</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sakura.css/css/sakura.css" type="text/css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release/build/styles/default.min.css">
-    <style>
-        body { max-width: 60em; }
-        dt { font-weight: bold; margin-top: 0.5em; }
-        .meta { color: #666; font-size: 0.85em; font-family: monospace; }
-        details > summary { cursor: pointer; }
-        pre { margin: 0.3em 0; }
-        hr { border: none; border-top: 2px solid #ddd; margin: 1.5em 0; }
-        .summary { background: #f4f6f8; border: 1px solid #d7dde3; border-radius: 8px;
-            padding: 1em 1.25em; margin: 1em 0 2em; display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.4em 2em; }
-        .summary div { display: flex; gap: 0.6em; align-items: baseline;
-            border-bottom: 1px solid #e3e8ec; padding: 0.25em 0; }
-        .summary span.k { font-weight: bold; min-width: 9em; color: #444; }
-        .summary span.v { font-family: monospace; word-break: break-all; }
-        .ledger > div { border-top: 1px solid #e3e8ec; padding: 0.75em 0; }
-        .ledger .step { font-weight: bold; font-size: 1.05em; }
-    </style>
+    <!-- Bootstrap only for direct (non-embedded) access: backoffice drops this
+         <head> when it embeds the page as a fragment and supplies its own build. -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
 </head>
 <body>
-<h1>{{ .Title }}</h1>
-<p class="meta">GroupId: {{ .GroupId }}</p>
-{{ if .Summary }}
-<div class="summary">
-    {{ range .Summary }}<div><span class="k">{{ .Label }}</span><span class="v">{{ if .Link }}<a href="{{ .Link }}">{{ .Value }}</a>{{ else }}{{ .Value }}{{ end }}</span></div>{{ end }}
-</div>
-{{ end }}
-{{ if .ErrorMessage }}<p style="color:red">{{ .ErrorMessage }}</p>{{ end }}
-{{ if .Actions }}
-<h2>Actions</h2>
-<table>
-    <thead><tr><th>Description</th><th>Action</th></tr></thead>
-    <tbody>
-    {{ range .Actions }}
-    <tr>
-        <td>{{ .Description }}</td>
-        <td>
-            {{ if .StatusText }}
-                <span>{{ .StatusText }}</span>
-            {{ else if .Link }}
-                <a href="{{ .Endpoint }}">{{ .ButtonText }}</a>
-            {{ else }}
-                <button type="button"
-                    data-method="{{ or .Method "POST" }}"
-                    data-endpoint="{{ .Endpoint }}"
-                    data-confirm="{{ .ConfirmMessage }}"
-                    onclick="doAction(this)">{{ .ButtonText }}</button>
-            {{ end }}
-        </td>
-    </tr>
-    {{ end }}
-    </tbody>
-</table>
-{{ end }}
-<div class="ledger">
-    {{ range .Records }}
-        {{ if .ShowSeparator }}<hr>{{ end }}
-        <div>
-            <p class="step">{{ .Step }}</p>
-            <p>{{ .Description }}</p>
-            <p class="meta">{{ formatTime .Timestamp }} · TraceId: {{ .RequestTraceId }} · EventSender: {{ .EventSender }}{{ if .EventSenderVersion }} ({{ .EventSenderVersion }}){{ end }}{{ if .Trigger.Display }} · Source: {{ .Trigger.Display }}{{ end }}</p>
-            <details>
-                <summary>payload</summary>
-                <pre><code class="language-json">{{ .JSON }}</code></pre>
-            </details>
+<div class="container-fluid py-3">
+    <h1 class="h4 mb-1">{{ .Title }}</h1>
+    <p class="text-body-secondary small font-monospace">GroupId: {{ .GroupId }}</p>
+
+    {{ if .Summary }}
+    <div class="card mb-4">
+        <div class="card-body py-2">
+            <dl class="row row-cols-1 row-cols-md-2 mb-0 small">
+                {{ range .Summary }}
+                <div class="col d-flex gap-2 border-bottom py-1">
+                    <dt class="fw-semibold text-nowrap" style="min-width:11em">{{ .Label }}</dt>
+                    <dd class="mb-0 font-monospace text-break">
+                        {{ if .Link }}<a href="{{ .Link }}">{{ .Value }}</a>{{ else }}{{ .Value }}{{ end }}
+                    </dd>
+                </div>
+                {{ end }}
+            </dl>
         </div>
-    {{ else }}
-        <p>No history records.</p>
+    </div>
     {{ end }}
+
+    {{ if .ErrorMessage }}<div class="alert alert-danger" role="alert">{{ .ErrorMessage }}</div>{{ end }}
+
+    {{ if .Actions }}
+    <h2 class="h5">Actions</h2>
+    <div class="table-responsive mb-4">
+        <table class="table table-sm align-middle">
+            <thead>
+            <tr><th scope="col">Description</th><th scope="col">Action</th></tr>
+            </thead>
+            <tbody>
+            {{ range .Actions }}
+            <tr>
+                <td>{{ .Description }}</td>
+                <td>
+                    {{ if .StatusText }}
+                        <span class="badge text-bg-secondary">{{ .StatusText }}</span>
+                    {{ else if .Link }}
+                        <a class="btn btn-sm btn-outline-primary" href="{{ .Endpoint }}">{{ .ButtonText }}</a>
+                    {{ else }}
+                        <button class="btn btn-sm btn-outline-danger" type="button"
+                            data-method="{{ or .Method "POST" }}"
+                            data-endpoint="{{ .Endpoint }}"
+                            data-confirm="{{ .ConfirmMessage }}">{{ .ButtonText }}</button>
+                    {{ end }}
+                </td>
+            </tr>
+            {{ end }}
+            </tbody>
+        </table>
+    </div>
+    {{ end }}
+
+    <div class="ledger">
+        {{ range .Records }}
+            {{ if .ShowSeparator }}<hr class="border-2">{{ end }}
+            <div class="border-top py-2">
+                <p class="fw-semibold mb-1">{{ .Step }}</p>
+                <p class="mb-1">{{ .Description }}</p>
+                <p class="text-body-secondary small font-monospace mb-1">{{ formatTime .Timestamp }} &middot; TraceId: {{ .RequestTraceId }} &middot; EventSender: {{ .EventSender }}{{ if .EventSenderVersion }} ({{ .EventSenderVersion }}){{ end }}{{ if .Trigger.Display }} &middot; Source: {{ .Trigger.Display }}{{ end }}</p>
+                <details>
+                    <summary class="small">payload</summary>
+                    <pre class="bg-body-tertiary border rounded p-2 mb-0 small"><code>{{ .JSON }}</code></pre>
+                </details>
+            </div>
+        {{ else }}
+            <p class="text-body-secondary">No history records.</p>
+        {{ end }}
+    </div>
 </div>
-<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release/build/highlight.min.js"></script>
-<script>hljs.highlightAll();</script>
-<script>
-async function doAction(btn) {
-    const msg = btn.getAttribute('data-confirm');
-    if (msg && !confirm(msg)) return;
-    btn.disabled = true;
-    btn.textContent = '...';
-    try {
-        const resp = await fetch(btn.getAttribute('data-endpoint'), {
-            method: btn.getAttribute('data-method') || 'POST',
-        });
-        if (resp.ok) {
-            btn.textContent = 'Done';
-            setTimeout(function() { location.reload(); }, 800);
-        } else {
-            const t = await resp.text();
-            alert('Error ' + resp.status + ': ' + t);
-            btn.disabled = false;
-            btn.textContent = btn.getAttribute('data-original') || 'Retry';
-        }
-    } catch (err) {
-        alert('Request failed: ' + err);
-        btn.disabled = false;
-        btn.textContent = 'Retry';
-    }
-}
-</script>
 </body>
 </html>
