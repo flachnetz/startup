@@ -107,14 +107,18 @@ type RecordView struct {
 
 // Action is one row in the actions table on the history detail page. When
 // StatusText is non-empty the row renders a static label instead of a button
-// (e.g. "Cancelled"); otherwise a clickable button that fires an HTTP request
-// to Endpoint is shown.
+// (e.g. "Cancelled"); otherwise a plain HTML form that POSTs to Endpoint.
+//
+// The page ships no JavaScript: the form is a form, and a ConfirmMessage renders
+// a Bootstrap modal driven by Bootstrap's own JS. Endpoint must therefore be a
+// URL the browser can resolve - a service behind backoffice builds it from the
+// base path backoffice sends with the fragment request, not from its own
+// internal path.
 type Action struct {
 	Description    string // e.g. "Cancel item Sword-Pack"
 	ButtonText     string // e.g. "Cancel"
-	Method         string // HTTP method, default POST
-	Endpoint       string // e.g. "/internal/v1/orders/123/items/1/cancel"
-	ConfirmMessage string // optional confirm() prompt; empty = no confirmation
+	Endpoint       string // e.g. "/orders/backoffice/v1/orders/123/items/1/cancel"
+	ConfirmMessage string // optional confirmation prompt; empty = submit immediately
 	StatusText     string // non-empty = show label instead of button
 
 	// true render a link to Endpoint instead of a button.
