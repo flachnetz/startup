@@ -240,3 +240,68 @@ func TestHighlightJSONColoursTokensAndEscapes(t *testing.T) {
 		t.Errorf("payload markup was not escaped:\n%s", out)
 	}
 }
+
+// A cell can carry its own link, so a table with several targets does not have to
+// make the whole row navigate to one of them. A cell link is a visible link.
+func TestRenderOverviewLinksIndividualCells(t *testing.T) {
+	var buf bytes.Buffer
+	err := RenderOverview(&buf, "t", []string{"Order ID", "Player", "Payment ID"},
+		[]OverviewRow{{
+			Cells:     []string{"o1", "player-1", "p1"},
+			CellLinks: []string{"/orders/backoffice/v1/orders/o1/history", "", "/payments/backoffice/v1/payments/p1/history"},
+		}})
+	if err != nil {
+		t.Fatalf("render overview: %v", err)
+	}
+	out := buf.String()
+
+	for _, want := range []string{
+		`<a href="/orders/backoffice/v1/orders/o1/history">o1</a>`,
+		`<a href="/payments/backoffice/v1/payments/p1/history">p1</a>`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %s:\n%s", want, out)
+		}
+	}
+	// The unlinked cell stays text, and nothing makes the row itself clickable.
+	if strings.Contains(out, `>player-1</a>`) || strings.Contains(out, "text-reset") {
+		t.Errorf("row was made clickable:\n%s", out)
+	}
+}
+
+// The pager sits above and below the table and can jump to the first page. The
+// last page is only offered when the caller counted the result set.
+func TestRenderOverviewPagerJumpsToFirstAndLast(t *testing.T) {
+	render := func(cfg OverviewConfig) string {
+		var buf bytes.Buffer
+		if err := RenderOverviewWithConfig(&buf, cfg); err != nil {
+			t.Fatalf("render overview: %v", err)
+		}
+
+		return buf.String()
+	}
+
+	filters := []OverviewFilter{{Name: "status", Value: "PAID"}}
+	out := render(OverviewConfig{
+		Title: "t", Headers: []string{"ID"}, Filters: filters, Page: 7, HasNext: true, TotalPages: 9,
+	})
+
+	if strings.Count(out, "<nav") != 2 {
+		t.Errorf("pager is not rendered above and below the table:\n%s", out)
+	}
+	if !strings.Contains(out, `href="?status=PAID"`) {
+		t.Errorf("first-page jump missing or lost its filters:\n%s", out)
+	}
+	if !strings.Contains(out, `href="?page=9&amp;status=PAID"`) {
+		t.Errorf("last-page jump missing:\n%s", out)
+	}
+	if !strings.Contains(out, "Page 7 of 9") {
+		t.Errorf("page position missing:\n%s", out)
+	}
+
+	// Without a known total there is no last page to jump to.
+	unknown := render(OverviewConfig{Title: "t", Headers: []string{"ID"}, Page: 2, HasNext: true})
+	if strings.Contains(unknown, "Last") {
+		t.Errorf("last-page jump offered without a total:\n%s", unknown)
+	}
+}

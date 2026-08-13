@@ -50,11 +50,15 @@ type OverviewModel struct {
 	// short.
 	ScopeNote string
 
-	// Page is the 1-based page currently shown; PrevLink/NextLink are empty when
-	// there is no such page.
-	Page     int
-	PrevLink string
-	NextLink string
+	// Page is the 1-based page currently shown; the links are empty when there is
+	// no such page. TotalPages is 0 when the caller does not know it, which is
+	// what hides the last-page jump.
+	Page       int
+	TotalPages int
+	FirstLink  string
+	PrevLink   string
+	NextLink   string
+	LastLink   string
 }
 
 // OverviewFilter is one field of the overview filter form. Value is the
@@ -106,6 +110,9 @@ type OverviewConfig struct {
 	// loading one row more than it displays, so no count query is needed.
 	Page    int
 	HasNext bool
+	// TotalPages enables the jump to the last page. Leave it 0 when counting the
+	// whole result set is not worth a second query; the pager then only walks.
+	TotalPages int
 }
 
 // PageParam is the query parameter the overview pager pages with.
@@ -132,11 +139,34 @@ func pageLink(filters []OverviewFilter, page int) string {
 	return "?" + query.Encode()
 }
 
-// OverviewRow is one list entry; Cells aligns with OverviewModel.Headers and
-// Link is the detail-page URL the row navigates to.
+// OverviewRow is one list entry; Cells aligns with OverviewModel.Headers.
+//
+// Link makes the whole row navigate to one detail page. CellLinks instead links
+// individual cells (index-aligned with Cells, empty entry = plain text), which is
+// what a table with several targets needs - an id column pointing at this
+// service's detail page, a foreign id pointing at the owning service. A cell link
+// is rendered as a visible link; a row link stays inconspicuous.
 type OverviewRow struct {
-	Link  string
-	Cells []string
+	Link      string
+	Cells     []string
+	CellLinks []string
+}
+
+// CellAt pairs a cell with its own link, so the template does not have to index
+// two slices in parallel.
+func (r OverviewRow) CellAt(i int) OverviewCell {
+	cell := OverviewCell{Text: r.Cells[i]}
+	if i < len(r.CellLinks) {
+		cell.Link = r.CellLinks[i]
+	}
+
+	return cell
+}
+
+// OverviewCell is one table cell with its optional own link.
+type OverviewCell struct {
+	Text string
+	Link string
 }
 
 // RenderOverview writes a standalone clickable table; each row links to Link.
@@ -158,12 +188,21 @@ func RenderOverviewWithConfig(w io.Writer, cfg OverviewConfig) error {
 		Page:      page,
 	}
 
+	model.TotalPages = cfg.TotalPages
+
 	if page > 1 {
+		model.FirstLink = pageLink(cfg.Filters, 1)
 		model.PrevLink = pageLink(cfg.Filters, page-1)
 	}
 
 	if cfg.HasNext {
 		model.NextLink = pageLink(cfg.Filters, page+1)
+	}
+
+	// Walking back from page 7 to page 1 is one click; walking forward to the end
+	// only when the caller knows where the end is.
+	if cfg.TotalPages > page {
+		model.LastLink = pageLink(cfg.Filters, cfg.TotalPages)
 	}
 	if err := overviewTemplate.Execute(w, model); err != nil {
 		return fmt.Errorf("render overview: %w", err)
