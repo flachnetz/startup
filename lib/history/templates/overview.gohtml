@@ -42,17 +42,23 @@
     </form>
     {{ end }}
     {{ if .ScopeNote }}<p class="text-body-secondary small mb-2">{{ .ScopeNote }}</p>{{ end }}
+    {{ template "pager" . }}
     <div class="table-responsive">
         <table class="table table-sm table-hover align-middle">
             <thead>
             <tr>{{ range .Headers }}<th scope="col">{{ . }}</th>{{ end }}</tr>
             </thead>
             <tbody class="font-monospace small">
-            {{ range .Rows }}
-            {{ $link := .Link }}
+            {{ range $row := .Rows }}
+            {{ $link := $row.Link }}
             <tr>
-                {{ range .Cells }}
-                <td>{{ if $link }}<a class="d-block text-reset text-decoration-none" href="{{ $link }}">{{ . }}</a>{{ else }}{{ . }}{{ end }}</td>
+                {{ range $i, $text := $row.Cells }}
+                {{ $cell := $row.CellAt $i }}
+                <td>
+                    {{ if $cell.Link }}<a href="{{ $cell.Link }}">{{ $cell.Text }}</a>
+                    {{ else if $link }}<a class="d-block text-reset text-decoration-none" href="{{ $link }}">{{ $cell.Text }}</a>
+                    {{ else }}{{ $cell.Text }}{{ end }}
+                </td>
                 {{ end }}
             </tr>
             {{ else }}
@@ -61,15 +67,25 @@
             </tbody>
         </table>
     </div>
-    {{ if or .PrevLink .NextLink }}
-    <nav class="d-flex gap-2 align-items-center">
-        {{ if .PrevLink }}<a class="btn btn-sm btn-outline-secondary" href="{{ .PrevLink }}">Previous</a>
-        {{ else }}<span class="btn btn-sm btn-outline-secondary disabled">Previous</span>{{ end }}
-        <span class="text-body-secondary small">Page {{ .Page }}</span>
-        {{ if .NextLink }}<a class="btn btn-sm btn-outline-secondary" href="{{ .NextLink }}">Next</a>
-        {{ else }}<span class="btn btn-sm btn-outline-secondary disabled">Next</span>{{ end }}
-    </nav>
-    {{ end }}
+    {{ template "pager" . }}
 </div>
 </body>
 </html>
+
+{{ define "pager" }}
+{{ if or .PrevLink .NextLink }}
+<nav class="d-flex gap-2 align-items-center my-2">
+    {{ if .FirstLink }}<a class="btn btn-sm btn-outline-secondary" href="{{ .FirstLink }}">&laquo; First</a>
+    {{ else }}<span class="btn btn-sm btn-outline-secondary disabled">&laquo; First</span>{{ end }}
+    {{ if .PrevLink }}<a class="btn btn-sm btn-outline-secondary" href="{{ .PrevLink }}">Previous</a>
+    {{ else }}<span class="btn btn-sm btn-outline-secondary disabled">Previous</span>{{ end }}
+    <span class="text-body-secondary small">Page {{ .Page }}{{ if .TotalPages }} of {{ .TotalPages }}{{ end }}</span>
+    {{ if .NextLink }}<a class="btn btn-sm btn-outline-secondary" href="{{ .NextLink }}">Next</a>
+    {{ else }}<span class="btn btn-sm btn-outline-secondary disabled">Next</span>{{ end }}
+    {{ if .TotalPages }}
+    {{ if .LastLink }}<a class="btn btn-sm btn-outline-secondary" href="{{ .LastLink }}">Last &raquo;</a>
+    {{ else }}<span class="btn btn-sm btn-outline-secondary disabled">Last &raquo;</span>{{ end }}
+    {{ end }}
+</nav>
+{{ end }}
+{{ end }}
