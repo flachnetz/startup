@@ -37,6 +37,35 @@ type OverviewModel struct {
 	Title   string
 	Headers []string
 	Rows    []OverviewRow
+	// Filters renders a GET form above the table; empty means no form. Only
+	// free filters belong here (a player id, a request id). Tenant scope
+	// (operator, shop) travels as a header set by backoffice, never as a form
+	// field a viewer can retype.
+	Filters []OverviewFilter
+	// ScopeNote is one line naming the scope the rows were loaded with (e.g.
+	// "operator bmh-audio-pt, all shops"), so the viewer sees why the list is
+	// short.
+	ScopeNote string
+}
+
+// OverviewFilter is one text input of the overview filter form. Value is the
+// currently applied value, echoed back so the form stays sticky.
+type OverviewFilter struct {
+	Label       string
+	Name        string
+	Value       string
+	Placeholder string
+}
+
+// OverviewConfig bundles everything the overview page renders. Mirrors
+// PageConfig, so a new display element does not grow the argument list of
+// RenderOverview.
+type OverviewConfig struct {
+	Title     string
+	Headers   []string
+	Rows      []OverviewRow
+	Filters   []OverviewFilter
+	ScopeNote string
 }
 
 // OverviewRow is one list entry; Cells aligns with OverviewModel.Headers and
@@ -48,7 +77,20 @@ type OverviewRow struct {
 
 // RenderOverview writes a standalone clickable table; each row links to Link.
 func RenderOverview(w io.Writer, title string, headers []string, rows []OverviewRow) error {
-	if err := overviewTemplate.Execute(w, OverviewModel{Title: title, Headers: headers, Rows: rows}); err != nil {
+	return RenderOverviewWithConfig(w, OverviewConfig{Title: title, Headers: headers, Rows: rows})
+}
+
+// RenderOverviewWithConfig is RenderOverview with the optional display elements
+// (filter form, scope note).
+func RenderOverviewWithConfig(w io.Writer, cfg OverviewConfig) error {
+	model := OverviewModel{
+		Title:     cfg.Title,
+		Headers:   cfg.Headers,
+		Rows:      cfg.Rows,
+		Filters:   cfg.Filters,
+		ScopeNote: cfg.ScopeNote,
+	}
+	if err := overviewTemplate.Execute(w, model); err != nil {
 		return fmt.Errorf("render overview: %w", err)
 	}
 	return nil
