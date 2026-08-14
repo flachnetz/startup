@@ -16,21 +16,27 @@ import (
 // Block is how you extend a page beyond its built-in sections without touching
 // the page shell.
 //
+// Render receives a RenderContext carrying the viewing identity and the shell
+// template. A block gates itself here - it consults rc.May (or the exposed
+// rc.GateActions / rc.DemoteLinks helpers) and emits only what the viewer may
+// see. Because the context is passed on every call, a container block hands the
+// same rc to its children, so gating and template resolution compose to any
+// nesting depth.
+//
 // A block is free to produce any HTML it likes. An empty block returns no bytes
 // and is simply skipped.
 type Block interface {
-	Render() (template.HTML, error)
+	Render(rc RenderContext) (template.HTML, error)
 }
 
 // TemplateBlock renders a named (sub-)template with a model. It is the common
 // shape of the built-in blocks and the easiest way to add your own: give it the
 // Name of a template and a Model to execute it with.
 //
-// Name is looked up in Template. When Template is nil, RenderBlocks fills it in
-// with the shell template it is given, so Name can refer to a sub-template
-// defined alongside the shell; set Template yourself to render against your own.
-// Set Empty to render nothing, which is how a section vanishes when it has no
-// content.
+// Template must contain a definition for Name. The built-in blocks set it to
+// Shell (or a clone), so they resolve the sub-templates defined alongside the
+// shell. Set Empty to render nothing, which is how a section vanishes when it
+// has no content.
 type TemplateBlock struct {
 	Name     string
 	Model    any
@@ -38,7 +44,7 @@ type TemplateBlock struct {
 	Template *template.Template
 }
 
-func (b TemplateBlock) Render() (template.HTML, error) {
+func (b TemplateBlock) Render(RenderContext) (template.HTML, error) {
 	if b.Empty {
 		return "", nil
 	}
@@ -59,50 +65,78 @@ func (b TemplateBlock) Render() (template.HTML, error) {
 // arbitrary markup without a template.
 type HTMLBlock template.HTML
 
-func (b HTMLBlock) Render() (template.HTML, error) {
+func (b HTMLBlock) Render(RenderContext) (template.HTML, error) {
 	return template.HTML(b), nil
 }
 
-// RenderedBlock is a Block after Render, carried into a page model so the shell
-// only concatenates the HTML.
-type RenderedBlock struct{ HTML template.HTML }
+// BlockFunc adapts a plain function to a Block, so a one-off block needs no
+// named type.
+type BlockFunc func(rc RenderContext) (template.HTML, error)
 
-// RenderBlocks renders every block, dropping the ones that produce no output.
-// tpl is the shell template supplied to any TemplateBlock that does not carry
-// its own, so its blocks can reference sub-templates defined alongside the
-// shell.
-func RenderBlocks(tpl *template.Template, blocks []Block) ([]RenderedBlock, error) {
-	rendered := make([]RenderedBlock, 0, len(blocks))
-	for _, block := range blocks {
-		if tb, ok := block.(TemplateBlock); ok && tb.Template == nil {
-			tb.Template = tpl
-			block = tb
+func (f BlockFunc) Render(rc RenderContext) (template.HTML, error) { return f(rc) }
+
+// Gate wraps a block so it renders only when the viewer satisfies required, in
+// the notation of Action.RequiredRole. A denied viewer sees nothing - the whole
+// wrapped block vanishes. This is the coarse counterpart to the fine-grained,
+// per-item gating SummaryBlock and ActionsBlock do: reach for it to hide an
+// entire section (a card, a whole custom block) behind one role.
+func Gate(required Role, block Block) Block {
+	return BlockFunc(func(rc RenderContext) (template.HTML, error) {
+		if !rc.May(required) {
+			return "", nil
 		}
 
-		html, err := block.Render()
-		if err != nil {
-			return nil, err
-		}
-
-		if html == "" {
-			continue
-		}
-
-		rendered = append(rendered, RenderedBlock{HTML: html})
-	}
-
-	return rendered, nil
+		return block.Render(rc)
+	})
 }
 
-// SummaryBlock renders the current-state summary card. Renders nothing when
-// items is empty.
-func SummaryBlock(items []SummaryItem) Block {
-	return TemplateBlock{Name: "block/summary", Model: items, Empty: len(items) == 0}
+// Blocks renders a sequence of child blocks and concatenates their output into
+// one HTML fragment, so a container block can hold other blocks - and so a page
+// turns its whole block slice into markup. Empty children (those that render to
+// nothing) are skipped, and the same rc is passed to each, so gating reaches
+// nested blocks unchanged.
+func Blocks(children ...Block) Block {
+	return BlockFunc(func(rc RenderContext) (template.HTML, error) {
+		var buf bytes.Buffer
+		for _, child := range children {
+			html, err := child.Render(rc)
+			if err != nil {
+				return "", err
+			}
+
+			buf.WriteString(string(html))
+		}
+
+		return template.HTML(buf.String()), nil //nolint:gosec // children already escaped
+	})
 }
 
-// ActionsBlock renders the actions table. Renders nothing when actions is empty.
-func ActionsBlock(actions []Action) Block {
-	return TemplateBlock{Name: "block/actions", Model: actions, Empty: len(actions) == 0}
+// SummaryBlock is a SummaryItem list rendered as the current-state summary card.
+// It gates itself at render time: the links a viewer may not follow are demoted
+// to plain values. Renders nothing when empty.
+//
+// The slice is the block: boff.SummaryBlock{...} or a boff.SummaryBlock(items)
+// conversion both give you a Block.
+type SummaryBlock []SummaryItem
+
+func (b SummaryBlock) Render(rc RenderContext) (template.HTML, error) {
+	items := DemoteLinks(rc, b)
+
+	return TemplateBlock{Name: "block/summary", Model: items, Empty: len(items) == 0, Template: Shell}.Render(rc)
+}
+
+// ActionsBlock is an Action list rendered as the actions table. It gates itself
+// at render time: the actions a viewer may not perform are dropped. Renders
+// nothing when empty.
+//
+// The slice is the block: boff.ActionsBlock{...} or a boff.ActionsBlock(actions)
+// conversion both give you a Block.
+type ActionsBlock []Action
+
+func (b ActionsBlock) Render(rc RenderContext) (template.HTML, error) {
+	actions := GateActions(rc, b)
+
+	return TemplateBlock{Name: "block/actions", Model: actions, Empty: len(actions) == 0, Template: Shell}.Render(rc)
 }
 
 // PagerModel is the pagination state a PagerBlock renders. Both pagers (above
@@ -126,22 +160,22 @@ type tableModel struct {
 // FiltersBlock renders the GET filter form. Renders nothing when filters is
 // empty.
 func FiltersBlock(filters []OverviewFilter) Block {
-	return TemplateBlock{Name: "overview/filters", Model: filters, Empty: len(filters) == 0}
+	return TemplateBlock{Name: "overview/filters", Model: filters, Empty: len(filters) == 0, Template: Shell}
 }
 
 // ScopeNoteBlock renders the one-line scope note. Renders nothing when empty.
 func ScopeNoteBlock(note string) Block {
-	return TemplateBlock{Name: "overview/scopenote", Model: note, Empty: note == ""}
+	return TemplateBlock{Name: "overview/scopenote", Model: note, Empty: note == "", Template: Shell}
 }
 
 // PagerBlock renders the pagination nav. Renders nothing when there is no
 // previous or next page.
 func PagerBlock(m PagerModel) Block {
-	return TemplateBlock{Name: "overview/pager", Model: m, Empty: m.PrevLink == "" && m.NextLink == ""}
+	return TemplateBlock{Name: "overview/pager", Model: m, Empty: m.PrevLink == "" && m.NextLink == "", Template: Shell}
 }
 
 // TableBlock renders the clickable rows table. Always renders (shows a "No
 // records." row when rows is empty).
 func TableBlock(headers []string, rows []OverviewRow) Block {
-	return TemplateBlock{Name: "overview/table", Model: tableModel{Headers: headers, Rows: rows}}
+	return TemplateBlock{Name: "overview/table", Model: tableModel{Headers: headers, Rows: rows}, Template: Shell}
 }

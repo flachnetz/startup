@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+
+	"github.com/flachnetz/startup/v2/lib/jwt"
 )
 
 //go:embed templates/shell.gohtml templates/blocks.gohtml
@@ -23,30 +25,40 @@ var Shell = template.Must(template.New("boff").ParseFS(shellFS, "templates/*.goh
 
 // RenderConfig is the caller-supplied config for the shell. Subtitle and
 // ErrorMessage are optional. Blocks are rendered into the shell in order.
+//
+// Viewer is the identity the page's gated blocks filter themselves against. It
+// is put into the RenderContext each block renders with. Leave it nil to fail
+// closed - every gated element is then hidden. Use ViewerOf to derive it from
+// the request context.
 type RenderConfig struct {
 	Title        string
 	Subtitle     string
 	ErrorMessage string
+	Viewer       *jwt.Identity
 	Blocks       []Block
 }
 
 // shellData is what the shell template actually executes against: the config
-// plus the rendered blocks.
+// plus the rendered blocks concatenated into one HTML fragment.
 type shellData struct {
 	RenderConfig
-	Blocks []RenderedBlock
+	Blocks template.HTML
 }
 
-// Render renders cfg.Blocks against tpl and writes the full page shell to
-// w. tpl must contain the "boff/shell" definition (parse your block templates
-// into a clone of Shell) and the sub-templates any TemplateBlock refers to.
+// Render renders cfg.Blocks and writes the full page shell to w. Each block
+// renders with a RenderContext carrying cfg.Viewer, so blocks gate themselves.
+// tpl provides the "boff/shell" definition (parse your block templates into a
+// clone of Shell); blocks resolve their own sub-templates via the template they
+// were built with.
 func Render(w io.Writer, tpl *template.Template, cfg RenderConfig) error {
-	rendered, err := RenderBlocks(tpl, cfg.Blocks)
+	rc := RenderContext{Viewer: cfg.Viewer}
+
+	blocks, err := Blocks(cfg.Blocks...).Render(rc)
 	if err != nil {
 		return err
 	}
 
-	if err := tpl.ExecuteTemplate(w, "boff/shell", shellData{RenderConfig: cfg, Blocks: rendered}); err != nil {
+	if err := tpl.ExecuteTemplate(w, "boff/shell", shellData{RenderConfig: cfg, Blocks: blocks}); err != nil {
 		return fmt.Errorf("render shell: %w", err)
 	}
 
