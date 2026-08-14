@@ -19,12 +19,7 @@ import (
 //go:embed templates/history.gohtml
 var templateFS embed.FS
 
-var pageTemplate = template.Must(template.Must(boff.Shell.Clone()).
-	Funcs(template.FuncMap{
-		"formatTime": func(t time.Time) string { return t.Format("2006-01-02 15:04:05.000") },
-		"add":        func(a, b int) int { return a + b },
-	}).
-	ParseFS(templateFS, "templates/history.gohtml"))
+var pageTemplate = boff.MustTemplatesFromFS(templateFS)
 
 // RecordView wraps a Record with its pretty-printed JSON payload for rendering.
 type RecordView struct {
@@ -64,17 +59,18 @@ type PageConfig struct {
 	Viewer *jwt.Identity
 
 	// Blocks overrides the sections rendered on the page. When nil the page uses
-	// its default layout: SummaryBlock, ActionsBlock and HistoryItemsBlock built
-	// from the fields above. When set, the callback receives those default blocks
-	// (already gated) plus the loaded record views, and returns the blocks to
-	// render in order - so a caller can reorder them, drop one, or splice its own
-	// Block in between.
+	// its default layout: a HeaderBlock, then SummaryBlock, ActionsBlock and
+	// HistoryItemsBlock built from the fields above. When set, the callback
+	// receives those default blocks (already gated) plus the loaded record views,
+	// and returns the blocks to render in order - so a caller can reorder them,
+	// drop one, or splice its own Block in between.
 	Blocks func(defaults DefaultBlocks) []boff.Block
 }
 
 // DefaultBlocks are the built-in blocks a page renders out of the box, handed to
 // a PageConfig.Blocks callback so custom layouts can reuse them.
 type DefaultBlocks struct {
+	Header  boff.Block
 	Summary boff.Block
 	Actions boff.Block
 	Records boff.Block
@@ -82,7 +78,7 @@ type DefaultBlocks struct {
 
 // All returns the default blocks in their default order.
 func (d DefaultBlocks) All() []boff.Block {
-	return []boff.Block{d.Summary, d.Actions, d.Records}
+	return []boff.Block{d.Header, d.Summary, d.Actions, d.Records}
 }
 
 // RenderPage writes a standalone HTML history page for groupId to w. Records are
@@ -148,6 +144,7 @@ func (h *Service) renderPage(ctx context.Context, w io.Writer, groupId GroupId, 
 	}
 
 	defaults := DefaultBlocks{
+		Header:  boff.HeaderBlock{Title: title, Subtitle: "GroupId: " + groupId.String()},
 		Summary: boff.SummaryBlock(cfg.Summary),
 		Actions: boff.ActionsBlock(cfg.Actions),
 		Records: HistoryItemsBlock(views),
@@ -158,10 +155,9 @@ func (h *Service) renderPage(ctx context.Context, w io.Writer, groupId GroupId, 
 		blocks = cfg.Blocks(defaults)
 	}
 
-	return boff.Render(w, pageTemplate, boff.RenderConfig{
-		Title:    title,
-		Subtitle: "GroupId: " + groupId.String(),
-		Viewer:   boff.ViewerOf(ctx, cfg.Viewer),
-		Blocks:   blocks,
+	return boff.Render(w, boff.RenderConfig{
+		Title:  title,
+		Viewer: boff.ViewerOf(ctx, cfg.Viewer),
+		Blocks: blocks,
 	})
 }
