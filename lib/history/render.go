@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/flachnetz/startup/v2/lib/boff"
 	"github.com/flachnetz/startup/v2/lib/jwt"
 	"github.com/flachnetz/startup/v2/lib/ql"
 )
@@ -25,41 +26,15 @@ var templateFS embed.FS
 //go:embed templates/overview.gohtml
 var overviewFS embed.FS
 
-var pageTemplate = template.Must(template.New("history.gohtml").
+var pageTemplate = template.Must(template.Must(boff.Shell.Clone()).
 	Funcs(template.FuncMap{
 		"formatTime": func(t time.Time) string { return t.Format("2006-01-02 15:04:05.000") },
+		"add":        func(a, b int) int { return a + b },
 	}).
 	ParseFS(templateFS, "templates/history.gohtml"))
 
-var overviewTemplate = template.Must(template.New("overview.gohtml").
+var overviewTemplate = template.Must(template.Must(boff.Shell.Clone()).
 	ParseFS(overviewFS, "templates/overview.gohtml"))
-
-// OverviewModel is the template model for a clickable list page linking to
-// per-item detail pages.
-type OverviewModel struct {
-	Title   string
-	Headers []string
-	Rows    []OverviewRow
-	// Filters renders a GET form above the table; empty means no form. Only
-	// free filters belong here (a player id, a request id). Tenant scope
-	// (operator, shop) travels as a header set by backoffice, never as a form
-	// field a viewer can retype.
-	Filters []OverviewFilter
-	// ScopeNote is one line naming the scope the rows were loaded with (e.g.
-	// "operator bmh-audio-pt, all shops"), so the viewer sees why the list is
-	// short.
-	ScopeNote string
-
-	// Page is the 1-based page currently shown; the links are empty when there is
-	// no such page. TotalPages is 0 when the caller does not know it, which is
-	// what hides the last-page jump.
-	Page       int
-	TotalPages int
-	FirstLink  string
-	PrevLink   string
-	NextLink   string
-	LastLink   string
-}
 
 // OverviewFilter is one field of the overview filter form. Value is the
 // currently applied value, echoed back so the form stays sticky.
@@ -113,6 +88,29 @@ type OverviewConfig struct {
 	// TotalPages enables the jump to the last page. Leave it 0 when counting the
 	// whole result set is not worth a second query; the pager then only walks.
 	TotalPages int
+
+	// Blocks overrides the sections rendered on the page. When nil the page uses
+	// its default layout: FiltersBlock, ScopeNoteBlock, a PagerBlock, TableBlock
+	// and a trailing PagerBlock built from the fields above. When set, the
+	// callback receives those default blocks and returns the blocks to render in
+	// order - so a caller can reorder them, drop one, or splice its own Block in.
+	Blocks func(defaults DefaultOverviewBlocks) []boff.Block
+}
+
+// DefaultOverviewBlocks are the built-in blocks an overview page renders out of
+// the box, handed to an OverviewConfig.Blocks callback so custom layouts can
+// reuse them. Pager is shared by the top and bottom pager.
+type DefaultOverviewBlocks struct {
+	Filters   boff.Block
+	ScopeNote boff.Block
+	Pager     boff.Block
+	Table     boff.Block
+}
+
+// All returns the default blocks in their default order (filters, scope note,
+// pager, table, pager).
+func (d DefaultOverviewBlocks) All() []boff.Block {
+	return []boff.Block{d.Filters, d.ScopeNote, d.Pager, d.Table, d.Pager}
 }
 
 // PageParam is the query parameter the overview pager pages with.
@@ -139,7 +137,7 @@ func pageLink(filters []OverviewFilter, page int) string {
 	return "?" + query.Encode()
 }
 
-// OverviewRow is one list entry; Cells aligns with OverviewModel.Headers.
+// OverviewRow is one list entry; Cells aligns with the overview Headers.
 //
 // Link makes the whole row navigate to one detail page. CellLinks instead links
 // individual cells (index-aligned with Cells, empty entry = plain text), which is
@@ -179,35 +177,36 @@ func RenderOverview(w io.Writer, title string, headers []string, rows []Overview
 func RenderOverviewWithConfig(w io.Writer, cfg OverviewConfig) error {
 	page := max(cfg.Page, 1)
 
-	model := OverviewModel{
-		Title:     cfg.Title,
-		Headers:   cfg.Headers,
-		Rows:      cfg.Rows,
-		Filters:   cfg.Filters,
-		ScopeNote: cfg.ScopeNote,
-		Page:      page,
-	}
-
-	model.TotalPages = cfg.TotalPages
+	pager := PagerModel{Page: page, TotalPages: cfg.TotalPages}
 
 	if page > 1 {
-		model.FirstLink = pageLink(cfg.Filters, 1)
-		model.PrevLink = pageLink(cfg.Filters, page-1)
+		pager.FirstLink = pageLink(cfg.Filters, 1)
+		pager.PrevLink = pageLink(cfg.Filters, page-1)
 	}
 
 	if cfg.HasNext {
-		model.NextLink = pageLink(cfg.Filters, page+1)
+		pager.NextLink = pageLink(cfg.Filters, page+1)
 	}
 
 	// Walking back from page 7 to page 1 is one click; walking forward to the end
 	// only when the caller knows where the end is.
 	if cfg.TotalPages > page {
-		model.LastLink = pageLink(cfg.Filters, cfg.TotalPages)
+		pager.LastLink = pageLink(cfg.Filters, cfg.TotalPages)
 	}
-	if err := overviewTemplate.Execute(w, model); err != nil {
-		return fmt.Errorf("render overview: %w", err)
+
+	defaults := DefaultOverviewBlocks{
+		Filters:   FiltersBlock(cfg.Filters),
+		ScopeNote: ScopeNoteBlock(cfg.ScopeNote),
+		Pager:     PagerBlock(pager),
+		Table:     TableBlock(cfg.Headers, cfg.Rows),
 	}
-	return nil
+
+	blocks := defaults.All()
+	if cfg.Blocks != nil {
+		blocks = cfg.Blocks(defaults)
+	}
+
+	return boff.Render(w, overviewTemplate, boff.RenderConfig{Title: cfg.Title, Blocks: blocks})
 }
 
 // RecordView wraps a Record with its pretty-printed JSON payload for rendering.
@@ -296,17 +295,27 @@ type PageConfig struct {
 	// request (a test, a report). No viewer at all means every gated element is
 	// omitted - fail closed.
 	Viewer *jwt.Identity
+
+	// Blocks overrides the sections rendered on the page. When nil the page uses
+	// its default layout: SummaryBlock, ActionsBlock and HistoryItemsBlock built
+	// from the fields above. When set, the callback receives those default blocks
+	// (already gated) plus the loaded record views, and returns the blocks to
+	// render in order - so a caller can reorder them, drop one, or splice its own
+	// Block in between.
+	Blocks func(defaults DefaultBlocks) []boff.Block
 }
 
-// PageModel is the template model for the generic history page.
-type PageModel struct {
-	Title        string
-	GroupType    string
-	GroupId      string
-	ErrorMessage string
-	Summary      []SummaryItem
-	Actions      []Action
-	Records      []RecordView
+// DefaultBlocks are the built-in blocks a page renders out of the box, handed to
+// a PageConfig.Blocks callback so custom layouts can reuse them.
+type DefaultBlocks struct {
+	Summary boff.Block
+	Actions boff.Block
+	Records boff.Block
+}
+
+// All returns the default blocks in their default order.
+func (d DefaultBlocks) All() []boff.Block {
+	return []boff.Block{d.Summary, d.Actions, d.Records}
 }
 
 // SummaryItem is one label/value row shown above the ledger, describing the
@@ -470,12 +479,20 @@ func (h *Service) renderPage(ctx context.Context, w io.Writer, groupId GroupId, 
 		}
 	}
 
-	return pageTemplate.Execute(w, PageModel{
-		Title:     title,
-		GroupType: groupId.Type,
-		GroupId:   groupId.String(),
-		Summary:   summary,
-		Actions:   actions,
-		Records:   views,
+	defaults := DefaultBlocks{
+		Summary: SummaryBlock(summary),
+		Actions: ActionsBlock(actions),
+		Records: HistoryItemsBlock(views),
+	}
+
+	blocks := defaults.All()
+	if cfg.Blocks != nil {
+		blocks = cfg.Blocks(defaults)
+	}
+
+	return boff.Render(w, pageTemplate, boff.RenderConfig{
+		Title:    title,
+		Subtitle: "GroupId: " + groupId.String(),
+		Blocks:   blocks,
 	})
 }

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/flachnetz/startup/v2/lib/boff"
 )
 
 // The filter form only exists when the caller passes fields, and applied values
@@ -87,14 +89,10 @@ func TestRenderOverviewShowsScopeNote(t *testing.T) {
 // embedding shell to repair.
 func TestRenderPageActionIsAPlainForm(t *testing.T) {
 	var buf bytes.Buffer
-	err := pageTemplate.Execute(&buf, PageModel{
-		Title:   "t",
-		GroupId: "order:1",
-		Actions: []Action{{
-			Description: "Cancel order", ButtonText: "Cancel",
-			Endpoint: "/orders/backoffice/v1/orders/o1/cancel",
-		}},
-	})
+	err := boff.Render(&buf, pageTemplate, boff.RenderConfig{Title: "t", Subtitle: "order:1", Blocks: []boff.Block{ActionsBlock([]Action{{
+		Description: "Cancel order", ButtonText: "Cancel",
+		Endpoint: "/orders/backoffice/v1/orders/o1/cancel",
+	}})}})
 	if err != nil {
 		t.Fatalf("execute template: %v", err)
 	}
@@ -115,14 +113,10 @@ func TestRenderPageActionIsAPlainForm(t *testing.T) {
 // driven by Bootstrap's own JS, which the shell already loads.
 func TestRenderPageConfirmationWrapsTheFormInAModal(t *testing.T) {
 	var buf bytes.Buffer
-	err := pageTemplate.Execute(&buf, PageModel{
-		Title:   "t",
-		GroupId: "order:1",
-		Actions: []Action{{
-			Description: "Cancel order", ButtonText: "Cancel",
-			Endpoint: "/orders/backoffice/v1/orders/o1/cancel", ConfirmMessage: "Cancel order o1?",
-		}},
-	})
+	err := boff.Render(&buf, pageTemplate, boff.RenderConfig{Title: "t", Subtitle: "order:1", Blocks: []boff.Block{ActionsBlock([]Action{{
+		Description: "Cancel order", ButtonText: "Cancel",
+		Endpoint: "/orders/backoffice/v1/orders/o1/cancel", ConfirmMessage: "Cancel order o1?",
+	}})}})
 	if err != nil {
 		t.Fatalf("execute template: %v", err)
 	}
