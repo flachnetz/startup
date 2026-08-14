@@ -1,0 +1,25 @@
+{{ define "boff/shell" }}<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ .Title }}</title>
+    <!-- Bootstrap only for direct (non-embedded) access: backoffice drops this
+         <head> when it embeds the page as a fragment and supplies its own build.
+         The bundle is what drives any confirmation dialogs - the page ships no
+         JavaScript of its own. -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+</head>
+<body>
+<div class="container-fluid py-3">
+    <h1 class="h4 mb-1">{{ .Title }}</h1>
+    {{ if .Subtitle }}<p class="text-body-secondary small font-monospace">{{ .Subtitle }}</p>{{ end }}
+
+    {{ if .ErrorMessage }}<div class="alert alert-danger" role="alert">{{ .ErrorMessage }}</div>{{ end }}
+
+    {{ range .Blocks }}{{ .HTML }}{{ end }}
+</div>
+</body>
+</html>
+{{ end }}
