@@ -1,11 +1,9 @@
-package history
+package boff
 
 import (
 	"bytes"
 	"strings"
 	"testing"
-
-	"github.com/flachnetz/startup/v2/lib/boff"
 )
 
 // The filter form only exists when the caller passes fields, and applied values
@@ -85,56 +83,6 @@ func TestRenderOverviewShowsScopeNote(t *testing.T) {
 	}
 }
 
-// An action is a plain form POST. No fetch, no inline handler, nothing for the
-// embedding shell to repair.
-func TestRenderPageActionIsAPlainForm(t *testing.T) {
-	var buf bytes.Buffer
-	err := boff.Render(&buf, pageTemplate, boff.RenderConfig{Title: "t", Subtitle: "order:1", Blocks: []boff.Block{ActionsBlock([]Action{{
-		Description: "Cancel order", ButtonText: "Cancel",
-		Endpoint: "/orders/backoffice/v1/orders/o1/cancel",
-	}})}})
-	if err != nil {
-		t.Fatalf("execute template: %v", err)
-	}
-	out := buf.String()
-
-	if !strings.Contains(out, `<form method="POST" action="/orders/backoffice/v1/orders/o1/cancel">`) {
-		t.Errorf("action is not a plain form POST:\n%s", out)
-	}
-	// The body is what gets embedded as a fragment (the <head> is dropped), so it
-	// is the body that must be script-free.
-	_, body, _ := strings.Cut(out, "<body>")
-	if strings.Contains(body, "onclick") || strings.Contains(body, "data-endpoint") || strings.Contains(body, "<script") {
-		t.Errorf("action page still needs JavaScript of its own:\n%s", body)
-	}
-}
-
-// A confirmation is a Bootstrap modal wrapping the same form: the dialog is
-// driven by Bootstrap's own JS, which the shell already loads.
-func TestRenderPageConfirmationWrapsTheFormInAModal(t *testing.T) {
-	var buf bytes.Buffer
-	err := boff.Render(&buf, pageTemplate, boff.RenderConfig{Title: "t", Subtitle: "order:1", Blocks: []boff.Block{ActionsBlock([]Action{{
-		Description: "Cancel order", ButtonText: "Cancel",
-		Endpoint: "/orders/backoffice/v1/orders/o1/cancel", ConfirmMessage: "Cancel order o1?",
-	}})}})
-	if err != nil {
-		t.Fatalf("execute template: %v", err)
-	}
-	out := buf.String()
-
-	for _, want := range []string{
-		`data-bs-toggle="modal"`,
-		`data-bs-target="#action-confirm-0"`,
-		`id="action-confirm-0"`,
-		`Cancel order o1?`,
-		`<form class="modal-content" method="POST" action="/orders/backoffice/v1/orders/o1/cancel">`,
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("confirmation modal missing %s:\n%s", want, out)
-		}
-	}
-}
-
 // A dropdown filter renders a select with the applied value preselected, a date
 // filter uses the browser's own date input, and a hidden filter keeps its value
 // without offering a control.
@@ -206,32 +154,6 @@ func TestRenderOverviewPaginationKeepsFilters(t *testing.T) {
 	}
 	if strings.Contains(single.String(), "Previous") {
 		t.Errorf("pager rendered for a single page:\n%s", single.String())
-	}
-}
-
-// The payload is coloured server-side: a fragment loses the <head>, so a
-// client-side highlighter would never run when the page is embedded.
-func TestHighlightJSONColoursTokensAndEscapes(t *testing.T) {
-	out := highlightJSON(`{
-  "name": "<b>x</b>",
-  "count": -12.5,
-  "ok": true,
-  "gone": null
-}`)
-
-	for _, want := range []string{
-		`<span class="text-primary">"name":</span>`,
-		`<span class="text-success">"&lt;b&gt;x&lt;/b&gt;"</span>`,
-		`<span class="text-danger">-12.5</span>`,
-		`<span class="text-body-secondary fst-italic">true</span>`,
-		`<span class="text-body-secondary fst-italic">null</span>`,
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("missing %s:\n%s", want, out)
-		}
-	}
-	if strings.Contains(out, "<b>x</b>") {
-		t.Errorf("payload markup was not escaped:\n%s", out)
 	}
 }
 
