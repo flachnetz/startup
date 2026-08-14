@@ -17,10 +17,10 @@ import (
 // the page shell.
 //
 // Render receives a RenderContext carrying the viewing identity and the shell
-// template. A block gates itself here - it consults rc.May (or the exposed
-// rc.GateActions / rc.DemoteLinks helpers) and emits only what the viewer may
-// see. Because the context is passed on every call, a container block hands the
-// same rc to its children, so gating and template resolution compose to any
+// template. A block gates itself here - it consults rc.May and emits only what
+// the viewer may see. Because the context is passed on every call, a container
+// block hands the same rc to its children, so gating and template resolution
+// compose to any
 // nesting depth.
 //
 // A block is free to produce any HTML it likes. An empty block returns no bytes
@@ -125,6 +125,41 @@ func (b HeaderBlock) Render(rc RenderContext) (template.HTML, error) {
 	return TemplateBlock{Name: "block/header", Model: b, Template: Shell}.Render(rc)
 }
 
+// CardBlock wraps a body block in a Bootstrap card with a title and optional
+// subtitle. The body is itself a Block, rendered with the same rc - so gating
+// and nested blocks compose inside a card like anywhere else.
+type CardBlock struct {
+	Title    string
+	Subtitle string
+	Body     Block
+	// Raised adds a small drop shadow (Bootstrap shadow-sm) to lift the card off
+	// the page.
+	Raised bool
+}
+
+// cardModel is what the card sub-template reads: the card's own fields plus the
+// already-rendered body HTML.
+type cardModel struct {
+	Title    string
+	Subtitle string
+	Raised   bool
+	Body     template.HTML
+}
+
+func (b CardBlock) Render(rc RenderContext) (template.HTML, error) {
+	var body template.HTML
+	if b.Body != nil {
+		var err error
+		if body, err = b.Body.Render(rc); err != nil {
+			return "", err
+		}
+	}
+
+	model := cardModel{Title: b.Title, Subtitle: b.Subtitle, Raised: b.Raised, Body: body}
+
+	return TemplateBlock{Name: "block/card", Model: model, Template: Shell}.Render(rc)
+}
+
 // SummaryBlock is a SummaryItem list rendered as the current-state summary card.
 // It gates itself at render time: the links a viewer may not follow are demoted
 // to plain values. Renders nothing when empty.
@@ -134,7 +169,7 @@ func (b HeaderBlock) Render(rc RenderContext) (template.HTML, error) {
 type SummaryBlock []SummaryItem
 
 func (b SummaryBlock) Render(rc RenderContext) (template.HTML, error) {
-	items := DemoteLinks(rc, b)
+	items := demoteLinks(rc, b)
 
 	return TemplateBlock{Name: "block/summary", Model: items, Empty: len(items) == 0, Template: Shell}.Render(rc)
 }
@@ -148,9 +183,23 @@ func (b SummaryBlock) Render(rc RenderContext) (template.HTML, error) {
 type ActionsBlock []Action
 
 func (b ActionsBlock) Render(rc RenderContext) (template.HTML, error) {
-	actions := GateActions(rc, b)
+	actions := GateSlice(rc, b)
 
 	return TemplateBlock{Name: "block/actions", Model: actions, Empty: len(actions) == 0, Template: Shell}.Render(rc)
+}
+
+// NavBlock is a NavLink list rendered as a <nav> bar. It gates itself at render
+// time: the links a viewer may not follow are dropped. Renders nothing when
+// empty.
+//
+// The slice is the block: boff.NavBlock{...} or a boff.NavBlock(links)
+// conversion both give you a Block.
+type NavBlock []NavLink
+
+func (b NavBlock) Render(rc RenderContext) (template.HTML, error) {
+	links := GateSlice(rc, b)
+
+	return TemplateBlock{Name: "block/nav", Model: links, Empty: len(links) == 0, Template: Shell}.Render(rc)
 }
 
 // PagerModel is the pagination state a PagerBlock renders. Both pagers (above
