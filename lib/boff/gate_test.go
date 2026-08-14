@@ -16,16 +16,15 @@ type gateConfig struct {
 	Actions []Action
 }
 
-// renderGated runs the gate and renders the summary and actions blocks.
+// renderGated renders the summary and actions blocks; each gates itself against
+// the context's viewer.
 func renderGated(t *testing.T, ctx context.Context, cfg gateConfig) string {
 	t.Helper()
 
-	summary, actions := Gate(ViewerOf(ctx, cfg.Viewer), cfg.Summary, cfg.Actions)
-
 	var buf bytes.Buffer
-	if err := Render(&buf, Shell, RenderConfig{Title: "t", Subtitle: "order:1", Blocks: []Block{
-		SummaryBlock(summary),
-		ActionsBlock(actions),
+	if err := Render(&buf, Shell, RenderConfig{Title: "t", Subtitle: "order:1", Viewer: ViewerOf(ctx, cfg.Viewer), Blocks: []Block{
+		SummaryBlock(cfg.Summary),
+		ActionsBlock(cfg.Actions),
 	}}); err != nil {
 		t.Fatalf("execute template: %v", err)
 	}
@@ -138,5 +137,31 @@ func TestGate_DeniedSummaryLinkRendersPlainValue(t *testing.T) {
 	})
 	if !strings.Contains(allowed, `<a href="/payments/pay_1/history">pay_1</a>`) {
 		t.Errorf("write viewer did not get the summary link:\n%s", allowed)
+	}
+}
+
+// The Gate block hides a whole wrapped block from a viewer who lacks the role,
+// and shows it whole to one who has it.
+func TestGateBlock_HidesWholeBlockFromDeniedViewer(t *testing.T) {
+	secret := HTMLBlock("<p>top secret</p>")
+
+	render := func(viewer *jwt.Identity) string {
+		var buf bytes.Buffer
+		if err := Render(&buf, Shell, RenderConfig{Title: "t", Viewer: viewer, Blocks: []Block{
+			Gate(jwt.RoleAdmin, secret),
+		}}); err != nil {
+			t.Fatalf("execute template: %v", err)
+		}
+		return buf.String()
+	}
+
+	if out := render(identity("order-service", jwt.RoleRead)); strings.Contains(out, "top secret") {
+		t.Errorf("read viewer saw an admin-gated block:\n%s", out)
+	}
+	if out := render(nil); strings.Contains(out, "top secret") {
+		t.Errorf("gated block rendered without a viewer, must fail closed:\n%s", out)
+	}
+	if out := render(identity("order-service", jwt.RoleAdmin)); !strings.Contains(out, "top secret") {
+		t.Errorf("admin viewer did not see the gated block:\n%s", out)
 	}
 }

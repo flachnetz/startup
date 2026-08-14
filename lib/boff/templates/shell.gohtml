@@ -18,7 +18,7 @@
 
     {{ if .ErrorMessage }}<div class="alert alert-danger" role="alert">{{ .ErrorMessage }}</div>{{ end }}
 
-    {{ range .Blocks }}{{ .HTML }}{{ end }}
+    {{ .Blocks }}
 </div>
 </body>
 </html>
