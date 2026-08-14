@@ -33,10 +33,10 @@ type Block interface {
 // shape of the built-in blocks and the easiest way to add your own: give it the
 // Name of a template and a Model to execute it with.
 //
-// Template must contain a definition for Name. The built-in blocks set it to
-// Shell (or a clone), so they resolve the sub-templates defined alongside the
-// shell. Set Empty to render nothing, which is how a section vanishes when it
-// has no content.
+// Template must contain a definition for Name. The built-in blocks set it to the
+// package shell, so they resolve the sub-templates defined alongside the shell.
+// Set Empty to render nothing, which is how a section vanishes when it has no
+// content.
 type TemplateBlock struct {
 	Name     string
 	Model    any
@@ -44,7 +44,7 @@ type TemplateBlock struct {
 	Template *template.Template
 }
 
-func (b TemplateBlock) Render(RenderContext) (template.HTML, error) {
+func (b TemplateBlock) Render(rc RenderContext) (template.HTML, error) {
 	if b.Empty {
 		return "", nil
 	}
@@ -53,12 +53,46 @@ func (b TemplateBlock) Render(RenderContext) (template.HTML, error) {
 		return "", fmt.Errorf("render block %q: no template", b.Name)
 	}
 
-	var buf bytes.Buffer
-	if err := b.Template.ExecuteTemplate(&buf, b.Name, b.Model); err != nil {
+	html, err := RenderTemplate(rc, b.Template, b.Name, b.Model)
+	if err != nil {
 		return "", fmt.Errorf("render block %q: %w", b.Name, err)
 	}
 
+	return html, nil
+}
+
+// RenderTemplate executes the named (sub-)template of tmpl with data, bound to
+// rc, and returns its HTML. It is the plumbing behind TemplateBlock and the way
+// to render a template from your own Block: the template can render a child Block
+// inline via {{ . | render }}, which executes against the same rc. tmpl is
+// cloned per call so the binding never leaks into a shared template, which also
+// means tmpl itself is never executed and stays reusable.
+func RenderTemplate(rc RenderContext, tmpl *template.Template, name string, data any) (template.HTML, error) {
+	var buf bytes.Buffer
+	if err := withRenderContext(tmpl, rc).ExecuteTemplate(&buf, name, data); err != nil {
+		return "", err
+	}
+
 	return template.HTML(buf.String()), nil //nolint:gosec // template output is already escaped
+}
+
+// withRenderContext clones tmpl and injects a "render" function bound to rc, so a
+// template can render a child Block inline: {{ .Body | render }} executes the
+// block against the same render context (viewer and all), returning its HTML.
+//
+// tmpl is cloned, so the injected func never leaks into the shared template; a
+// clone failure is a programmer error (a template already executed), so it
+// panics.
+func withRenderContext(tmpl *template.Template, rc RenderContext) *template.Template {
+	return template.Must(tmpl.Clone()).Funcs(template.FuncMap{
+		"render": func(block Block) (template.HTML, error) {
+			if block == nil {
+				return "", nil
+			}
+
+			return block.Render(rc)
+		},
+	})
 }
 
 // HTMLBlock is a block of pre-rendered HTML, for callers that want to drop in
@@ -122,12 +156,13 @@ type HeaderBlock struct {
 }
 
 func (b HeaderBlock) Render(rc RenderContext) (template.HTML, error) {
-	return TemplateBlock{Name: "block/header", Model: b, Template: Shell}.Render(rc)
+	return TemplateBlock{Name: "block/header", Model: b, Template: shell}.Render(rc)
 }
 
 // CardBlock wraps a body block in a Bootstrap card with a title and optional
-// subtitle. The body is itself a Block, rendered with the same rc - so gating
-// and nested blocks compose inside a card like anywhere else.
+// subtitle. The body is itself a Block, rendered inline by the card template via
+// the render func (RenderTemplate), with the same rc - so gating and nested
+// blocks compose inside a card like anywhere else.
 type CardBlock struct {
 	Title    string
 	Subtitle string
@@ -137,27 +172,8 @@ type CardBlock struct {
 	Raised bool
 }
 
-// cardModel is what the card sub-template reads: the card's own fields plus the
-// already-rendered body HTML.
-type cardModel struct {
-	Title    string
-	Subtitle string
-	Raised   bool
-	Body     template.HTML
-}
-
 func (b CardBlock) Render(rc RenderContext) (template.HTML, error) {
-	var body template.HTML
-	if b.Body != nil {
-		var err error
-		if body, err = b.Body.Render(rc); err != nil {
-			return "", err
-		}
-	}
-
-	model := cardModel{Title: b.Title, Subtitle: b.Subtitle, Raised: b.Raised, Body: body}
-
-	return TemplateBlock{Name: "block/card", Model: model, Template: Shell}.Render(rc)
+	return TemplateBlock{Name: "block/card", Model: b, Template: shell}.Render(rc)
 }
 
 // SummaryBlock is a SummaryItem list rendered as the current-state summary card.
@@ -171,7 +187,7 @@ type SummaryBlock []SummaryItem
 func (b SummaryBlock) Render(rc RenderContext) (template.HTML, error) {
 	items := demoteLinks(rc, b)
 
-	return TemplateBlock{Name: "block/summary", Model: items, Empty: len(items) == 0, Template: Shell}.Render(rc)
+	return TemplateBlock{Name: "block/summary", Model: items, Empty: len(items) == 0, Template: shell}.Render(rc)
 }
 
 // ActionsBlock is an Action list rendered as the actions table. It gates itself
@@ -185,7 +201,7 @@ type ActionsBlock []Action
 func (b ActionsBlock) Render(rc RenderContext) (template.HTML, error) {
 	actions := GateSlice(rc, b)
 
-	return TemplateBlock{Name: "block/actions", Model: actions, Empty: len(actions) == 0, Template: Shell}.Render(rc)
+	return TemplateBlock{Name: "block/actions", Model: actions, Empty: len(actions) == 0, Template: shell}.Render(rc)
 }
 
 // NavBlock is a NavLink list rendered as a <nav> bar. It gates itself at render
@@ -199,7 +215,7 @@ type NavBlock []NavLink
 func (b NavBlock) Render(rc RenderContext) (template.HTML, error) {
 	links := GateSlice(rc, b)
 
-	return TemplateBlock{Name: "block/nav", Model: links, Empty: len(links) == 0, Template: Shell}.Render(rc)
+	return TemplateBlock{Name: "block/nav", Model: links, Empty: len(links) == 0, Template: shell}.Render(rc)
 }
 
 // PagerModel is the pagination state a PagerBlock renders. Both pagers (above
@@ -223,22 +239,22 @@ type tableModel struct {
 // FiltersBlock renders the GET filter form. Renders nothing when filters is
 // empty.
 func FiltersBlock(filters []OverviewFilter) Block {
-	return TemplateBlock{Name: "overview/filters", Model: filters, Empty: len(filters) == 0, Template: Shell}
+	return TemplateBlock{Name: "overview/filters", Model: filters, Empty: len(filters) == 0, Template: shell}
 }
 
 // ScopeNoteBlock renders the one-line scope note. Renders nothing when empty.
 func ScopeNoteBlock(note string) Block {
-	return TemplateBlock{Name: "overview/scopenote", Model: note, Empty: note == "", Template: Shell}
+	return TemplateBlock{Name: "overview/scopenote", Model: note, Empty: note == "", Template: shell}
 }
 
 // PagerBlock renders the pagination nav. Renders nothing when there is no
 // previous or next page.
 func PagerBlock(m PagerModel) Block {
-	return TemplateBlock{Name: "overview/pager", Model: m, Empty: m.PrevLink == "" && m.NextLink == "", Template: Shell}
+	return TemplateBlock{Name: "overview/pager", Model: m, Empty: m.PrevLink == "" && m.NextLink == "", Template: shell}
 }
 
 // TableBlock renders the clickable rows table. Always renders (shows a "No
 // records." row when rows is empty).
 func TableBlock(headers []string, rows []OverviewRow) Block {
-	return TemplateBlock{Name: "overview/table", Model: tableModel{Headers: headers, Rows: rows}, Template: Shell}
+	return TemplateBlock{Name: "overview/table", Model: tableModel{Headers: headers, Rows: rows}, Template: shell}
 }

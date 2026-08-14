@@ -16,20 +16,26 @@ import (
 //go:embed templates
 var shellFS embed.FS
 
-// Shell is the parsed page shell together with the built-in block sub-templates
-// (block/summary, block/actions, overview/*). The built-in blocks render against
-// it, so it stays the home of those definitions. Page packages do not parse into
-// Shell; they build their own template with Templates or TemplatesFromFS.
-var Shell = MustTemplatesFromFS(shellFS)
+// shell is the pristine base template: the page shell plus the built-in block
+// sub-templates (block/summary, block/actions, overview/*), parsed from shellFS.
+// It is never executed or mutated directly - a template that has executed can no
+// longer be cloned - only cloned (by RenderTemplate, per render). It is
+// unexported so no caller can execute it by accident.
+var shell = MustTemplatesFromFS(shellFS)
 
-// defaultFuncs registers the funcs every boff page template shares, so a page's
-// own block templates can use them without re-declaring: formatTime for
-// timestamps, add for index arithmetic in ranges, formatMoney for amounts.
-func defaultFuncs(t *template.Template) *template.Template {
-	return t.Funcs(template.FuncMap{
+// defaultFuncs returns a fresh empty template named "boff" carrying the funcs
+// every boff page template shares, so a page's own block templates can use them
+// without re-declaring: formatTime for timestamps, add for index arithmetic in
+// ranges, formatMoney for amounts, and a placeholder render (rebound per call by
+// RenderTemplate) so templates using {{ . | render }} still parse.
+func defaultFuncs() *template.Template {
+	return template.New("boff").Funcs(template.FuncMap{
 		"formatTime":  func(t time.Time) string { return t.Format("2006-01-02 15:04:05.000") },
 		"add":         func(a, b int) int { return a + b },
 		"formatMoney": formatMoney,
+		"render": func(Block) (template.HTML, error) {
+			return "", fmt.Errorf("render: template executed without RenderTemplate - the render func was never bound to a RenderContext")
+		},
 	})
 }
 
@@ -53,19 +59,19 @@ func formatMoney(minor any, currency string) (string, error) {
 	return fmt.Sprintf("%s%d.%02d %s", sign, n/100, n%100, currency), nil
 }
 
-// Templates returns a fresh page template carrying the shared default funcs
-// (formatTime, add). Parse your own block sub-templates into it, then pass it to
-// Render. The built-in blocks resolve their own sub-templates against Shell, so
-// this template needs only whatever your custom blocks define.
+// Templates returns a fresh, empty page template carrying only the shared default
+// funcs (formatTime, add, formatMoney, render). Parse your own block
+// sub-templates into it, then pass it to RenderWithShell. It is a fresh template
+// every call, so callers never share (or accidentally execute) a common base.
 func Templates() *template.Template {
-	return defaultFuncs(template.New("boff"))
+	return defaultFuncs()
 }
 
 // TemplatesFromFS is Templates with every .gohtml file in fsys parsed in, for a
 // page that keeps its block templates in an embedded FS. It walks fsys, so the
 // files may sit at any depth (a templates/ subdirectory, say) without the caller
 // naming a glob. The parsed definitions and the shared funcs are all available
-// to Render.
+// to RenderWithShell.
 func TemplatesFromFS(fsys fs.FS) (*template.Template, error) {
 	tpl := Templates()
 
@@ -125,16 +131,17 @@ type shellData struct {
 }
 
 // Render renders cfg.Blocks and writes the full page shell to w, using the
-// built-in Shell. Each block renders with a RenderContext carrying cfg.Viewer,
-// so blocks gate themselves; blocks resolve their own sub-templates via the
-// template they were built with. Use RenderWithShell to supply your own shell
-// template (a clone of Shell carrying extra funcs or sub-templates).
+// built-in shell. Each block renders with a RenderContext carrying cfg.Viewer,
+// so blocks gate themselves. Use RenderWithShell to supply your own shell
+// template (from Templates or TemplatesFromFS) carrying extra funcs or
+// sub-templates.
 func Render(w io.Writer, cfg RenderConfig) error {
-	return RenderWithShell(w, Shell, cfg)
+	return RenderWithShell(w, shell, cfg)
 }
 
-// RenderWithShell is Render with an explicit shell template. tpl provides the
-// "boff/shell" definition (parse your block templates into a clone of Shell).
+// RenderWithShell is Render with an explicit shell template, from Templates or
+// TemplatesFromFS. tpl is never executed directly - RenderTemplate executes a
+// render-bound clone so tpl stays pristine and reusable.
 func RenderWithShell(w io.Writer, tpl *template.Template, cfg RenderConfig) error {
 	rc := RenderContext{Viewer: cfg.Viewer}
 
@@ -143,8 +150,13 @@ func RenderWithShell(w io.Writer, tpl *template.Template, cfg RenderConfig) erro
 		return err
 	}
 
-	if err := tpl.ExecuteTemplate(w, "boff/shell", shellData{RenderConfig: cfg, Blocks: blocks}); err != nil {
+	html, err := RenderTemplate(rc, tpl, "boff/shell", shellData{RenderConfig: cfg, Blocks: blocks})
+	if err != nil {
 		return fmt.Errorf("render shell: %w", err)
+	}
+
+	if _, err := io.WriteString(w, string(html)); err != nil {
+		return fmt.Errorf("write shell: %w", err)
 	}
 
 	return nil
