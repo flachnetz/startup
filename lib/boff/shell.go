@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"io"
 	"io/fs"
+	"reflect"
 	"strings"
 	"time"
 
@@ -23,12 +24,33 @@ var Shell = MustTemplatesFromFS(shellFS)
 
 // defaultFuncs registers the funcs every boff page template shares, so a page's
 // own block templates can use them without re-declaring: formatTime for
-// timestamps, add for index arithmetic in ranges.
+// timestamps, add for index arithmetic in ranges, formatMoney for amounts.
 func defaultFuncs(t *template.Template) *template.Template {
 	return t.Funcs(template.FuncMap{
-		"formatTime": func(t time.Time) string { return t.Format("2006-01-02 15:04:05.000") },
-		"add":        func(a, b int) int { return a + b },
+		"formatTime":  func(t time.Time) string { return t.Format("2006-01-02 15:04:05.000") },
+		"add":         func(a, b int) int { return a + b },
+		"formatMoney": formatMoney,
 	})
+}
+
+// formatMoney renders an integer amount in minor units (cents) with its currency
+// as "0.00 EUR": formatMoney 1234 "EUR" is "12.34 EUR". A negative amount keeps
+// its sign before the digits ("-12.34 EUR"). minor is taken via reflection so a
+// template can pass any integer kind (int, int32, int64).
+func formatMoney(minor any, currency string) (string, error) {
+	v := reflect.ValueOf(minor)
+	if !v.CanInt() {
+		return "", fmt.Errorf("formatMoney: amount must be an integer, got %T", minor)
+	}
+
+	n := v.Int()
+
+	sign := ""
+	if n < 0 {
+		sign, n = "-", -n
+	}
+
+	return fmt.Sprintf("%s%d.%02d %s", sign, n/100, n%100, currency), nil
 }
 
 // Templates returns a fresh page template carrying the shared default funcs
