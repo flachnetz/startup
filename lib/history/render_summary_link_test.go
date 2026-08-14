@@ -4,20 +4,18 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/flachnetz/startup/v2/lib/boff"
 )
 
 // A SummaryItem with a Link renders as an anchor; without one it stays plain
 // text. Exercises the template branch added for cross-service backoffice links.
 func TestSummaryItemLinkRendersAnchor(t *testing.T) {
 	var buf bytes.Buffer
-	err := pageTemplate.Execute(&buf, PageModel{
-		Title:   "t",
-		GroupId: "order:1",
-		Summary: []SummaryItem{
-			{Label: "Payment ID", Value: "pay_1", Link: "/payments/backoffice/v1/payments/pay_1/history"},
-			{Label: "Status", Value: "PAID"},
-		},
-	})
+	err := boff.Render(&buf, pageTemplate, boff.RenderConfig{Title: "t", Subtitle: "order:1", Blocks: []boff.Block{SummaryBlock([]SummaryItem{
+		{Label: "Payment ID", Value: "pay_1", Link: "/payments/backoffice/v1/payments/pay_1/history"},
+		{Label: "Status", Value: "PAID"},
+	})}})
 	if err != nil {
 		t.Fatalf("execute template: %v", err)
 	}
