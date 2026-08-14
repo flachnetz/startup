@@ -111,6 +111,20 @@ func Blocks(children ...Block) Block {
 	})
 }
 
+// HeaderBlock is the page heading: an h1 title, an optional monospace subtitle,
+// and an optional error alert. It was the shell's built-in header; as a block a
+// page places it wherever it likes (or drops it), for full control of the page
+// layout.
+type HeaderBlock struct {
+	Title        string
+	Subtitle     string
+	ErrorMessage string
+}
+
+func (b HeaderBlock) Render(rc RenderContext) (template.HTML, error) {
+	return TemplateBlock{Name: "block/header", Model: b, Template: Shell}.Render(rc)
+}
+
 // SummaryBlock is a SummaryItem list rendered as the current-state summary card.
 // It gates itself at render time: the links a viewer may not follow are demoted
 // to plain values. Renders nothing when empty.

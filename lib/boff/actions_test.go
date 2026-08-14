@@ -10,7 +10,7 @@ import (
 // embedding shell to repair.
 func TestActionsBlockActionIsAPlainForm(t *testing.T) {
 	var buf bytes.Buffer
-	err := Render(&buf, Shell, RenderConfig{Title: "t", Subtitle: "order:1", Blocks: []Block{ActionsBlock([]Action{{
+	err := Render(&buf, RenderConfig{Title: "t", Blocks: []Block{ActionsBlock([]Action{{
 		Description: "Cancel order", ButtonText: "Cancel",
 		Endpoint: "/orders/backoffice/v1/orders/o1/cancel",
 	}})}})
@@ -34,7 +34,7 @@ func TestActionsBlockActionIsAPlainForm(t *testing.T) {
 // driven by Bootstrap's own JS, which the shell already loads.
 func TestActionsBlockConfirmationWrapsTheFormInAModal(t *testing.T) {
 	var buf bytes.Buffer
-	err := Render(&buf, Shell, RenderConfig{Title: "t", Subtitle: "order:1", Blocks: []Block{ActionsBlock([]Action{{
+	err := Render(&buf, RenderConfig{Title: "t", Blocks: []Block{ActionsBlock([]Action{{
 		Description: "Cancel order", ButtonText: "Cancel",
 		Endpoint: "/orders/backoffice/v1/orders/o1/cancel", ConfirmMessage: "Cancel order o1?",
 	}})}})
