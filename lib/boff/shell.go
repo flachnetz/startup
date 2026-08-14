@@ -7,17 +7,19 @@ import (
 	"io"
 )
 
-//go:embed templates/shell.gohtml
+//go:embed templates/shell.gohtml templates/blocks.gohtml
 var shellFS embed.FS
 
 // Shell is the parsed page shell, a full HTML document that renders a title, an
-// optional subtitle and error line, and then concatenates the page's blocks. A
-// page package parses its own block sub-templates into a clone of this shell so
-// TemplateBlock names resolve, then renders with Render.
+// optional subtitle and error line, and then concatenates the page's blocks. It
+// also carries the built-in block sub-templates (block/summary, block/actions,
+// overview/*), so a page package that clones Shell has them available. A page
+// package parses its own extra block sub-templates into a clone of this shell,
+// then renders with Render.
 //
 // The shell is exposed as a template rather than a render function so callers
 // keep control of Funcs and of parsing their own block definitions alongside it.
-var Shell = template.Must(template.New("boff").ParseFS(shellFS, "templates/shell.gohtml"))
+var Shell = template.Must(template.New("boff").ParseFS(shellFS, "templates/*.gohtml"))
 
 // RenderConfig is the caller-supplied config for the shell. Subtitle and
 // ErrorMessage are optional. Blocks are rendered into the shell in order.

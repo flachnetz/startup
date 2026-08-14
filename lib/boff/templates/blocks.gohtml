@@ -1,3 +1,63 @@
+{{ define "block/summary" }}
+<div class="card mb-4">
+    <div class="card-body py-2">
+        <dl class="row row-cols-1 row-cols-md-2 mb-0 small">
+            {{ range . }}
+            <div class="col d-flex gap-2 border-bottom py-1">
+                <dt class="fw-semibold text-nowrap" style="min-width:11em">{{ .Label }}</dt>
+                <dd class="mb-0 font-monospace text-break">
+                    {{ if .Link }}<a href="{{ .Link }}">{{ .Value }}</a>{{ else }}{{ .Value }}{{ end }}
+                </dd>
+            </div>
+            {{ end }}
+        </dl>
+    </div>
+</div>
+{{ end }}
+
+{{ define "block/actions" }}
+<h2 class="h5">Actions</h2>
+<div class="table-responsive mb-4">
+    <table class="table table-sm align-middle">
+        <thead>
+        <tr><th scope="col">Description</th><th scope="col">Action</th></tr>
+        </thead>
+        <tbody>
+        {{ range $i, $a := . }}
+        <tr>
+            <td>{{ $a.Description }}</td>
+            <td>
+                {{ if $a.StatusText }}
+                    <span class="badge text-bg-secondary">{{ $a.StatusText }}</span>
+                {{ else if $a.Link }}
+                    <a class="btn btn-sm btn-outline-primary" href="{{ $a.Endpoint }}">{{ $a.ButtonText }}</a>
+                {{ else if $a.ConfirmMessage }}
+                    <button class="btn btn-sm btn-outline-danger" type="button"
+                            data-bs-toggle="modal" data-bs-target="#action-confirm-{{ $i }}">{{ $a.ButtonText }}</button>
+                    <div class="modal fade" id="action-confirm-{{ $i }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <form class="modal-content" method="POST" action="{{ $a.Endpoint }}">
+                                <div class="modal-body">{{ $a.ConfirmMessage }}</div>
+                                <div class="modal-footer">
+                                    <button class="btn btn-sm btn-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+                                    <button class="btn btn-sm btn-danger" type="submit">{{ $a.ButtonText }}</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                {{ else }}
+                    <form method="POST" action="{{ $a.Endpoint }}">
+                        <button class="btn btn-sm btn-outline-danger" type="submit">{{ $a.ButtonText }}</button>
+                    </form>
+                {{ end }}
+            </td>
+        </tr>
+        {{ end }}
+        </tbody>
+    </table>
+</div>
+{{ end }}
+
 {{ define "overview/filters" }}
 <form method="GET" class="row row-cols-lg-auto g-2 align-items-end mb-3">
     {{ range . }}
