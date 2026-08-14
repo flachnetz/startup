@@ -1,3 +1,9 @@
+{{ define "block/header" }}
+<h1 class="h4 mb-1">{{ .Title }}</h1>
+{{ if .Subtitle }}<p class="text-body-secondary small font-monospace">{{ .Subtitle }}</p>{{ end }}
+{{ if .ErrorMessage }}<div class="alert alert-danger" role="alert">{{ .ErrorMessage }}</div>{{ end }}
+{{ end }}
+
 {{ define "block/summary" }}
 <div class="card mb-4">
     <div class="card-body py-2">
