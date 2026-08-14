@@ -4,6 +4,24 @@
 {{ if .ErrorMessage }}<div class="alert alert-danger" role="alert">{{ .ErrorMessage }}</div>{{ end }}
 {{ end }}
 
+{{ define "block/nav" }}
+<nav class="nav nav-pills mb-3">
+    {{ range . }}
+    <a class="nav-link{{ if .Active }} active{{ end }}" href="{{ .Href }}"{{ if .Active }} aria-current="page"{{ end }}>{{ .Label }}</a>
+    {{ end }}
+</nav>
+{{ end }}
+
+{{ define "block/card" }}
+<div class="card mb-4{{ if .Raised }} shadow-sm{{ end }}">
+    <div class="card-body">
+        {{ if .Title }}<h5 class="card-title">{{ .Title }}</h5>{{ end }}
+        {{ if .Subtitle }}<h6 class="card-subtitle mb-2 text-body-secondary">{{ .Subtitle }}</h6>{{ end }}
+        {{ .Body }}
+    </div>
+</div>
+{{ end }}
+
 {{ define "block/summary" }}
 <div class="card mb-4">
     <div class="card-body py-2">

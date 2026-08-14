@@ -44,6 +44,9 @@ type Action struct {
 	RequiredRole Role
 }
 
+// GatingRole implements HasRequiredRole.
+func (a Action) GatingRole() Role { return a.RequiredRole }
+
 // SummaryItem is one label/value row shown above the page content, describing
 // the current state of the tracked object. Ordered slice (not a map) so the page
 // renders stably.
@@ -61,14 +64,20 @@ type SummaryItem struct {
 	RequiredRole Role
 }
 
-// GateActions returns the actions rc's viewer may perform, dropping the rest.
-// Exposed so a custom block that renders its own actions gates them the same way
-// ActionsBlock does.
-func GateActions(rc RenderContext, actions []Action) []Action {
-	gated := make([]Action, 0, len(actions))
-	for _, action := range actions {
-		if rc.May(action.RequiredRole) {
-			gated = append(gated, action)
+// HasRequiredRole is implemented by anything a viewer can be gated against - an
+// Action, a NavLink. GateSlice uses it to drop the entries a viewer may not see,
+// so a new gated element type only has to report its role, not its own filter.
+type HasRequiredRole interface {
+	GatingRole() Role
+}
+
+// GateSlice returns the entries rc's viewer may see, dropping the rest. Returns
+// nil when nothing survives, so an empty block renders nothing.
+func GateSlice[T HasRequiredRole](rc RenderContext, values []T) []T {
+	gated := make([]T, 0, len(values))
+	for _, v := range values {
+		if rc.May(v.GatingRole()) {
+			gated = append(gated, v)
 		}
 	}
 
@@ -79,11 +88,11 @@ func GateActions(rc RenderContext, actions []Action) []Action {
 	return gated
 }
 
-// DemoteLinks returns a copy of summary with the links rc's viewer may not follow
-// blanked out - the label and value survive, only the anchor is dropped. Exposed
-// so a custom block that renders summary-like rows gates its links the same way
-// SummaryBlock does.
-func DemoteLinks(rc RenderContext, summary []SummaryItem) []SummaryItem {
+// demoteLinks returns a copy of summary with the links rc's viewer may not follow
+// blanked out - the label and value survive, only the anchor is dropped. Unlike
+// gateSlice, a denied item is kept, since its value is not the secret; only the
+// page behind the link is.
+func demoteLinks(rc RenderContext, summary []SummaryItem) []SummaryItem {
 	demoted := make([]SummaryItem, len(summary))
 	for i, item := range summary {
 		if item.Link != "" && !rc.May(item.RequiredRole) {
@@ -94,3 +103,21 @@ func DemoteLinks(rc RenderContext, summary []SummaryItem) []SummaryItem {
 
 	return demoted
 }
+
+// NavLink is one entry of a NavBlock: a labelled link in the page's navigation
+// bar. Active marks the current page, so the nav can highlight where the viewer
+// is.
+type NavLink struct {
+	Label  string // e.g. "Orders"
+	Href   string // e.g. "/orders/backoffice/v1/orders"
+	Active bool   // true renders the current page's entry as active
+
+	// RequiredRole gates the link, in the same notation as Action.RequiredRole. A
+	// viewer who lacks the role does not see the entry at all - a nav link is a
+	// pointer to a page, and pointing a read-only user at a page they cannot open
+	// is noise.
+	RequiredRole Role
+}
+
+// GatingRole implements HasRequiredRole.
+func (l NavLink) GatingRole() Role { return l.RequiredRole }
