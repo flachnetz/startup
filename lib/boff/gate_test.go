@@ -22,7 +22,7 @@ func renderGated(t *testing.T, ctx context.Context, cfg gateConfig) string {
 	t.Helper()
 
 	var buf bytes.Buffer
-	if err := Render(&buf, Shell, RenderConfig{Title: "t", Subtitle: "order:1", Viewer: ViewerOf(ctx, cfg.Viewer), Blocks: []Block{
+	if err := Render(&buf, RenderConfig{Title: "t", Viewer: ViewerOf(ctx, cfg.Viewer), Blocks: []Block{
 		SummaryBlock(cfg.Summary),
 		ActionsBlock(cfg.Actions),
 	}}); err != nil {
@@ -147,7 +147,7 @@ func TestGateBlock_HidesWholeBlockFromDeniedViewer(t *testing.T) {
 
 	render := func(viewer *jwt.Identity) string {
 		var buf bytes.Buffer
-		if err := Render(&buf, Shell, RenderConfig{Title: "t", Viewer: viewer, Blocks: []Block{
+		if err := Render(&buf, RenderConfig{Title: "t", Viewer: viewer, Blocks: []Block{
 			Gate(jwt.RoleAdmin, secret),
 		}}); err != nil {
 			t.Fatalf("execute template: %v", err)

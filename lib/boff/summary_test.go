@@ -10,7 +10,7 @@ import (
 // text. Exercises the template branch added for cross-service backoffice links.
 func TestSummaryItemLinkRendersAnchor(t *testing.T) {
 	var buf bytes.Buffer
-	err := Render(&buf, Shell, RenderConfig{Title: "t", Subtitle: "order:1", Blocks: []Block{SummaryBlock([]SummaryItem{
+	err := Render(&buf, RenderConfig{Title: "t", Blocks: []Block{SummaryBlock([]SummaryItem{
 		{Label: "Payment ID", Value: "pay_1", Link: "/payments/backoffice/v1/payments/pay_1/history"},
 		{Label: "Status", Value: "PAID"},
 	})}})

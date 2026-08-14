@@ -69,16 +69,17 @@ type OverviewConfig struct {
 // the box, handed to an OverviewConfig.Blocks callback so custom layouts can
 // reuse them. Pager is shared by the top and bottom pager.
 type DefaultOverviewBlocks struct {
+	Header    Block
 	Filters   Block
 	ScopeNote Block
 	Pager     Block
 	Table     Block
 }
 
-// All returns the default blocks in their default order (filters, scope note,
-// pager, table, pager).
+// All returns the default blocks in their default order (header, filters, scope
+// note, pager, table, pager).
 func (d DefaultOverviewBlocks) All() []Block {
-	return []Block{d.Filters, d.ScopeNote, d.Pager, d.Table, d.Pager}
+	return []Block{d.Header, d.Filters, d.ScopeNote, d.Pager, d.Table, d.Pager}
 }
 
 // PageParam is the query parameter the overview pager pages with.
@@ -163,6 +164,7 @@ func RenderOverviewWithConfig(w io.Writer, cfg OverviewConfig) error {
 	}
 
 	defaults := DefaultOverviewBlocks{
+		Header:    HeaderBlock{Title: cfg.Title},
 		Filters:   FiltersBlock(cfg.Filters),
 		ScopeNote: ScopeNoteBlock(cfg.ScopeNote),
 		Pager:     PagerBlock(pager),
@@ -174,5 +176,5 @@ func RenderOverviewWithConfig(w io.Writer, cfg OverviewConfig) error {
 		blocks = cfg.Blocks(defaults)
 	}
 
-	return Render(w, Shell, RenderConfig{Title: cfg.Title, Blocks: blocks})
+	return Render(w, RenderConfig{Title: cfg.Title, Blocks: blocks})
 }
