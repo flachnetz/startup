@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/flachnetz/startup/v2/lib/boff"
 	"github.com/flachnetz/startup/v2/lib/events"
 	"github.com/flachnetz/startup/v2/lib/ql"
 	"github.com/flachnetz/startup/v2/startup_base"
@@ -101,7 +102,7 @@ func RenderPageAt(ctx context.Context, w io.Writer, groupId GroupId, title strin
 }
 
 // RenderPageSummary is RenderPage with a current-state summary above the ledger.
-func RenderPageSummary(ctx context.Context, w io.Writer, groupId GroupId, title string, summary []SummaryItem) error {
+func RenderPageSummary(ctx context.Context, w io.Writer, groupId GroupId, title string, summary []boff.SummaryItem) error {
 	if instance == nil {
 		return errors.New("history: global instance not initialized")
 	}
@@ -110,7 +111,7 @@ func RenderPageSummary(ctx context.Context, w io.Writer, groupId GroupId, title 
 }
 
 // RenderPageSummaryAt is RenderPageSummary with the Athena fallback (see RenderPageAt).
-func RenderPageSummaryAt(ctx context.Context, w io.Writer, groupId GroupId, title string, summary []SummaryItem, createdTime time.Time) error {
+func RenderPageSummaryAt(ctx context.Context, w io.Writer, groupId GroupId, title string, summary []boff.SummaryItem, createdTime time.Time) error {
 	if instance == nil {
 		return errors.New("history: global instance not initialized")
 	}
