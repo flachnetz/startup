@@ -46,7 +46,7 @@ func (v RecordView) JSONHTML() template.HTML {
 // HistoryItemsBlock renders the record ledger. Always renders (shows a "No
 // history records." note when views is empty).
 func HistoryItemsBlock(views []RecordView) boff.Block {
-	return boff.TemplateBlock{Name: "block/records", Model: views}
+	return boff.TemplateBlock{Name: "block/records", Model: views, Template: pageTemplate}
 }
 
 // PageConfig bundles all optional display elements for a history detail page.
@@ -120,8 +120,6 @@ func (h *Service) RenderPageWithConfig(ctx context.Context, w io.Writer, groupId
 }
 
 func (h *Service) renderPage(ctx context.Context, w io.Writer, groupId GroupId, title string, cfg PageConfig) error {
-	summary, actions := boff.Gate(boff.ViewerOf(ctx, cfg.Viewer), cfg.Summary, cfg.Actions)
-
 	records, err := ql.InNewTransactionWithResult(ctx, h.txStarter, func(ctx ql.TxContext) ([]Record, error) {
 		return h.RecordsAt(ctx, groupId, cfg.CreatedAt)
 	})
@@ -150,8 +148,8 @@ func (h *Service) renderPage(ctx context.Context, w io.Writer, groupId GroupId, 
 	}
 
 	defaults := DefaultBlocks{
-		Summary: boff.SummaryBlock(summary),
-		Actions: boff.ActionsBlock(actions),
+		Summary: boff.SummaryBlock(cfg.Summary),
+		Actions: boff.ActionsBlock(cfg.Actions),
 		Records: HistoryItemsBlock(views),
 	}
 
@@ -163,6 +161,7 @@ func (h *Service) renderPage(ctx context.Context, w io.Writer, groupId GroupId, 
 	return boff.Render(w, pageTemplate, boff.RenderConfig{
 		Title:    title,
 		Subtitle: "GroupId: " + groupId.String(),
+		Viewer:   boff.ViewerOf(ctx, cfg.Viewer),
 		Blocks:   blocks,
 	})
 }
