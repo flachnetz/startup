@@ -1,78 +1,66 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ .Title }}</title>
-    <!-- Bootstrap only for direct (non-embedded) access: backoffice drops this
-         <head> when it embeds the page as a fragment and supplies its own build. -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-</head>
-<body>
-<div class="container-fluid py-3">
-    <h1 class="h4 mb-3">{{ .Title }}</h1>
-    {{ if .Filters }}
-    <form method="GET" class="row row-cols-lg-auto g-2 align-items-end mb-3">
-        {{ range .Filters }}
-        {{ if .Hidden }}
-        <input type="hidden" name="{{ .Name }}" value="{{ .Value }}">
+{{ define "overview/filters" }}
+<form method="GET" class="row row-cols-lg-auto g-2 align-items-end mb-3">
+    {{ range . }}
+    {{ if .Hidden }}
+    <input type="hidden" name="{{ .Name }}" value="{{ .Value }}">
+    {{ else }}
+    <div class="col-12">
+        <label class="form-label mb-1" for="filter-{{ .Name }}">{{ .Label }}</label>
+        {{ if .Options }}
+        <select class="form-select form-select-sm" id="filter-{{ .Name }}" name="{{ .Name }}">
+            {{ $selected := .Value }}
+            {{ range .Options }}
+            <option value="{{ .Value }}"{{ if eq .Value $selected }} selected{{ end }}>{{ .Label }}</option>
+            {{ end }}
+        </select>
         {{ else }}
-        <div class="col-12">
-            <label class="form-label mb-1" for="filter-{{ .Name }}">{{ .Label }}</label>
-            {{ if .Options }}
-            <select class="form-select form-select-sm" id="filter-{{ .Name }}" name="{{ .Name }}">
-                {{ $selected := .Value }}
-                {{ range .Options }}
-                <option value="{{ .Value }}"{{ if eq .Value $selected }} selected{{ end }}>{{ .Label }}</option>
-                {{ end }}
-            </select>
-            {{ else }}
-            <input class="form-control form-control-sm" type="{{ .InputType }}" id="filter-{{ .Name }}"
-                   name="{{ .Name }}" value="{{ .Value }}" placeholder="{{ .Placeholder }}">
-            {{ end }}
-        </div>
+        <input class="form-control form-control-sm" type="{{ .InputType }}" id="filter-{{ .Name }}"
+               name="{{ .Name }}" value="{{ .Value }}" placeholder="{{ .Placeholder }}">
         {{ end }}
-        {{ end }}
-        <div class="col-12">
-            <button class="btn btn-sm btn-primary" type="submit">Filter</button>
-        </div>
-        <div class="col-12">
-            <a class="btn btn-sm btn-outline-secondary" href="?">Clear</a>
-        </div>
-    </form>
-    {{ end }}
-    {{ if .ScopeNote }}<p class="text-body-secondary small mb-2">{{ .ScopeNote }}</p>{{ end }}
-    {{ template "pager" . }}
-    <div class="table-responsive">
-        <table class="table table-sm table-hover align-middle">
-            <thead>
-            <tr>{{ range .Headers }}<th scope="col">{{ . }}</th>{{ end }}</tr>
-            </thead>
-            <tbody class="font-monospace small">
-            {{ range $row := .Rows }}
-            {{ $link := $row.Link }}
-            <tr>
-                {{ range $i, $text := $row.Cells }}
-                {{ $cell := $row.CellAt $i }}
-                <td>
-                    {{ if $cell.Link }}<a href="{{ $cell.Link }}">{{ $cell.Text }}</a>
-                    {{ else if $link }}<a class="d-block text-reset text-decoration-none" href="{{ $link }}">{{ $cell.Text }}</a>
-                    {{ else }}{{ $cell.Text }}{{ end }}
-                </td>
-                {{ end }}
-            </tr>
-            {{ else }}
-            <tr><td colspan="{{ len .Headers }}" class="text-body-secondary">No records.</td></tr>
-            {{ end }}
-            </tbody>
-        </table>
     </div>
-    {{ template "pager" . }}
-</div>
-</body>
-</html>
+    {{ end }}
+    {{ end }}
+    <div class="col-12">
+        <button class="btn btn-sm btn-primary" type="submit">Filter</button>
+    </div>
+    <div class="col-12">
+        <a class="btn btn-sm btn-outline-secondary" href="?">Clear</a>
+    </div>
+</form>
+{{ end }}
 
-{{ define "pager" }}
+{{ define "overview/scopenote" }}
+<p class="text-body-secondary small mb-2">{{ . }}</p>
+{{ end }}
+
+{{ define "overview/table" }}
+<div class="table-responsive">
+    <table class="table table-sm table-hover align-middle">
+        <thead>
+        <tr>{{ range .Headers }}<th scope="col">{{ . }}</th>{{ end }}</tr>
+        </thead>
+        <tbody class="font-monospace small">
+        {{ range $row := .Rows }}
+        {{ $link := $row.Link }}
+        <tr>
+            {{ range $i, $text := $row.Cells }}
+            {{ $cell := $row.CellAt $i }}
+            <td>
+                {{ if $cell.Link }}<a href="{{ $cell.Link }}">{{ $cell.Text }}</a>
+                {{ else if $link }}<a class="d-block text-reset text-decoration-none" href="{{ $link }}">{{ $cell.Text }}</a>
+                {{ else }}{{ $cell.Text }}{{ end }}
+            </td>
+            {{ end }}
+        </tr>
+        {{ else }}
+        <tr><td colspan="{{ len .Headers }}" class="text-body-secondary">No records.</td></tr>
+        {{ end }}
+        </tbody>
+    </table>
+</div>
+{{ end }}
+
+{{ define "overview/pager" }}
 {{ if or .PrevLink .NextLink }}
 <nav class="d-flex gap-2 align-items-center my-2">
     {{ if .FirstLink }}<a class="btn btn-sm btn-outline-secondary" href="{{ .FirstLink }}">&laquo; First</a>

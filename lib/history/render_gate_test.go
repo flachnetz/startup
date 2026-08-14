@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/flachnetz/startup/v2/lib/boff"
 	"github.com/flachnetz/startup/v2/lib/jwt"
 )
 
@@ -17,12 +18,10 @@ func renderGated(t *testing.T, ctx context.Context, cfg PageConfig) string {
 	summary, actions := gate(viewerOf(ctx, cfg.Viewer), cfg.Summary, cfg.Actions)
 
 	var buf bytes.Buffer
-	if err := pageTemplate.Execute(&buf, PageModel{
-		Title:   "t",
-		GroupId: "order:1",
-		Summary: summary,
-		Actions: actions,
-	}); err != nil {
+	if err := boff.Render(&buf, pageTemplate, boff.RenderConfig{Title: "t", Subtitle: "order:1", Blocks: []boff.Block{
+		SummaryBlock(summary),
+		ActionsBlock(actions),
+	}}); err != nil {
 		t.Fatalf("execute template: %v", err)
 	}
 
