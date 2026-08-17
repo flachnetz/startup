@@ -102,7 +102,7 @@
             <th scope="col"><div class="text-nowrap">Filter Tags (comma separated)</div></th>
         </tr>
         </thead>
-        {{ $failPoints := .FailPoints}}
+        {{ $failPointsByLocation := .FailPointsByLocation }}
         {{ range $location, $failpoint := .FailPointLocations }}
             <tr>
                 <td class="scope"><span>{{ $location }}</span></td>
@@ -111,7 +111,7 @@
                         <div class="list-group list-group-flush border-bottom ">
                             <select class="form-select" aria-label="Default select example" id="select__{{ $location }}"
                                     onchange="updateFailPoint({{$location}})">
-                                {{ range $fp := $failPoints }}
+                                {{ range $fp := index $failPointsByLocation $location }}
                                     <option {{ if eq $fp.ErrorName $failpoint.ErrorName }} selected {{ end }}
                                             value={{ $fp.ErrorName }}>{{ $fp.ErrorName }}</option>
                                 {{ end }}
