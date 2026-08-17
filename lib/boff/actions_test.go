@@ -49,9 +49,26 @@ func TestActionsBlockConfirmationWrapsTheFormInAModal(t *testing.T) {
 		`id="action-confirm-0"`,
 		`Cancel order o1?`,
 		`<form class="modal-content" method="POST" action="/orders/backoffice/v1/orders/o1/cancel">`,
+		// Confirm defaults to "OK", not the action label: two "Cancel" buttons in
+		// one footer read as a choice between cancelling twice.
+		`type="submit">OK</button>`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("confirmation modal missing %s:\n%s", want, out)
 		}
+	}
+}
+
+func TestActionsBlockConfirmTextOverridesTheConfirmButtonLabel(t *testing.T) {
+	var buf bytes.Buffer
+	err := Render(&buf, RenderConfig{Title: "t", Blocks: []Block{ActionsBlock([]Action{{
+		Description: "Cancel order", ButtonText: "Cancel",
+		Endpoint: "/cancel", ConfirmMessage: "Cancel order o1?", ConfirmText: "Yes, cancel",
+	}})}})
+	if err != nil {
+		t.Fatalf("execute template: %v", err)
+	}
+	if out := buf.String(); !strings.Contains(out, `type="submit">Yes, cancel</button>`) {
+		t.Errorf("ConfirmText not used:\n%s", out)
 	}
 }
