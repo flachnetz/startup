@@ -65,7 +65,7 @@
                                 <div class="modal-body">{{ $a.ConfirmMessage }}</div>
                                 <div class="modal-footer">
                                     <button class="btn btn-sm btn-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
-                                    <button class="btn btn-sm btn-danger" type="submit">{{ $a.ButtonText }}</button>
+                                    <button class="btn btn-sm btn-danger" type="submit">{{ with $a.ConfirmText }}{{ . }}{{ else }}OK{{ end }}</button>
                                 </div>
                             </form>
                         </div>

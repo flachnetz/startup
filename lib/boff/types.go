@@ -32,6 +32,7 @@ type Action struct {
 	ButtonText     string // e.g. "Cancel"
 	Endpoint       string // e.g. "/orders/backoffice/v1/orders/123/items/1/cancel"
 	ConfirmMessage string // optional confirmation prompt; empty = submit immediately
+	ConfirmText    string // label of the modal's confirm button; empty = "OK"
 	StatusText     string // non-empty = show label instead of button
 
 	// true renders a link to Endpoint instead of a form, for an action that only
