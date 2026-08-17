@@ -46,17 +46,12 @@
 {{ end }}
 
 {{ define "block/actions" }}
-<h2 class="h5">Actions</h2>
-<div class="table-responsive mb-4">
-    <table class="table table-sm align-middle">
-        <thead>
-        <tr><th scope="col">Description</th><th scope="col">Action</th></tr>
-        </thead>
-        <tbody>
-        {{ range $i, $a := . }}
-        <tr>
-            <td>{{ $a.Description }}</td>
-            <td>
+<div class="card mb-4 shadow-sm">
+    <div class="card-body">
+        <h5 class="card-title mb-3">Actions</h5>
+        <ul class="list-unstyled mb-0">
+            {{ range $i, $a := . }}
+            <li class="d-flex align-items-center gap-2{{ if $i }} mt-2{{ end }}">
                 {{ if $a.StatusText }}
                     <span class="badge text-bg-secondary">{{ $a.StatusText }}</span>
                 {{ else if $a.Link }}
@@ -80,11 +75,11 @@
                         <button class="btn btn-sm btn-outline-danger" type="submit">{{ $a.ButtonText }}</button>
                     </form>
                 {{ end }}
-            </td>
-        </tr>
-        {{ end }}
-        </tbody>
-    </table>
+                <span>{{ $a.Description }}</span>
+            </li>
+            {{ end }}
+        </ul>
+    </div>
 </div>
 {{ end }}
 
