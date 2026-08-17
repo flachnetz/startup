@@ -2,6 +2,8 @@ package startup_failpoints
 
 import (
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -85,4 +87,28 @@ func dedupeSelectable(fps []FailPoint) []string {
 		}
 	}
 	return out
+}
+
+func TestFailPointPageRendersPerLocationControlsAndPlaywrightSnippet(t *testing.T) {
+	f := newTestService()
+	require.NoError(t, f.UpdateFailPoint(FailPointRequest{
+		CodeLocationPointName: locA, FailPointErrorName: "only_a", Active: true, FilterTags: "Tag1, tag2",
+	}))
+
+	rec := httptest.NewRecorder()
+	f.HandleFailPointPage("/internal/failpoints")(rec, httptest.NewRequest(http.MethodPut, "/failpoints", nil))
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	body := rec.Body.String()
+
+	// Controls exist per location, with the armed state reflected.
+	assert.Contains(t, body, `id="select__a"`)
+	assert.Contains(t, body, `id="cb__a"`)
+	assert.Contains(t, body, `id="ft__a"`)
+	assert.Contains(t, body, `value="tag1,tag2"`)
+	assert.Contains(t, body, `id="select__b"`)
+
+	// The tester-facing snippet target and the endpoint it PUTs to are rendered.
+	assert.Contains(t, body, `id="snippet__a"`)
+	assert.Contains(t, body, "/internal/failpoints")
 }
