@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"io"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/flachnetz/startup/v2/lib/boff"
@@ -36,6 +37,29 @@ type RecordView struct {
 // page is embedded as a backoffice fragment.
 func (v RecordView) JSONHTML() template.HTML {
 	return template.HTML(boff.HighlightJSON(v.JSON)) //nolint:gosec // HighlightJSON escapes its input
+}
+
+// payloadCollapseThreshold is the number of lines above which a payload is
+// hidden behind a "Show full payload" toggle instead of being shown inline.
+const payloadCollapseThreshold = 10
+
+// HasPayload reports whether the record carries a payload worth displaying -
+// i.e. it is not empty and not just "{}", which many events carry as a
+// placeholder body.
+func (v RecordView) HasPayload() bool {
+	switch strings.TrimSpace(v.JSON) {
+	case "", "{}":
+		return false
+	default:
+		return true
+	}
+}
+
+// PayloadCollapsible reports whether the payload has more lines than
+// payloadCollapseThreshold, and should therefore be hidden behind a
+// "Show full payload" toggle rather than shown inline.
+func (v RecordView) PayloadCollapsible() bool {
+	return strings.Count(v.JSON, "\n")+1 > payloadCollapseThreshold
 }
 
 // HistoryItemsBlock renders the record ledger. Always renders (shows a "No

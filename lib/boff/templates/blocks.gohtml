@@ -1,7 +1,9 @@
 {{ define "block/header" }}
-<h1 class="h4 mb-1">{{ .Title }}</h1>
-{{ if .Subtitle }}<p class="text-body-secondary small font-monospace">{{ .Subtitle }}</p>{{ end }}
-{{ if .ErrorMessage }}<div class="alert alert-danger" role="alert">{{ .ErrorMessage }}</div>{{ end }}
+<div class="mb-4">
+    <h1 class="h4 mb-1">{{ .Title }}</h1>
+    {{ if .Subtitle }}<p class="text-body-secondary small font-monospace mb-0">{{ .Subtitle }}</p>{{ end }}
+    {{ if .ErrorMessage }}<div class="alert alert-danger mt-2 mb-0" role="alert">{{ .ErrorMessage }}</div>{{ end }}
+</div>
 {{ end }}
 
 {{ define "block/card" }}
@@ -14,20 +16,27 @@
 </div>
 {{ end }}
 
+{{ define "block/panel" }}
+<div class="card mb-4{{ if .Raised }} shadow-sm{{ end }}">
+    {{ range .Children }}{{ . | render }}{{ end }}
+</div>
+{{ end }}
+
 {{ define "block/summary" }}
-<div class="card mb-4">
-    <div class="card-body py-2">
+<div class="card mb-4 shadow-sm">
+    <div class="card-body">
+        {{ if .Title }}<h5 class="card-title mb-3">{{ .Title }}</h5>{{ end }}
         <dl class="row row-cols-1 row-cols-md-2 mb-0 small">
-            {{ range . }}
-            <div class="col d-flex gap-2 border-bottom py-1">
-                <dt class="fw-semibold text-nowrap" style="min-width:11em">{{ .Label }}</dt>
+            {{ range .Items }}
+            <div class="col d-flex align-items-baseline gap-2 py-2">
+                <dt class="text-uppercase text-body-secondary small fw-semibold text-nowrap" style="min-width:11em">{{ .Label }}</dt>
                 <dd class="mb-0 font-monospace text-break">
                     {{ if .JSON }}
                         <details>
                             <summary>{{ .Value }}</summary>
                             <pre class="small mb-0 mt-1">{{ .JSONHTML }}</pre>
                         </details>
-                    {{ else if .Link }}<a href="{{ .Link }}">{{ .Value }}</a>{{ else }}{{ .Value }}{{ end }}
+                    {{ else if .Link }}<a href="{{ .Link }}" class="text-decoration-none">{{ .Value }}</a>{{ else }}{{ .Value }}{{ end }}
                 </dd>
             </div>
             {{ end }}
@@ -79,8 +88,8 @@
 </div>
 {{ end }}
 
-{{ define "overview/filters" }}
-<form method="GET" class="row row-cols-lg-auto g-2 align-items-end mb-3">
+{{ define "overview/filters-form" }}
+<form method="GET" class="row row-cols-lg-auto g-2 align-items-end">
     {{ range . }}
     {{ if .Hidden }}
     <input type="hidden" name="{{ .Name }}" value="{{ .Value }}">
@@ -110,34 +119,48 @@
 </form>
 {{ end }}
 
-{{ define "overview/scopenote" }}
-<p class="text-body-secondary small mb-2">{{ . }}</p>
+{{ define "overview/filters" }}
+<div class="mb-3">{{ template "overview/filters-form" . }}</div>
 {{ end }}
 
-{{ define "overview/table" }}
-<div class="table-responsive">
-    <table class="table table-sm table-hover align-middle">
-        <thead>
-        <tr>{{ range .Headers }}<th scope="col">{{ . }}</th>{{ end }}</tr>
-        </thead>
-        <tbody class="font-monospace small">
-        {{ range $row := .Rows }}
-        {{ $link := $row.Link }}
-        <tr>
-            {{ range $i, $text := $row.Cells }}
-            {{ $cell := $row.CellAt $i }}
-            <td>
-                {{ if $cell.Link }}<a href="{{ $cell.Link }}">{{ $cell.Text }}</a>
-                {{ else if $link }}<a class="d-block text-reset text-decoration-none" href="{{ $link }}">{{ $cell.Text }}</a>
-                {{ else }}{{ $cell.Text }}{{ end }}
-            </td>
-            {{ end }}
-        </tr>
-        {{ else }}
-        <tr><td colspan="{{ len .Headers }}" class="text-body-secondary">No records.</td></tr>
+{{ define "overview/scopenote" }}
+<p class="text-body-secondary small mb-3">{{ . }}</p>
+{{ end }}
+
+{{ define "overview/table-rows" }}
+<table class="table table-hover align-middle mb-0">
+    <thead class="table-light">
+    <tr>{{ range .Headers }}<th scope="col" class="fw-semibold py-3">{{ . }}</th>{{ end }}</tr>
+    </thead>
+    <tbody>
+    {{ range $row := .Rows }}
+    {{ $link := $row.Link }}
+    <tr>
+        {{ range $i, $text := $row.Cells }}
+        {{ $cell := $row.CellAt $i }}
+        <td class="py-3">
+            {{ if $cell.Link }}<a href="{{ $cell.Link }}">{{ $cell.Text }}</a>
+            {{ else if $link }}<a class="d-block text-reset text-decoration-none" href="{{ $link }}">{{ $cell.Text }}</a>
+            {{ else }}{{ $cell.Text }}{{ end }}
+        </td>
         {{ end }}
-        </tbody>
-    </table>
+    </tr>
+    {{ else }}
+    <tr><td colspan="{{ len .Headers }}" class="text-body-secondary">No records.</td></tr>
+    {{ end }}
+    </tbody>
+</table>
+{{ end }}
+
+{{ define "overview/table-flush" }}
+<div class="table-responsive">
+    {{ template "overview/table-rows" . }}
+</div>
+{{ end }}
+
+{{ define "overview/filters-card-body" }}
+<div class="card-body border-bottom">
+    {{ template "overview/filters-form" . }}
 </div>
 {{ end }}
 

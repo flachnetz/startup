@@ -135,7 +135,7 @@ func TestGate_DeniedSummaryLinkRendersPlainValue(t *testing.T) {
 		Viewer:  identity("order-service", jwt.RoleWrite),
 		Summary: summary,
 	})
-	if !strings.Contains(allowed, `<a href="/payments/pay_1/history">pay_1</a>`) {
+	if !strings.Contains(allowed, `<a href="/payments/pay_1/history" class="text-decoration-none">pay_1</a>`) {
 		t.Errorf("write viewer did not get the summary link:\n%s", allowed)
 	}
 }

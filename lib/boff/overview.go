@@ -58,16 +58,19 @@ type OverviewConfig struct {
 	TotalPages int
 
 	// Blocks overrides the sections rendered on the page. When nil the page uses
-	// its default layout: FiltersBlock, ScopeNoteBlock, a PagerBlock, TableBlock
-	// and a trailing PagerBlock built from the fields above. When set, the
-	// callback receives those default blocks and returns the blocks to render in
-	// order - so a caller can reorder them, drop one, or splice its own Block in.
+	// its default layout: a HeaderBlock, ScopeNoteBlock, a PagerBlock, a
+	// FilterableTableBlock (filters and table in one card) and a trailing
+	// PagerBlock built from the fields above. When set, the callback receives
+	// those default blocks and returns the blocks to render in order - so a
+	// caller can reorder them, drop one, or splice its own Block in.
 	Blocks func(defaults DefaultOverviewBlocks) []Block
 }
 
 // DefaultOverviewBlocks are the built-in blocks an overview page renders out of
 // the box, handed to an OverviewConfig.Blocks callback so custom layouts can
-// reuse them. Pager is shared by the top and bottom pager.
+// reuse them. Pager is shared by the top and bottom pager. Filters is the form
+// on its own (not part of All()) for a custom layout that wants it apart from
+// Table, which by default already renders the filters and the table together.
 type DefaultOverviewBlocks struct {
 	Header    Block
 	Filters   Block
@@ -76,10 +79,10 @@ type DefaultOverviewBlocks struct {
 	Table     Block
 }
 
-// All returns the default blocks in their default order (header, filters, scope
-// note, pager, table, pager).
+// All returns the default blocks in their default order (header, scope note,
+// pager, filters+table, pager).
 func (d DefaultOverviewBlocks) All() []Block {
-	return []Block{d.Header, d.Filters, d.ScopeNote, d.Pager, d.Table, d.Pager}
+	return []Block{d.Header, d.ScopeNote, d.Pager, d.Table, d.Pager}
 }
 
 // PageParam is the query parameter the overview pager pages with.
@@ -168,7 +171,7 @@ func RenderOverviewWithConfig(w io.Writer, cfg OverviewConfig) error {
 		Filters:   FiltersBlock(cfg.Filters),
 		ScopeNote: ScopeNoteBlock(cfg.ScopeNote),
 		Pager:     PagerBlock(pager),
-		Table:     TableBlock(cfg.Headers, cfg.Rows),
+		Table:     FilterableTableBlock(cfg.Filters, cfg.Headers, cfg.Rows),
 	}
 
 	blocks := defaults.All()
