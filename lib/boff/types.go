@@ -115,21 +115,3 @@ func demoteLinks(rc RenderContext, summary []SummaryItem) []SummaryItem {
 
 	return demoted
 }
-
-// NavLink is one entry of a NavBlock: a labelled link in the page's navigation
-// bar. Active marks the current page, so the nav can highlight where the viewer
-// is.
-type NavLink struct {
-	Label  string // e.g. "Orders"
-	Href   string // e.g. "/orders/backoffice/v1/orders"
-	Active bool   // true renders the current page's entry as active
-
-	// RequiredRole gates the link, in the same notation as Action.RequiredRole. A
-	// viewer who lacks the role does not see the entry at all - a nav link is a
-	// pointer to a page, and pointing a read-only user at a page they cannot open
-	// is noise.
-	RequiredRole Role
-}
-
-// GatingRole implements HasRequiredRole.
-func (l NavLink) GatingRole() Role { return l.RequiredRole }

@@ -1,54 +1,67 @@
 package boff
 
 import (
-	"bytes"
-	"strings"
 	"testing"
 
-	"github.com/flachnetz/startup/v2/lib/jwt"
+	"github.com/stretchr/testify/require"
 )
 
-func navLinks() NavBlock {
-	return NavBlock{
-		{Label: "Orders", Href: "/orders", Active: true},
-		{Label: "Payments", Href: "/payments"},
-		{Label: "Admin", Href: "/admin", RequiredRole: jwt.RoleAdmin},
-	}
+func TestBreadcrumbCookie_Reconcile_FillsInMissingLabelAndPathFromCache(t *testing.T) {
+	cookie := breadcrumbCookie{Breadcrumbs: []Breadcrumb{
+		BreadcrumbLocal("player:abc", "Player abc", "/players/abc"),
+	}}
+
+	result := cookie.Reconcile([]Breadcrumb{
+		BreadcrumbRemote("player:abc"),
+		BreadcrumbLocal("order:123", "Order 123", "/orders/123"),
+	})
+
+	require.Equal(t, []Breadcrumb{
+		BreadcrumbLocal("player:abc", "Player abc", "/players/abc"),
+		BreadcrumbLocal("order:123", "Order 123", "/orders/123"),
+	}, result.Breadcrumbs)
 }
 
-func renderNav(t *testing.T, viewer *jwt.Identity) string {
-	t.Helper()
+func TestBreadcrumbCookie_Reconcile_KeepsAncestorEntryWithoutLinkIfNotCached(t *testing.T) {
+	cookie := breadcrumbCookie{}
 
-	var buf bytes.Buffer
-	if err := Render(&buf, RenderConfig{Title: "t", Viewer: viewer, Blocks: []Block{navLinks()}}); err != nil {
-		t.Fatalf("execute template: %v", err)
-	}
+	result := cookie.Reconcile([]Breadcrumb{
+		BreadcrumbRemote("player:abc"),
+		BreadcrumbLocal("order:123", "Order 123", "/orders/123"),
+	})
 
-	return buf.String()
+	require.Equal(t, []Breadcrumb{
+		BreadcrumbRemote("player:abc"),
+		BreadcrumbLocal("order:123", "Order 123", "/orders/123"),
+	}, result.Breadcrumbs)
 }
 
-// The nav renders as a <nav> and marks the active entry.
-func TestNavBlockRendersNavElementWithActive(t *testing.T) {
-	out := renderNav(t, identity("order-service", jwt.RoleAdmin))
+func TestBreadcrumbCookie_Reconcile_UpdatesCachedLabelAndPathWhenNewValuesAreProvided(t *testing.T) {
+	cookie := breadcrumbCookie{Breadcrumbs: []Breadcrumb{
+		BreadcrumbLocal("player:abc", "Old Label", "/old/path"),
+	}}
 
-	if !strings.Contains(out, "<nav") {
-		t.Errorf("nav did not render a <nav> element:\n%s", out)
-	}
-	if !strings.Contains(out, `<a class="nav-link active" href="/orders" aria-current="page">Orders</a>`) {
-		t.Errorf("active entry not marked:\n%s", out)
-	}
-	if !strings.Contains(out, `href="/payments"`) {
-		t.Errorf("ungated entry missing:\n%s", out)
-	}
+	result := cookie.Reconcile([]Breadcrumb{
+		BreadcrumbLocal("player:abc", "New Label", "/new/path"),
+		BreadcrumbLocal("order:123", "Order 123", "/orders/123"),
+	})
+
+	require.Equal(t, []Breadcrumb{
+		BreadcrumbLocal("player:abc", "New Label", "/new/path"),
+		BreadcrumbLocal("order:123", "Order 123", "/orders/123"),
+	}, result.Breadcrumbs)
 }
 
-// A viewer without the role does not see the gated entry.
-func TestNavBlockGatesLinks(t *testing.T) {
-	out := renderNav(t, identity("order-service", jwt.RoleRead))
-	if strings.Contains(out, "/admin") {
-		t.Errorf("read viewer saw an admin-gated nav link:\n%s", out)
-	}
-	if !strings.Contains(out, "/orders") {
-		t.Errorf("ungated nav link was hidden:\n%s", out)
-	}
+func TestBreadcrumbCookie_Reconcile_LastEntryIsAlwaysAuthoritativeEvenIfCached(t *testing.T) {
+	cookie := breadcrumbCookie{Breadcrumbs: []Breadcrumb{
+		BreadcrumbLocal("order:123", "Old Order Label", "/old/orders/123"),
+	}}
+
+	result := cookie.Reconcile([]Breadcrumb{
+		BreadcrumbLocal("order:123", "Order 123", "/orders/123"),
+	})
+
+	require.Equal(t, []Breadcrumb{
+		BreadcrumbLocal("order:123", "Order 123", "/orders/123"),
+	}, result.Breadcrumbs)
 }

@@ -4,14 +4,6 @@
 {{ if .ErrorMessage }}<div class="alert alert-danger" role="alert">{{ .ErrorMessage }}</div>{{ end }}
 {{ end }}
 
-{{ define "block/nav" }}
-<nav class="nav nav-pills mb-3">
-    {{ range . }}
-    <a class="nav-link{{ if .Active }} active{{ end }}" href="{{ .Href }}"{{ if .Active }} aria-current="page"{{ end }}>{{ .Label }}</a>
-    {{ end }}
-</nav>
-{{ end }}
-
 {{ define "block/card" }}
 <div class="card mb-4{{ if .Raised }} shadow-sm{{ end }}">
     <div class="card-body">

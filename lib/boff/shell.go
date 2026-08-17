@@ -26,8 +26,9 @@ var shell = MustTemplatesFromFS(shellFS)
 // defaultFuncs returns a fresh empty template named "boff" carrying the funcs
 // every boff page template shares, so a page's own block templates can use them
 // without re-declaring: formatTime for timestamps, add for index arithmetic in
-// ranges, formatMoney for amounts, and a placeholder render (rebound per call by
-// RenderTemplate) so templates using {{ . | render }} still parse.
+// ranges, formatMoney for amounts, and placeholder render and allowed funcs
+// (rebound per call by RenderTemplate) so templates using {{ . | render }} or
+// {{ if allowed .RequiredRole }} still parse.
 func defaultFuncs() *template.Template {
 	return template.New("boff").Funcs(template.FuncMap{
 		"formatTime":  func(t time.Time) string { return t.Format("2006-01-02 15:04:05.000") },
@@ -35,6 +36,9 @@ func defaultFuncs() *template.Template {
 		"formatMoney": formatMoney,
 		"render": func(Block) (template.HTML, error) {
 			return "", fmt.Errorf("render: template executed without RenderTemplate - the render func was never bound to a RenderContext")
+		},
+		"allowed": func(Role) (bool, error) {
+			return false, fmt.Errorf("allowed: template executed without RenderTemplate - the allowed func was never bound to a RenderContext")
 		},
 	})
 }

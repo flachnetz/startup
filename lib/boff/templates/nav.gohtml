@@ -1,0 +1,34 @@
+{{ define "block/breadcrumbs" }}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        {{ range $i, $b := . }}
+        {{ if or (not $b.Path) (eq $i (add (len $) -1)) }}
+        <li class="breadcrumb-item active" aria-current="page">{{ $b.Label }}</li>
+        {{ else }}
+        <li class="breadcrumb-item"><a href="{{ $b.Path }}">{{ $b.Label }}</a></li>
+        {{ end }}
+        {{ end }}
+    </ol>
+</nav>
+{{ end }}
+
+{{ define "block/navigation" }}
+<nav class="navbar navbar-expand-lg bg-white border-bottom mb-4">
+    <div class="container-fluid">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#backofficeNav" aria-controls="backofficeNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="backofficeNav">
+            <ul class="navbar-nav">
+                {{ range . }}
+                {{ if .RequiredRole|allowed }}
+                <li class="nav-item">
+                    <a class="nav-link{{ if .IsActive }} active{{ end }}"{{ if .IsActive }} aria-current="page"{{ end }} href="{{ .Path }}">{{ .Label }}</a>
+                </li>
+                {{ end }}
+                {{ end }}
+            </ul>
+        </div>
+    </div>
+</nav>
+{{ end }}
