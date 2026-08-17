@@ -35,17 +35,17 @@ type Block interface {
 //
 // Template must contain a definition for Name. The built-in blocks set it to the
 // package shell, so they resolve the sub-templates defined alongside the shell.
-// Set Empty to render nothing, which is how a section vanishes when it has no
+// Set Skip to render nothing, which is how a section vanishes when it has no
 // content.
 type TemplateBlock struct {
 	Name     string
 	Model    any
-	Empty    bool
+	Skip     bool
 	Template *template.Template
 }
 
 func (b TemplateBlock) Render(rc RenderContext) (template.HTML, error) {
-	if b.Empty {
+	if b.Skip {
 		return "", nil
 	}
 
@@ -76,11 +76,13 @@ func RenderTemplate(rc RenderContext, tmpl *template.Template, name string, data
 	return template.HTML(buf.String()), nil //nolint:gosec // template output is already escaped
 }
 
-// withRenderContext clones tmpl and injects a "render" function bound to rc, so a
-// template can render a child Block inline: {{ .Body | render }} executes the
-// block against the same render context (viewer and all), returning its HTML.
+// withRenderContext clones tmpl and injects the funcs bound to rc: "render", so a
+// template can render a child Block inline ({{ .Body | render }} executes the
+// block against the same render context, returning its HTML), and "allowed", so
+// a template can gate a fragment inline ({{ if allowed .RequiredRole }}...{{ end }})
+// using the same rc.May check a Go block uses.
 //
-// tmpl is cloned, so the injected func never leaks into the shared template; a
+// tmpl is cloned, so the injected funcs never leak into the shared template; a
 // clone failure is a programmer error (a template already executed), so it
 // panics.
 func withRenderContext(tmpl *template.Template, rc RenderContext) *template.Template {
@@ -91,6 +93,9 @@ func withRenderContext(tmpl *template.Template, rc RenderContext) *template.Temp
 			}
 
 			return block.Render(rc)
+		},
+		"allowed": func(required Role) (bool, error) {
+			return rc.May(required), nil
 		},
 	})
 }
@@ -187,7 +192,7 @@ type SummaryBlock []SummaryItem
 func (b SummaryBlock) Render(rc RenderContext) (template.HTML, error) {
 	items := demoteLinks(rc, b)
 
-	return TemplateBlock{Name: "block/summary", Model: items, Empty: len(items) == 0, Template: shell}.Render(rc)
+	return TemplateBlock{Name: "block/summary", Model: items, Skip: len(items) == 0, Template: shell}.Render(rc)
 }
 
 // ActionsBlock is an Action list rendered as the actions table. It gates itself
@@ -201,21 +206,7 @@ type ActionsBlock []Action
 func (b ActionsBlock) Render(rc RenderContext) (template.HTML, error) {
 	actions := GateSlice(rc, b)
 
-	return TemplateBlock{Name: "block/actions", Model: actions, Empty: len(actions) == 0, Template: shell}.Render(rc)
-}
-
-// NavBlock is a NavLink list rendered as a <nav> bar. It gates itself at render
-// time: the links a viewer may not follow are dropped. Renders nothing when
-// empty.
-//
-// The slice is the block: boff.NavBlock{...} or a boff.NavBlock(links)
-// conversion both give you a Block.
-type NavBlock []NavLink
-
-func (b NavBlock) Render(rc RenderContext) (template.HTML, error) {
-	links := GateSlice(rc, b)
-
-	return TemplateBlock{Name: "block/nav", Model: links, Empty: len(links) == 0, Template: shell}.Render(rc)
+	return TemplateBlock{Name: "block/actions", Model: actions, Skip: len(actions) == 0, Template: shell}.Render(rc)
 }
 
 // PagerModel is the pagination state a PagerBlock renders. Both pagers (above
@@ -239,18 +230,18 @@ type tableModel struct {
 // FiltersBlock renders the GET filter form. Renders nothing when filters is
 // empty.
 func FiltersBlock(filters []OverviewFilter) Block {
-	return TemplateBlock{Name: "overview/filters", Model: filters, Empty: len(filters) == 0, Template: shell}
+	return TemplateBlock{Name: "overview/filters", Model: filters, Skip: len(filters) == 0, Template: shell}
 }
 
 // ScopeNoteBlock renders the one-line scope note. Renders nothing when empty.
 func ScopeNoteBlock(note string) Block {
-	return TemplateBlock{Name: "overview/scopenote", Model: note, Empty: note == "", Template: shell}
+	return TemplateBlock{Name: "overview/scopenote", Model: note, Skip: note == "", Template: shell}
 }
 
 // PagerBlock renders the pagination nav. Renders nothing when there is no
 // previous or next page.
 func PagerBlock(m PagerModel) Block {
-	return TemplateBlock{Name: "overview/pager", Model: m, Empty: m.PrevLink == "" && m.NextLink == "", Template: shell}
+	return TemplateBlock{Name: "overview/pager", Model: m, Skip: m.PrevLink == "" && m.NextLink == "", Template: shell}
 }
 
 // TableBlock renders the clickable rows table. Always renders (shows a "No
