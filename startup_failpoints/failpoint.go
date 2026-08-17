@@ -27,6 +27,18 @@ type FailPoint struct {
 	ErrorName  string   `json:"errorName"`
 	IsActive   bool     `json:"isActive"`
 	FilterTags []string `json:"filterTags"`
+
+	// Locations restricts the failure to those code locations: it is only offered
+	// there and can only be armed there. Empty means every location, which is what
+	// a generic failure (a timeout, a 500) wants. A service whose locations are
+	// different peers uses it to keep one peer's product errors out of another
+	// peer's dropdown.
+	Locations []FailPointLocation `json:"locations,omitempty"`
+}
+
+// offeredAt reports whether the fail point can be armed at location.
+func (fp FailPoint) offeredAt(location FailPointLocation) bool {
+	return len(fp.Locations) == 0 || slices.Contains(fp.Locations, location)
 }
 
 type timeoutError struct {
@@ -98,10 +110,42 @@ func NewFailPointService(fps []FailPoint, codeLocations []FailPointLocation, dev
 	})
 
 	for _, v := range codeLocations {
+		// The default selection has to be one the location actually offers, otherwise
+		// the page shows a value its own dropdown does not contain.
 		point := f.failPoints[0]
+		for _, fp := range f.failPoints {
+			if fp.offeredAt(v) {
+				point = fp
+				break
+			}
+		}
 		f.failPointLocations[v] = &point
 	}
 	return f
+}
+
+// FailPointsFor returns the fail points offered at location, in the order the
+// page should show them.
+func (f *FailPointService) FailPointsFor(location FailPointLocation) []FailPoint {
+	f.failPointsLock.RLock()
+	defer f.failPointsLock.RUnlock()
+
+	resp := make([]FailPoint, 0, len(f.failPoints))
+	for _, fp := range f.failPoints {
+		if fp.offeredAt(location) {
+			resp = append(resp, fp)
+		}
+	}
+	return resp
+}
+
+// FailPointsByLocation is the per-location selection the page renders.
+func (f *FailPointService) FailPointsByLocation() map[FailPointLocation][]FailPoint {
+	resp := make(map[FailPointLocation][]FailPoint, len(f.failPointLocations))
+	for location := range f.GetFailPointLocations() {
+		resp[location] = f.FailPointsFor(location)
+	}
+	return resp
 }
 
 func (f *FailPointService) NewFailPointRequest() FailPointRequest {
@@ -187,6 +231,9 @@ func (f *FailPointService) UpdateFailPoint(req FailPointRequest) error {
 	if !ok {
 		return errors.New("cannot find error for " + req.FailPointErrorName)
 	}
+	if !f.offeredAt(req.FailPointErrorName, req.CodeLocationPointName) {
+		return errors.New(req.FailPointErrorName + " is not offered at " + string(req.CodeLocationPointName))
+	}
 	fp.Error = err
 	fp.ErrorName = req.FailPointErrorName
 	fp.IsActive = req.Active
@@ -218,12 +265,24 @@ func (f *FailPointService) UpdateFailPointHandlerFunc() http.HandlerFunc {
 	}
 }
 
+// offeredAt reports whether the error named errorName may be armed at location.
+// The caller holds the lock.
+func (f *FailPointService) offeredAt(errorName string, location FailPointLocation) bool {
+	for _, fp := range f.failPoints {
+		if fp.ErrorName == errorName {
+			return fp.offeredAt(location)
+		}
+	}
+	return false
+}
+
 func (f *FailPointService) HandleFailPointPage(updateFailPointsEndpoint string) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		err := renderIndex(writer, TemplateResponse{
 			UpdateFailPointsEndpoint: updateFailPointsEndpoint,
 			FailPoints:               f.GetFailPoints(),
 			FailPointLocations:       f.GetFailPointLocations(),
+			FailPointsByLocation:     f.FailPointsByLocation(),
 		})
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusInternalServerError)

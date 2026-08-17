@@ -15,6 +15,9 @@ type TemplateResponse struct {
 	UpdateFailPointsEndpoint string
 	FailPoints               []FailPoint
 	FailPointLocations       map[FailPointLocation]FailPoint
+	// FailPointsByLocation is the per-location dropdown; FailPoints stays the
+	// full list for callers that render their own page.
+	FailPointsByLocation map[FailPointLocation][]FailPoint
 }
 
 func renderIndex(w io.Writer, model any) error {
