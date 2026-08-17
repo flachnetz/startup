@@ -24,6 +24,10 @@ var DefaultPollTimeout = 100 * time.Millisecond
 // and partition/offset metadata.
 type HandleMessage func(ctx context.Context, msg *kafka.Message) error
 
+func (h HandleMessage) LogValue() slog.Value {
+	return slog.StringValue(fmt.Sprintln(h))
+}
+
 // PartitionConsumer subscribes to a topic and runs a dedicated goroutine per
 // assigned partition. Offset storage is explicit: only messages that were
 // successfully handled are stored for auto-commit.

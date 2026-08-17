@@ -181,18 +181,60 @@ func (b CardBlock) Render(rc RenderContext) (template.HTML, error) {
 	return TemplateBlock{Name: "block/card", Model: b, Template: shell}.Render(rc)
 }
 
+// PanelBlock wraps child blocks in a bare Bootstrap card frame, one that adds
+// no card-body padding of its own - unlike CardBlock, whose Body always sits in
+// a padded card-body. Reach for PanelBlock when a card holds sections with
+// different padding needs (e.g. a padded filter form above a table that must
+// sit flush against the card's edges); each child renders itself and is
+// responsible for its own spacing. A child that renders to nothing (Skip, or
+// an empty Blocks) simply contributes nothing.
+type PanelBlock struct {
+	Children []Block
+	// Raised adds a small drop shadow (Bootstrap shadow-sm) to lift the card off
+	// the page.
+	Raised bool
+}
+
+func (b PanelBlock) Render(rc RenderContext) (template.HTML, error) {
+	return TemplateBlock{Name: "block/panel", Model: b, Template: shell}.Render(rc)
+}
+
+// summaryCardModel is what the block/summary template renders: the label/value
+// pairs, plus an optional card title (empty renders no heading), so a page
+// with more than one summary section can label each one.
+type summaryCardModel struct {
+	Title string
+	Items []SummaryItem
+}
+
 // SummaryBlock is a SummaryItem list rendered as the current-state summary card.
 // It gates itself at render time: the links a viewer may not follow are demoted
 // to plain values. Renders nothing when empty.
 //
 // The slice is the block: boff.SummaryBlock{...} or a boff.SummaryBlock(items)
-// conversion both give you a Block.
+// conversion both give you a Block. Use SummaryCard instead for a titled card.
 type SummaryBlock []SummaryItem
 
 func (b SummaryBlock) Render(rc RenderContext) (template.HTML, error) {
 	items := demoteLinks(rc, b)
 
-	return TemplateBlock{Name: "block/summary", Model: items, Skip: len(items) == 0, Template: shell}.Render(rc)
+	return TemplateBlock{Name: "block/summary", Model: summaryCardModel{Items: items}, Skip: len(items) == 0, Template: shell}.Render(rc)
+}
+
+// SummaryCard is SummaryBlock under a card title, for a page that shows more
+// than one summary section (e.g. account data next to profile data) and needs
+// each one labeled. It gates and renders nothing exactly like SummaryBlock.
+func SummaryCard(title string, items []SummaryItem) Block {
+	return BlockFunc(func(rc RenderContext) (template.HTML, error) {
+		gated := demoteLinks(rc, items)
+
+		return TemplateBlock{
+			Name:     "block/summary",
+			Model:    summaryCardModel{Title: title, Items: gated},
+			Skip:     len(gated) == 0,
+			Template: shell,
+		}.Render(rc)
+	})
 }
 
 // ActionsBlock is an Action list rendered as the actions table. It gates itself
@@ -227,8 +269,10 @@ type tableModel struct {
 	Rows    []OverviewRow
 }
 
-// FiltersBlock renders the GET filter form. Renders nothing when filters is
-// empty.
+// FiltersBlock renders the GET filter form on its own, outside any card. Reach
+// for FilterableTableBlock instead when the filters belong above a results
+// table - the common case, and the default overview layout. Renders nothing
+// when filters is empty.
 func FiltersBlock(filters []OverviewFilter) Block {
 	return TemplateBlock{Name: "overview/filters", Model: filters, Skip: len(filters) == 0, Template: shell}
 }
@@ -244,8 +288,36 @@ func PagerBlock(m PagerModel) Block {
 	return TemplateBlock{Name: "overview/pager", Model: m, Skip: m.PrevLink == "" && m.NextLink == "", Template: shell}
 }
 
-// TableBlock renders the clickable rows table. Always renders (shows a "No
-// records." row when rows is empty).
+// tableRowsBlock is the table itself, flush against its container (no card, no
+// padding) - the shared piece TableBlock and FilterableTableBlock both nest
+// inside a PanelBlock. Always renders (shows a "No records." row when rows is
+// empty).
+func tableRowsBlock(headers []string, rows []OverviewRow) Block {
+	return TemplateBlock{Name: "overview/table-flush", Model: tableModel{Headers: headers, Rows: rows}, Template: shell}
+}
+
+// filtersCardBodyBlock is the filter form padded as one card-body section,
+// bordered off from whatever follows it in the same PanelBlock. Renders
+// nothing when filters is empty.
+func filtersCardBodyBlock(filters []OverviewFilter) Block {
+	return TemplateBlock{Name: "overview/filters-card-body", Model: filters, Skip: len(filters) == 0, Template: shell}
+}
+
+// TableBlock renders the clickable rows table in its own card. Always renders
+// (shows a "No records." row when rows is empty). Use this for a table with no
+// filter form (e.g. a fixed recent-N list); use FilterableTableBlock when the
+// table has a filter form above it, so both sit in one card.
 func TableBlock(headers []string, rows []OverviewRow) Block {
-	return TemplateBlock{Name: "overview/table", Model: tableModel{Headers: headers, Rows: rows}, Template: shell}
+	return PanelBlock{Raised: true, Children: []Block{tableRowsBlock(headers, rows)}}
+}
+
+// FilterableTableBlock renders the filter form and the results table together
+// in one card, the form separated from the table by a divider. This is what
+// RenderOverviewWithConfig uses by default. Renders the table even when
+// filters is empty (the form section is simply omitted).
+func FilterableTableBlock(filters []OverviewFilter, headers []string, rows []OverviewRow) Block {
+	return PanelBlock{Raised: true, Children: []Block{
+		filtersCardBodyBlock(filters),
+		tableRowsBlock(headers, rows),
+	}}
 }
