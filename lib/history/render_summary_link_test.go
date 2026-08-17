@@ -31,3 +31,27 @@ func TestSummaryItemLinkRendersAnchor(t *testing.T) {
 		t.Errorf("unlinked summary item was wrapped in an anchor:\n%s", out)
 	}
 }
+
+// A SummaryItem with JSON renders a collapsible payload, highlighted like a
+// ledger record, instead of a plain value.
+func TestSummaryItemJSONRendersCollapsiblePayload(t *testing.T) {
+	var buf bytes.Buffer
+	err := pageTemplate.Execute(&buf, PageModel{
+		Title:   "t",
+		GroupId: "order:1",
+		Summary: []SummaryItem{
+			{Label: "Item 0", Value: "coins x1", JSON: "{\n  \"offerId\": \"o1\"\n}"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("execute template: %v", err)
+	}
+	out := buf.String()
+
+	if !strings.Contains(out, "<details>") || !strings.Contains(out, "<summary>coins x1</summary>") {
+		t.Errorf("JSON summary item did not render a collapsible row:\n%s", out)
+	}
+	if !strings.Contains(out, `<span class="text-primary">"offerId":</span>`) {
+		t.Errorf("JSON payload was not highlighted:\n%s", out)
+	}
+}

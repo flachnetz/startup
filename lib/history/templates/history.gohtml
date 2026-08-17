@@ -24,7 +24,12 @@
                 <div class="col d-flex gap-2 border-bottom py-1">
                     <dt class="fw-semibold text-nowrap" style="min-width:11em">{{ .Label }}</dt>
                     <dd class="mb-0 font-monospace text-break">
-                        {{ if .Link }}<a href="{{ .Link }}">{{ .Value }}</a>{{ else }}{{ .Value }}{{ end }}
+                        {{ if .JSON }}
+                            <details>
+                                <summary>{{ .Value }}</summary>
+                                <pre class="small mb-0 mt-1">{{ .JSONHTML }}</pre>
+                            </details>
+                        {{ else if .Link }}<a href="{{ .Link }}">{{ .Value }}</a>{{ else }}{{ .Value }}{{ end }}
                     </dd>
                 </div>
                 {{ end }}
