@@ -324,6 +324,16 @@ type SummaryItem struct {
 	// Action.RequiredRole. A denied item still shows Label and Value, just not as
 	// an anchor: the value itself is not the secret, the page behind it is.
 	RequiredRole string
+
+	// JSON, when non-empty, renders Value as a collapsible <details> whose body is
+	// this payload, highlighted like a ledger record - for a row that summarises a
+	// structure the operator sometimes needs verbatim (an order item as stored).
+	JSON string
+}
+
+// JSONHTML is SummaryItem.JSON colourised, same treatment as a record payload.
+func (i SummaryItem) JSONHTML() template.HTML {
+	return template.HTML(highlightJSON(i.JSON)) //nolint:gosec // highlightJSON escapes its input
 }
 
 // mayPerform reports whether viewer satisfies required. An empty required is
