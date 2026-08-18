@@ -207,7 +207,7 @@ func loadNavigationCookie(c *echo.Context) (navigationCookie, bool) {
 }
 
 func updateNavigationIsActive(c *echo.Context, nav []NavLink) {
-	currentPath := path.Clean(c.Request().URL.Path)
+	currentPath := path.Clean(getRealPathFromContext(c))
 	for i := range nav {
 		if nav[i].Path == "" {
 			continue
