@@ -201,16 +201,28 @@ func loadNavigationCookie(c *echo.Context) (navigationCookie, bool) {
 		return navigationCookie{}, false
 	}
 
+	updateNavigationIsActive(c, nc.Links)
+
+	return nc, true
+}
+
+func updateNavigationIsActive(c *echo.Context, nav []NavLink) {
 	currentPath := path.Clean(c.Request().URL.Path)
-	for i := range nc.Links {
-		if nc.Links[i].Path == "" {
+	for i := range nav {
+		if nav[i].Path == "" {
 			continue
 		}
 
-		nc.Links[i].IsActive = strings.HasPrefix(currentPath, path.Clean(nc.Links[i].Path))
+		nav[i].IsActive = strings.HasPrefix(currentPath, path.Clean(nav[i].Path))
+	}
+}
+
+func getRealPathFromContext(c *echo.Context) string {
+	if path := c.Request().Header.Get("Real-Path"); path != "" {
+		return path
 	}
 
-	return nc, true
+	return c.Request().URL.Path
 }
 
 // LoadNavigation returns the persistent top-level navigation links stored
@@ -244,6 +256,8 @@ func (nc navigationCookie) Save(c *echo.Context) {
 // top-level navigation, replacing whatever was stored before.
 func UpdateNavigation(c *echo.Context, links []NavLink) {
 	navigationCookie{Links: links}.Save(c)
+
+	updateNavigationIsActive(c, links)
 }
 
 // BreadcrumbsBlock renders the breadcrumb trail as a bootstrap breadcrumb.
