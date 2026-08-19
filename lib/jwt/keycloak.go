@@ -15,8 +15,19 @@ import (
 // request: wrong audience, or a missing role.
 var ErrForbidden = echo.NewHTTPError(http.StatusForbidden, "forbidden")
 
-// serviceAccountPrefix is how Keycloak names the subject of a
-// client_credentials token: service-account-<client-id>.
+// serviceAccountPrefix is how Keycloak names the service-account USER of a
+// client_credentials token: service-account-<client-id>. It appears in
+// preferred_username, NOT in sub.
+//
+// DEV-NOTE: sub is the service-account user's UUID for a client_credentials
+// token, always. Keycloak 26 release notes, "sub claim is added to access token
+// via protocol mapper": the Subject (sub) mapper "has no effects for service
+// accounts, because no user session exists, and the sub claim is always added
+// to the access token". Classifying a caller by a sub prefix therefore never
+// matched, and labelled every service call as a staff user in the audit trail.
+// client_id is the authoritative signal; it is added by the realm-level
+// service_account client scope Keycloak assigns whenever serviceAccountsEnabled
+// is set.
 const serviceAccountPrefix = "service-account-"
 
 // Role names used across the platform. The levels are ordered: read is any call
@@ -46,16 +57,30 @@ type ClientRoles struct {
 type KeycloakClaims struct {
 	Email          string                 `json:"email"`
 	ResourceAccess map[string]ClientRoles `json:"resource_access"`
+
+	// ClientID is the client_credentials marker: set for a service account,
+	// absent for a human. Added by the service_account client scope.
+	ClientID string `json:"client_id"`
+
+	// PreferredUsername is service-account-<client-id> for a service account.
+	// Fallback for a realm whose service_account scope lacks the client_id
+	// mapper.
+	PreferredUsername string `json:"preferred_username"`
 }
 
 // Identity is the verified caller of a request.
 type Identity struct {
-	// Subject is the Keycloak sub claim: a user id for a human,
-	// service-account-<client-id> for a service.
+	// Subject is the Keycloak sub claim: the user id for a human, the
+	// service-account user's UUID for a service. Never a service name - use
+	// ClientID or Actor() for that.
 	Subject string
 
 	// Email is set for humans only.
 	Email string
+
+	// ClientID is the calling service's Keycloak client id, set only for a
+	// client_credentials (service account) token. Empty for a human.
+	ClientID string
 
 	// Audience is the client id this token was accepted for, which is also the
 	// key its roles were read from.
@@ -89,20 +114,32 @@ func (i Identity) HasRole(role string) bool {
 
 // IsService reports whether the caller is a service account rather than a human.
 func (i Identity) IsService() bool {
-	return strings.HasPrefix(i.Subject, serviceAccountPrefix)
+	return i.ClientID != ""
 }
 
 // Actor returns the audit actor for this identity: a service account becomes
 // the calling service under its client id, anything else a staff user.
 func (i Identity) Actor() actor.Actor {
 	if i.IsService() {
-		return actor.Actor{
-			Type: actor.TypeService,
-			Id:   strings.TrimPrefix(i.Subject, serviceAccountPrefix),
-		}
+		return actor.Actor{Type: actor.TypeService, Id: i.ClientID}
 	}
 
 	return actor.Actor{Type: actor.TypeUser, Id: i.Subject, Label: i.Email}
+}
+
+// clientIDOf returns the calling service's client id, or "" for a human. The
+// client_id claim is authoritative; preferred_username is the fallback for a
+// realm that does not emit it.
+func clientIDOf(claims KeycloakClaims) string {
+	if claims.ClientID != "" {
+		return claims.ClientID
+	}
+
+	if name, ok := strings.CutPrefix(claims.PreferredUsername, serviceAccountPrefix); ok {
+		return name
+	}
+
+	return ""
 }
 
 type identityKey struct{}
@@ -144,6 +181,7 @@ func KeycloakRoleMiddleware(verifier Verifier, audience string, roles ...string)
 			identity := Identity{
 				Subject:  subject,
 				Email:    claims.Email,
+				ClientID: clientIDOf(claims),
 				Audience: audience,
 				Roles:    claims.ResourceAccess[audience].Roles,
 			}

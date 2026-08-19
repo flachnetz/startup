@@ -137,13 +137,65 @@ func TestKeycloakRoleMiddleware_HumanBecomesUserActor(t *testing.T) {
 	require.Contains(t, rec.Body.String(), `"actorText":"jane@example.com"`)
 }
 
+// A real client_credentials token: sub is the service-account user's UUID, the
+// service is named by client_id. Classifying on sub would call this a staff user.
 func TestKeycloakRoleMiddleware_ServiceAccountBecomesServiceActor(t *testing.T) {
 	store, call := protectedRoute(t, jwt.RoleWrite)
 
-	rec := call(keycloakToken(store, testAudience, "service-account-order-service", jwt.RoleWrite))
+	token := store.Sign(jwt.NewBuilder().
+		Expiration(time.Now().Add(10*time.Minute)).
+		Subject("bc516045-d3d4-4890-b6b8-8f43ece010fe").
+		Audience([]string{testAudience}).
+		Claim("client_id", "order-service").
+		Claim("preferred_username", "service-account-order-service").
+		Claim("resource_access", map[string]any{
+			testAudience: map[string]any{"roles": []string{jwt.RoleWrite}},
+		}))
+
+	rec := call(token)
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.Contains(t, rec.Body.String(), `"actorType":"service"`)
 	require.Contains(t, rec.Body.String(), `"actorId":"order-service"`)
+}
+
+// A realm whose service_account scope has no client_id mapper still names the
+// service, through preferred_username.
+func TestKeycloakRoleMiddleware_ServiceAccountFallsBackToPreferredUsername(t *testing.T) {
+	store, call := protectedRoute(t, jwt.RoleWrite)
+
+	token := store.Sign(jwt.NewBuilder().
+		Expiration(time.Now().Add(10*time.Minute)).
+		Subject("bc516045-d3d4-4890-b6b8-8f43ece010fe").
+		Audience([]string{testAudience}).
+		Claim("preferred_username", "service-account-order-service").
+		Claim("resource_access", map[string]any{
+			testAudience: map[string]any{"roles": []string{jwt.RoleWrite}},
+		}))
+
+	rec := call(token)
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), `"actorType":"service"`)
+	require.Contains(t, rec.Body.String(), `"actorId":"order-service"`)
+}
+
+// A staff member's own preferred_username must never be read as a service.
+func TestKeycloakRoleMiddleware_HumanWithUsernameStaysUserActor(t *testing.T) {
+	store, call := protectedRoute(t, jwt.RoleWrite)
+
+	token := store.Sign(jwt.NewBuilder().
+		Expiration(time.Now().Add(10*time.Minute)).
+		Subject("9f1c-sub").
+		Audience([]string{testAudience}).
+		Claim("email", "jane@example.com").
+		Claim("preferred_username", "jane").
+		Claim("resource_access", map[string]any{
+			testAudience: map[string]any{"roles": []string{jwt.RoleWrite}},
+		}))
+
+	rec := call(token)
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), `"actorType":"user"`)
+	require.Contains(t, rec.Body.String(), `"actorId":"9f1c-sub"`)
 }
 
 func TestKeycloakRoleMiddleware_RejectsPlayerToken(t *testing.T) {
