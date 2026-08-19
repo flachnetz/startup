@@ -126,10 +126,7 @@ func WriteConfigMap(ctx context.Context, cs *kubernetes.Clientset, writer, names
 		payload,
 		metav1.PatchOptions{
 			FieldManager: writer,
-			// valid in go 1.26
-			// Force:        new(true)
-
-			Force: new(true),
+			Force:        new(true),
 		},
 	)
 

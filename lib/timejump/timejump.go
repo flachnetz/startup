@@ -23,9 +23,13 @@ type Options struct {
 	Enabled      bool   `long:"timejump-enabled" env:"TIMEJUMP_ENABLED" description:"Set true if you want timejumps to be enabled"`
 	Namespace    string `long:"timejump-namespace" env:"TIMEJUMP_NAMESPACE" default:"default" description:"Namespace to look for the timejump config, defaults to default"`
 	ResourceName string `long:"timejump-resource-name" env:"TIMEJUMP_RESOURCE_NAME" default:"timejump" description:"Name of the configmap that contains timejump configuration"`
+
+	kubeOpts kube.KubernetesOptions
 }
 
 func (o *Options) Initialize(ctx context.Context, kubeOpts kube.KubernetesOptions) {
+	o.kubeOpts = kubeOpts
+
 	if !o.Enabled {
 		return
 	}
@@ -68,6 +72,47 @@ func (o *Options) fetchInitial(ctx context.Context, kubeClient *kubernetes.Clien
 	}
 
 	return values, nil
+}
+
+// Timejumper writes offsets to the timejump ConfigMap, causing every instance
+// observing that ConfigMap (via Options.Initialize) to jump its mocked clock
+// forward.
+type Timejumper struct {
+	kubeClient   *kubernetes.Clientset
+	namespace    string
+	resourceName string
+}
+
+// Timejumper returns a Timejumper that writes to the ConfigMap configured by o.
+// Options.Initialize must have been called beforehand, as it is used to obtain
+// the kube client.
+func (o *Options) Timejumper() *Timejumper {
+	return &Timejumper{
+		kubeClient:   o.kubeOpts.Client(),
+		namespace:    o.Namespace,
+		resourceName: o.ResourceName,
+	}
+}
+
+// JumpTo updates the timejump ConfigMap so that the mocked clock jumps to t.
+// The offset is computed relative to time.Now(), so t must lie in the future.
+// An error is returned if the resulting offset would be negative, i.e. if t is
+// in the past.
+func (j *Timejumper) JumpTo(ctx context.Context, t time.Time) error {
+	offset := time.Until(t)
+	if offset < 0 {
+		return fmt.Errorf("cannot jump to %s: time is in the past", t)
+	}
+
+	values := kube.ConfigMapValues{
+		"offsetInSeconds": strconv.Itoa(int(offset / time.Second)),
+	}
+
+	if err := kube.WriteConfigMap(ctx, j.kubeClient, "timejump", j.namespace, j.resourceName, values); err != nil {
+		return fmt.Errorf("write timejump configmap: %w", err)
+	}
+
+	return nil
 }
 
 func applyConfigMapValues(ctx context.Context, values kube.ConfigMapValues, timeOffset *atomic.Pointer[time.Duration]) {
