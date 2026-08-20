@@ -25,6 +25,11 @@ type Options struct {
 	ResourceName string `long:"timejump-resource-name" env:"TIMEJUMP_RESOURCE_NAME" default:"timejump" description:"Name of the configmap that contains timejump configuration"`
 
 	kubeOpts kube.KubernetesOptions
+
+	// timeOffset backs Timejumper.CurrentOffset; it stays at its zero value
+	// (nil) until Initialize runs with Enabled set, so CurrentOffset reports no
+	// offset when timejump is disabled.
+	timeOffset atomic.Pointer[time.Duration]
 }
 
 func (o *Options) Initialize(ctx context.Context, kubeOpts kube.KubernetesOptions) {
@@ -42,16 +47,15 @@ func (o *Options) Initialize(ctx context.Context, kubeOpts kube.KubernetesOption
 	startup_base.FatalOnError(err, "Read ConfigMap for timejump")
 
 	// initialize the time offset
-	var timeOffset atomic.Pointer[time.Duration]
-	timeOffset.Store(new(0 * time.Second))
-	applyConfigMapValues(ctx, values, &timeOffset)
+	o.timeOffset.Store(new(0 * time.Second))
+	applyConfigMapValues(ctx, values, &o.timeOffset)
 
 	// create mock clock
-	clock.GlobalClock = createMockClock(&timeOffset)
+	clock.GlobalClock = createMockClock(&o.timeOffset)
 
 	go func() {
 		err := kube.ObserveConfigMap(ctx, kubeClient, o.Namespace, o.ResourceName, func(values kube.ConfigMapValues) error {
-			applyConfigMapValues(ctx, values, &timeOffset)
+			applyConfigMapValues(ctx, values, &o.timeOffset)
 			return nil
 		})
 
@@ -81,6 +85,7 @@ type Timejumper struct {
 	kubeClient   *kubernetes.Clientset
 	namespace    string
 	resourceName string
+	timeOffset   *atomic.Pointer[time.Duration]
 }
 
 // Timejumper returns a Timejumper that writes to the ConfigMap configured by o.
@@ -91,7 +96,23 @@ func (o *Options) Timejumper() *Timejumper {
 		kubeClient:   o.kubeOpts.Client(),
 		namespace:    o.Namespace,
 		resourceName: o.ResourceName,
+		timeOffset:   &o.timeOffset,
 	}
+}
+
+// CurrentOffset returns the offset currently applied to the mocked clock, i.e.
+// how far clock.GlobalClock.Now() runs ahead of wall-clock time. It is zero
+// when timejump is disabled or no jump has happened yet.
+func (j *Timejumper) CurrentOffset() time.Duration {
+	if j.timeOffset == nil {
+		return 0
+	}
+
+	if offset := j.timeOffset.Load(); offset != nil {
+		return *offset
+	}
+
+	return 0
 }
 
 // JumpTo updates the timejump ConfigMap so that the mocked clock jumps to t.
