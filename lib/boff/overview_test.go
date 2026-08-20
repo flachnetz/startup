@@ -159,6 +159,29 @@ func TestRenderOverviewPaginationKeepsFilters(t *testing.T) {
 
 // A cell can carry its own link, so a table with several targets does not have to
 // make the whole row navigate to one of them. A cell link is a visible link.
+// A cell with a tone renders as a badge; a row link still wraps it, and a cell
+// link wins over the tone.
+func TestRenderOverviewTonesIndividualCells(t *testing.T) {
+	var buf bytes.Buffer
+	err := RenderOverview(&buf, "t", []string{"Status", "Order ID"},
+		[]OverviewRow{{
+			Cells:     []string{"PAID", "o1"},
+			CellLinks: []string{"", "/orders/o1/history"},
+			CellTones: []string{"success", "danger"},
+		}})
+	if err != nil {
+		t.Fatalf("render overview: %v", err)
+	}
+	out := buf.String()
+
+	if !strings.Contains(out, `<span class="badge text-bg-success">PAID</span>`) {
+		t.Errorf("toned cell did not render a badge:\n%s", out)
+	}
+	if !strings.Contains(out, `<a href="/orders/o1/history">o1</a>`) || strings.Contains(out, "text-bg-danger") {
+		t.Errorf("cell link did not win over the tone:\n%s", out)
+	}
+}
+
 func TestRenderOverviewLinksIndividualCells(t *testing.T) {
 	var buf bytes.Buffer
 	err := RenderOverview(&buf, "t", []string{"Order ID", "Player", "Payment ID"},

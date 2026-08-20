@@ -70,6 +70,12 @@ type SummaryItem struct {
 	// this payload, highlighted like a ledger record - for a row that summarises a
 	// structure the operator sometimes needs verbatim (an order item as stored).
 	JSON string
+
+	// Tone, when non-empty, renders Value as a bootstrap badge in that tone
+	// ("success", "danger", "warning", "info", "secondary", ...) - for a state
+	// value an operator scans for rather than reads, e.g. an order status. Ignored
+	// for a JSON row.
+	Tone string
 }
 
 // JSONHTML is SummaryItem.JSON colourised, same treatment as a record payload.

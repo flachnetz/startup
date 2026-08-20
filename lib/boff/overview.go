@@ -120,6 +120,11 @@ type OverviewRow struct {
 	Link      string
 	Cells     []string
 	CellLinks []string
+	// CellTones renders individual cells as a bootstrap badge in that tone
+	// (index-aligned with Cells, empty entry = plain text) - for a state column an
+	// operator scans down rather than reads, e.g. a status. A cell link wins over
+	// a tone.
+	CellTones []string
 }
 
 // CellAt pairs a cell with its own link, so the template does not have to index
@@ -129,6 +134,9 @@ func (r OverviewRow) CellAt(i int) OverviewCell {
 	if i < len(r.CellLinks) {
 		cell.Link = r.CellLinks[i]
 	}
+	if i < len(r.CellTones) {
+		cell.Tone = r.CellTones[i]
+	}
 
 	return cell
 }
@@ -137,6 +145,7 @@ func (r OverviewRow) CellAt(i int) OverviewCell {
 type OverviewCell struct {
 	Text string
 	Link string
+	Tone string
 }
 
 // RenderOverview writes a standalone clickable table; each row links to Link.

@@ -36,7 +36,9 @@
                             <summary>{{ .Value }}</summary>
                             <pre class="small mb-0 mt-1">{{ .JSONHTML }}</pre>
                         </details>
-                    {{ else if .Link }}<a href="{{ .Link }}" class="text-decoration-none">{{ .Value }}</a>{{ else }}{{ .Value }}{{ end }}
+                    {{ else if .Link }}<a href="{{ .Link }}" class="text-decoration-none">{{ .Value }}</a>
+                    {{ else if .Tone }}<span class="badge text-bg-{{ .Tone }}">{{ .Value }}</span>
+                    {{ else }}{{ .Value }}{{ end }}
                 </dd>
             </div>
             {{ end }}
@@ -135,6 +137,7 @@
         {{ $cell := $row.CellAt $i }}
         <td class="py-3">
             {{ if $cell.Link }}<a href="{{ $cell.Link }}">{{ $cell.Text }}</a>
+            {{ else if $cell.Tone }}{{ if $link }}<a class="text-reset text-decoration-none" href="{{ $link }}"><span class="badge text-bg-{{ $cell.Tone }}">{{ $cell.Text }}</span></a>{{ else }}<span class="badge text-bg-{{ $cell.Tone }}">{{ $cell.Text }}</span>{{ end }}
             {{ else if $link }}<a class="d-block text-reset text-decoration-none" href="{{ $link }}">{{ $cell.Text }}</a>
             {{ else }}{{ $cell.Text }}{{ end }}
         </td>
