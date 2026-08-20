@@ -28,6 +28,27 @@ func TestSummaryItemLinkRendersAnchor(t *testing.T) {
 	}
 }
 
+// A SummaryItem with a Tone renders its value as a bootstrap badge; without one
+// it stays plain text.
+func TestSummaryItemToneRendersBadge(t *testing.T) {
+	var buf bytes.Buffer
+	err := Render(&buf, RenderConfig{Title: "t", Blocks: []Block{SummaryBlock([]SummaryItem{
+		{Label: "Status", Value: "PAID", Tone: "success"},
+		{Label: "Order ID", Value: "o1"},
+	})}})
+	if err != nil {
+		t.Fatalf("execute template: %v", err)
+	}
+	out := buf.String()
+
+	if !strings.Contains(out, `<span class="badge text-bg-success">PAID</span>`) {
+		t.Errorf("toned summary item did not render a badge:\n%s", out)
+	}
+	if strings.Contains(out, `>o1</span>`) {
+		t.Errorf("untoned summary item was wrapped in a badge:\n%s", out)
+	}
+}
+
 // A SummaryItem with JSON renders a collapsible payload, highlighted like a
 // ledger record, instead of a plain value.
 func TestSummaryItemJSONRendersCollapsiblePayload(t *testing.T) {
