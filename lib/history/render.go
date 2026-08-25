@@ -62,10 +62,36 @@ func (v RecordView) PayloadCollapsible() bool {
 	return strings.Count(v.JSON, "\n")+1 > payloadCollapseThreshold
 }
 
+// recordsModel is the template model for "block/records": the record views
+// plus the display option that isn't a property of any single view.
+type recordsModel struct {
+	Views       []RecordView
+	CollapseAll bool
+}
+
 // HistoryItemsBlock renders the record ledger. Always renders (shows a "No
-// history records." note when views is empty).
+// history records." note when views is empty). A short payload shows inline;
+// a long one collapses behind a "Show full payload" toggle (see
+// payloadCollapseThreshold). Use HistoryItemsBlockCollapsed to collapse every
+// payload regardless of length.
 func HistoryItemsBlock(views []RecordView) boff.Block {
-	return boff.TemplateBlock{Name: "block/records", Model: views, Template: pageTemplate}
+	return historyItemsBlock(views, false)
+}
+
+// HistoryItemsBlockCollapsed is HistoryItemsBlock with every payload hidden
+// behind a "Show full payload" toggle regardless of length - useful for a
+// ledger with many records, where showing every payload inline would make the
+// page unwieldy to scan.
+func HistoryItemsBlockCollapsed(views []RecordView) boff.Block {
+	return historyItemsBlock(views, true)
+}
+
+func historyItemsBlock(views []RecordView, collapseAll bool) boff.Block {
+	return boff.TemplateBlock{
+		Name:     "block/records",
+		Model:    recordsModel{Views: views, CollapseAll: collapseAll},
+		Template: pageTemplate,
+	}
 }
 
 // PageConfig bundles all optional display elements for a history detail page.
@@ -75,6 +101,12 @@ type PageConfig struct {
 	Summary   []boff.SummaryItem
 	Actions   []boff.Action
 	CreatedAt time.Time // zero = local-only, non-zero = Athena fallback
+
+	// CollapseAllPayloads, when true, hides every record's payload behind a
+	// "Show full payload" toggle regardless of length (see
+	// HistoryItemsBlockCollapsed). The default only collapses long payloads
+	// (see payloadCollapseThreshold).
+	CollapseAllPayloads bool
 
 	// Viewer overrides the identity used for RequiredRole gating. Normally the
 	// identity comes from the request context; set this when rendering outside a
@@ -167,11 +199,16 @@ func (h *Service) renderPage(ctx context.Context, w io.Writer, groupId GroupId, 
 		}
 	}
 
+	recordsBlock := HistoryItemsBlock(views)
+	if cfg.CollapseAllPayloads {
+		recordsBlock = HistoryItemsBlockCollapsed(views)
+	}
+
 	defaults := DefaultBlocks{
 		Header:  boff.HeaderBlock{Title: title, Subtitle: "GroupId: " + groupId.String()},
 		Summary: boff.SummaryBlock(cfg.Summary),
 		Actions: boff.ActionsBlock(cfg.Actions),
-		Records: HistoryItemsBlock(views),
+		Records: recordsBlock,
 	}
 
 	blocks := defaults.All()
