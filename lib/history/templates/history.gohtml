@@ -1,6 +1,7 @@
 {{ define "block/records" }}
 <div class="ledger">
-    {{ range $i, $r := . }}
+    {{ $collapseAll := .CollapseAll }}
+    {{ range $i, $r := .Views }}
         {{ if $r.ShowSeparator }}
             </div></div>
             <div class="card mb-3">
@@ -16,7 +17,7 @@
             <p class="fw-semibold mb-1">{{ $r.Step }}</p>
             <p class="text-body-secondary small mb-2">{{ $r.Description }}</p>
             {{ if $r.HasPayload }}
-                {{ if $r.PayloadCollapsible }}
+                {{ if or $collapseAll $r.PayloadCollapsible }}
                 <details class="mt-1">
                     <summary class="small text-body-secondary">Show full payload</summary>
                     <pre class="bg-body-tertiary border rounded p-2 mt-2 mb-0 small"><code>{{ $r.JSONHTML }}</code></pre>
@@ -26,7 +27,7 @@
                 {{ end }}
             {{ end }}
         </div>
-        {{ if eq (add $i 1) (len $) }}</div></div>{{ end }}
+        {{ if eq (add $i 1) (len $.Views) }}</div></div>{{ end }}
     {{ else }}
         <p class="text-body-secondary">No history records.</p>
     {{ end }}
