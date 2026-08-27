@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -168,6 +170,51 @@ func TestTracing_ServerSpanNamedAfterRequest(t *testing.T) {
 	}
 	assert.Equal(t, "serve", attrs["operation"], "op stays queryable as an attribute")
 	assert.Equal(t, "GET /v1/orders/ORDER_ID", attrs["resource.name"])
+}
+
+// A propagated request must still get a server span of this service, as a child
+// of the caller's span. Without it every client and db span of the request hangs
+// off the caller and the request has no local root.
+func TestTracing_ServerSpanIsCreatedForAPropagatedRequest(t *testing.T) {
+	recorder := recordSpans(t)
+
+	prevProp := otel.GetTextMapPropagator()
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+	t.Cleanup(func() { otel.SetTextMapPropagator(prevProp) })
+
+	var childTraceID trace.TraceID
+	var childParent trace.SpanID
+	handler := Tracing("order-service", "serve")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		span := trace.SpanFromContext(r.Context())
+		childTraceID = span.SpanContext().TraceID()
+		childParent = span.SpanContext().SpanID()
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	callerTraceID, err := trace.TraceIDFromHex("5a697f07e03d04999ad863247383871a")
+	require.NoError(t, err)
+	callerSpanID, err := trace.SpanIDFromHex("00f067aa0ba902b7")
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/orders/checkout", nil)
+	req.Header.Set("traceparent", "00-"+callerTraceID.String()+"-"+callerSpanID.String()+"-01")
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+
+	ended := recorder.Ended()
+	require.Len(t, ended, 1, "a propagated request must still produce a server span")
+	assert.Equal(t, "serve POST /v1/orders/checkout", ended[0].Name())
+	assert.Equal(t, callerTraceID, ended[0].SpanContext().TraceID(), "same trace as the caller")
+	assert.Equal(t, callerSpanID, ended[0].Parent().SpanID(), "child of the caller's span")
+	assert.Equal(t, callerTraceID, childTraceID, "handler sees the server span")
+	assert.Equal(t, ended[0].SpanContext().SpanID(), childParent,
+		"handler's context carries the new server span, so its children nest under it")
+
+	attrs := map[string]string{}
+	for _, kv := range ended[0].Attributes() {
+		attrs[string(kv.Key)] = kv.Value.Emit()
+	}
+	assert.Equal(t, "order-service", attrs["peer.service"])
+	assert.Equal(t, "200", attrs["http.status_code"])
 }
 
 func TestLooksLikeID_TokenShapes(t *testing.T) {

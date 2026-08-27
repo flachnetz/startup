@@ -58,7 +58,8 @@ func isNotErrNoRows(err error) bool {
 	return !errors.Is(err, sql.ErrNoRows)
 }
 
-var extraTagsKey = "zipkin tags"
+// The value is never read, only its address is used as the context key.
+var extraTagsKey = "span attributes"
 
 // WithTags adds the given tags to the context. All spans that are created using
 // functions from this package will automatically set those tags.
