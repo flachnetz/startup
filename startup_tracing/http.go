@@ -52,16 +52,12 @@ func Tracing(service string, op string) Middleware {
 			// Extract propagated context from incoming request headers
 			ctx := otel.GetTextMapPropagator().Extract(req.Context(), propagation.HeaderCarrier(req.Header))
 
-			// Check if we already have a valid span (chained middleware)
-			if existingSpan := trace.SpanFromContext(ctx); existingSpan.SpanContext().IsValid() {
-				existingSpan.SetAttributes(
-					attribute.String("peer.service", service),
-				)
-				// We can't rename an OTel span after creation easily,
-				// but we update attributes. Continue with existing span.
-				handler.ServeHTTP(w, req.WithContext(ctx))
-				return
-			}
+			// A server span is always started, also when the caller propagated a
+			// trace: after Extract the context holds a non-recording remote span,
+			// so a "do we already have a span" check would be true for every
+			// propagated request and this service would contribute no span of its
+			// own - its client and db spans would then hang off the caller's span.
+			// The extracted context is the parent.
 
 			// op alone ("serve") cannot be grouped by endpoint, so the request is
 			// appended: "serve GET /v1/orders/UUID". The op prefix stays first so
