@@ -27,9 +27,18 @@ import (
 )
 
 var (
-	reNumber = regexp.MustCompile(`/[0-9]+`)
-	reClean  = regexp.MustCompile(`/(?:tenants|sites|games|customers|tickets)/[^/]+`)
-	reUUID   = regexp.MustCompile(`/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}`)
+	reNumber = regexp.MustCompile(`^[0-9]+$`)
+	reUUID   = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	reHex    = regexp.MustCompile(`(?i)^[0-9a-f]{16,}$`)
+
+	// ULID: 26 chars of Crockford base32 (no I, L, O, U).
+	reULID = regexp.MustCompile(`(?i)^[0-7][0-9ABCDEFGHJKMNPQRSTVWXYZ]{25}$`)
+
+	// idCollections are path segments whose next segment is an id even when it
+	// does not look like one (slugs, external references).
+	idCollections = map[string]bool{
+		"tenants": true, "sites": true, "games": true, "customers": true, "tickets": true,
+	}
 )
 
 type Middleware func(http.Handler) http.Handler
@@ -54,11 +63,18 @@ func Tracing(service string, op string) Middleware {
 				return
 			}
 
+			// op alone ("serve") cannot be grouped by endpoint, so the request is
+			// appended: "serve GET /v1/orders/UUID". The op prefix stays first so
+			// queries that matched on it keep working with a prefix match.
+			resource := resourceOf(req.Method, req.URL)
+
 			ctx, serverSpan := tracer.Start(
-				ctx, op,
+				ctx, op+" "+resource,
 				trace.WithSpanKind(trace.SpanKindServer),
 				trace.WithAttributes(
 					attribute.String("peer.service", service),
+					attribute.String("operation", op),
+					attribute.String("resource.name", resource),
 					semconv.HTTPRequestMethodKey.String(req.Method),
 					attribute.String("http.url", cleanUrl(req.URL)),
 				),
@@ -92,19 +108,100 @@ func cleanUrl(u *url.URL) string {
 	urlCopy := new(*u)
 	urlCopy.RawQuery = ""
 	urlCopy.User = nil
+	urlCopy.Path = cleanPath(u.Path)
 
-	urlStr := urlCopy.String()
+	return urlCopy.String()
+}
 
-	urlStr = reClean.ReplaceAllStringFunc(urlStr, func(s string) string {
-		idx := strings.LastIndexByte(s, '/')
-		return s[:idx] + strings.ToUpper(s[:idx])
-	})
+// cleanPath replaces id segments with a placeholder named after the collection
+// they belong to: /orders/6ba7…/config becomes /orders/ORDER_ID/config. This
+// keeps one endpoint one span name (so latency can be averaged over it) while
+// staying readable, which a bare /UUID does not.
+func cleanPath(path string) string {
+	if path == "" || path == "/" {
+		return path
+	}
 
-	// clean uuid and numbers
-	urlStr = reUUID.ReplaceAllString(urlStr, "/UUID")
-	urlStr = reNumber.ReplaceAllString(urlStr, "/N")
+	segments := strings.Split(path, "/")
+	for i, segment := range segments {
+		previous := ""
+		if i > 0 {
+			previous = segments[i-1]
+		}
 
-	return urlStr
+		if !looksLikeID(segment) && !idCollections[previous] {
+			continue
+		}
+
+		segments[i] = placeholderFor(previous)
+	}
+
+	return strings.Join(segments, "/")
+}
+
+func looksLikeID(segment string) bool {
+	return reNumber.MatchString(segment) ||
+		reUUID.MatchString(segment) ||
+		reULID.MatchString(segment) ||
+		reHex.MatchString(segment) ||
+		isOpaqueToken(segment)
+}
+
+// isOpaqueToken catches the remaining opaque shapes (KSUID, nanoid, base62
+// external references): long, alphanumeric, carrying at least one digit. Real
+// path words are shorter, so a false positive costs a wrong label, not
+// cardinality.
+func isOpaqueToken(segment string) bool {
+	if len(segment) < 20 {
+		return false
+	}
+
+	hasDigit := false
+	for _, r := range segment {
+		switch {
+		case r >= '0' && r <= '9':
+			hasDigit = true
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z':
+		default:
+			return false
+		}
+	}
+
+	return hasDigit
+}
+
+// placeholderFor names the placeholder after the preceding collection segment,
+// e.g. "orders" -> ORDER_ID. Plural handling is deliberately crude (English "s"
+// and "ies"); a wrong singular is a cosmetic issue, not a cardinality one.
+func placeholderFor(collection string) string {
+	if collection == "" || looksLikeID(collection) {
+		return "ID"
+	}
+
+	singular := collection
+	switch {
+	case strings.HasSuffix(singular, "ies"):
+		singular = strings.TrimSuffix(singular, "ies") + "y"
+	case strings.HasSuffix(singular, "sses"), strings.HasSuffix(singular, "xes"):
+		singular = strings.TrimSuffix(singular, "es")
+	case strings.HasSuffix(singular, "s"):
+		singular = strings.TrimSuffix(singular, "s")
+	}
+
+	return strings.ToUpper(strings.ReplaceAll(singular, "-", "_")) + "_ID"
+}
+
+// resourceOf names a span after the request it describes, e.g.
+// "PUT /orders/ORDER_ID/config". Host and query are left out: they carry no
+// information a trace view can group by, while the path prefix already
+// identifies the peer (also behind an api gateway).
+func resourceOf(method string, u *url.URL) string {
+	path := cleanPath(u.Path)
+	if path == "" {
+		path = "/"
+	}
+
+	return method + " " + path
 }
 
 // WithSpanPropagation returns a new http.Client that has automatic propagation
@@ -136,13 +233,16 @@ func (rt tracingRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 		return rt.delegate.RoundTrip(req)
 	}
 
+	resource := resourceOf(req.Method, req.URL)
+
 	tracer := otel.Tracer("")
 	ctx, span := tracer.Start(
-		ctx, "http-client",
+		ctx, resource,
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			semconv.HTTPRequestMethodKey.String(req.Method),
 			attribute.String("http.url", cleanUrl(req.URL)),
+			attribute.String("resource.name", resource),
 		),
 		trace.WithAttributes(TagsFromContext(ctx)...),
 	)

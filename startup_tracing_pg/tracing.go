@@ -27,7 +27,10 @@ func (opts *PostgresTracingOptions) Initialize(base startup_base.BaseOptions, tr
 			}
 
 			pt.InstallTracer(&tracer{
-				ServiceName:         base.ServiceName + "-db",
+				// Underscore, not a dash: the service name itself is snake_case
+				// (order_service), and a mixed order_service-db reads as a typo in
+				// every trace view.
+				ServiceName:         base.ServiceName + "_db",
 				SkipFrameworkMethod: skipFunction,
 			})
 		}

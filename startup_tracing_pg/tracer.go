@@ -16,7 +16,26 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-var reSpace = regexp.MustCompile(`\s+`)
+// reTable matches an optionally quoted, optionally schema-qualified table name.
+const reTable = `"?([a-z_][a-z0-9_$]*(?:"?\."?[a-z_][a-z0-9_$]*)?)"?`
+
+var (
+	reSpace = regexp.MustCompile(`\s+`)
+
+	// One regex per operation, tried in this order: a statement that writes is
+	// named after the write even when it reads via a CTE or a sub-select.
+	reStatements = []struct {
+		verb string
+		re   *regexp.Regexp
+	}{
+		{verb: "INSERT", re: regexp.MustCompile(`(?is)\binsert\s+into\s+` + reTable)},
+		{verb: "UPDATE", re: regexp.MustCompile(`(?is)\bupdate\s+` + reTable)},
+		{verb: "DELETE", re: regexp.MustCompile(`(?is)\bdelete\s+from\s+` + reTable)},
+		{verb: "SELECT", re: regexp.MustCompile(`(?is)\bselect\b.*?\bfrom\s+` + reTable)},
+	}
+
+	reVerb = regexp.MustCompile(`(?is)^\s*\(*\s*([a-z]+)`)
+)
 
 type tracer struct {
 	ServiceName         string
@@ -28,7 +47,10 @@ func (t *tracer) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data pgx.T
 		return ctx
 	}
 	cleanQuery := cleanQuery(data.SQL)
-	ctx, span := t.startSpan(ctx, cleanQuery)
+	// The full statement lives in sql.query only. The span name and
+	// resource.name get the short form, so a trace view groups by statement
+	// shape instead of showing one distinct resource per query text.
+	ctx, span := t.startSpan(ctx, queryResource(cleanQuery))
 	span.SetAttributes(attribute.String("sql.query", cleanQuery))
 	return ctx
 }
@@ -52,7 +74,7 @@ func (t *tracer) TracePrepareStart(ctx context.Context, conn *pgx.Conn, data pgx
 		return ctx
 	}
 	cleanQuery := cleanQuery(data.SQL)
-	ctx, span := t.startSpan(ctx, cleanQuery)
+	ctx, span := t.startSpan(ctx, "PREPARE "+queryResource(cleanQuery))
 	span.SetAttributes(
 		attribute.String("sql.query", cleanQuery),
 		attribute.Bool("sql.prepare", true),
@@ -123,23 +145,26 @@ func (t *tracer) startSpan(ctx context.Context, res string) (context.Context, tr
 	}
 
 	ctx, span := otel.Tracer("").Start(
-		ctx, t.ServiceName,
+		ctx, res,
 		trace.WithSpanKind(trace.SpanKindClient),
 	)
 
 	span.SetAttributes(
 		attribute.String("peer.service", t.ServiceName),
-		attribute.String("dd.resource", res),
 		attribute.String("resource.name", res),
 	)
 
 	return ctx, span
 }
 
-var cleanQueryCache *lru.Cache
+var (
+	cleanQueryCache    *lru.Cache
+	queryResourceCache *lru.Cache
+)
 
 func init() {
 	cleanQueryCache, _ = lru.New(10_000)
+	queryResourceCache, _ = lru.New(10_000)
 }
 
 func cleanQuery(query string) string {
@@ -151,4 +176,30 @@ func cleanQuery(query string) string {
 	cleaned := strings.TrimSpace(reSpace.ReplaceAllString(query, " "))
 	cleanQueryCache.Add(query, cleaned)
 	return cleaned
+}
+
+// queryResource turns a statement into a short, groupable name such as
+// "INSERT order_service_history" or "SELECT orders". A statement whose table
+// cannot be recognised keeps its leading keyword ("BEGIN", "COPY"), which is
+// still bounded - the full text stays in the sql.query attribute.
+func queryResource(query string) string {
+	if cached, ok := queryResourceCache.Get(query); ok {
+		return cached.(string)
+	}
+
+	resource := "query"
+	for _, s := range reStatements {
+		if m := s.re.FindStringSubmatch(query); m != nil {
+			resource = s.verb + " " + strings.ToLower(strings.ReplaceAll(m[1], `"`, ""))
+			break
+		}
+	}
+	if resource == "query" {
+		if m := reVerb.FindStringSubmatch(query); m != nil {
+			resource = strings.ToUpper(m[1])
+		}
+	}
+
+	queryResourceCache.Add(query, resource)
+	return resource
 }
