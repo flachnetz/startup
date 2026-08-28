@@ -73,7 +73,8 @@ func (opts *HTTPOptions) Initialize(ctx context.Context, base startup_base.BaseO
 
 func (opts *HTTPOptions) ServeHandler(handler http.Handler) {
 	opts.Serve(Config{
-		Routing: func(mux *http.ServeMux) http.Handler { return handler },
+		Routing:       func(mux *http.ServeMux) http.Handler { return handler },
+		UseMiddleware: tracing.Tracing(opts.inputs.ServiceName, "serve"),
 	})
 }
 
