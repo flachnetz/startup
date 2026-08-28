@@ -33,6 +33,10 @@ func (c *txContext) Value(key any) any {
 }
 
 func (c *txContext) CommitAndChain() error {
+	if err := c.RunBeforeCommit(c); err != nil {
+		return err
+	}
+
 	if err := Exec(c, "COMMIT AND CHAIN"); err != nil {
 		return err
 	}

@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"os"
 	"reflect"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/flachnetz/startup/v2/lib/clock"
@@ -97,6 +99,11 @@ type Service struct {
 
 	// record to send out async
 	queue chan RecordToSend
+
+	// table rows buffered per open transaction, flushed as one INSERT before that
+	// transaction commits. Keyed by the *sqlx.Tx behind the TxContext.
+	pendingMu sync.Mutex
+	pending   map[any][]RecordToSend
 }
 
 // Option customizes a Service created with New.
@@ -296,19 +303,10 @@ func (h *Service) trackAsyncEvent(ctx context.Context, rec RecordToSend) {
 }
 
 func (h *Service) trackInTx(ctx ql.TxContext, rec RecordToSend) error {
-	stmt := fmt.Sprintf(
-		`INSERT INTO %s ("timestamp", group_ids, request_trace_id, step, description, payload, "trigger") VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		h.table.Sanitize(),
-	)
-
 	var result error
 
 	// store in local table
-	err := ql.Exec(ctx, stmt, rec.Timestamp,
-		groupIdStrings(rec.GroupIds), rec.RequestTraceId, rec.Step, rec.Description,
-		[]byte(rec.Payload), rec.Trigger)
-
-	result = errors.Join(result, err)
+	result = errors.Join(result, h.bufferRow(ctx, rec))
 
 	if h.eventSending != nil {
 		// convert to an event
@@ -326,6 +324,81 @@ func (h *Service) trackInTx(ctx ql.TxContext, rec RecordToSend) error {
 	}
 
 	return result
+}
+
+// bufferRow queues the record's table row for a single multi-row INSERT run just
+// before the transaction commits. A request that tracks several records would
+// otherwise pay one round trip per record while holding the transaction open;
+// the rows are identical in shape, so one statement does.
+//
+// Rows are written on the same transaction and in tracking order, so the ledger
+// reads exactly as before. A TxContext not created by ql (test doubles) has no
+// transaction to key the buffer on and is written immediately.
+func (h *Service) bufferRow(ctx ql.TxContext, rec RecordToSend) error {
+	tx := ql.TryTxFromContext(ctx)
+	if tx == nil {
+		return h.writeRows(ctx, []RecordToSend{rec})
+	}
+
+	h.pendingMu.Lock()
+	defer h.pendingMu.Unlock()
+
+	if pending, ok := h.pending[tx]; ok {
+		h.pending[tx] = append(pending, rec)
+		return nil
+	}
+
+	if h.pending == nil {
+		h.pending = map[any][]RecordToSend{}
+	}
+
+	h.pending[tx] = []RecordToSend{rec}
+
+	ctx.BeforeCommit(func(ctx ql.TxContext) error {
+		h.pendingMu.Lock()
+		recs := h.pending[tx]
+		delete(h.pending, tx)
+		h.pendingMu.Unlock()
+
+		return h.writeRows(ctx, recs)
+	})
+
+	// a rolled back transaction never flushes, so drop the buffer either way.
+	ctx.OnDone(func() {
+		h.pendingMu.Lock()
+		delete(h.pending, tx)
+		h.pendingMu.Unlock()
+	})
+
+	return nil
+}
+
+// writeRows inserts all buffered records with one statement.
+func (h *Service) writeRows(ctx ql.TxContext, recs []RecordToSend) error {
+	if len(recs) == 0 {
+		return nil
+	}
+
+	const colCount = 7
+
+	values := make([]string, 0, len(recs))
+	args := make([]any, 0, len(recs)*colCount)
+
+	for i, rec := range recs {
+		base := i * colCount
+		values = append(values, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d)",
+			base+1, base+2, base+3, base+4, base+5, base+6, base+7))
+
+		args = append(args, rec.Timestamp, groupIdStrings(rec.GroupIds), rec.RequestTraceId,
+			rec.Step, rec.Description, []byte(rec.Payload), rec.Trigger)
+	}
+
+	stmt := fmt.Sprintf(
+		`INSERT INTO %s ("timestamp", group_ids, request_trace_id, step, description, payload, "trigger") VALUES %s`,
+		h.table.Sanitize(), strings.Join(values, ", "),
+	)
+
+	return ql.Exec(ctx, stmt, args...)
 }
 
 // groupIdStrings converts a slice of GroupId to their string representations
