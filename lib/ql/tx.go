@@ -79,6 +79,9 @@ func InNewTransactionWithResult[R any](ctx context.Context, db TxStarter, fun fu
 
 	defer closeConn()
 
+	// cleanup hooks run on every outcome, including a panic in the users code.
+	defer hooks.RunOnDone()
+
 	// set to true once the users code ran
 	var userCodeOk bool
 	defer func() {
@@ -94,10 +97,19 @@ func InNewTransactionWithResult[R any](ctx context.Context, db TxStarter, fun fu
 	}()
 
 	// run the users transaction code
-	res, err := fun(newTxContext(ctx, tx, &hooks))
+	txCtx := newTxContext(ctx, tx, &hooks)
+	res, err := fun(txCtx)
 
 	// if we panic now, we dont do anything
 	userCodeOk = true
+
+	// flush buffered writes while the transaction is still open. A failure here
+	// must not be committed, so it is treated like an error from the users code.
+	if err == nil {
+		if ferr := hooks.RunBeforeCommit(txCtx); ferr != nil {
+			err = ferr
+		}
+	}
 
 	// check if the user wants to rollback
 	err, rollback := requiresTxRollback(err)

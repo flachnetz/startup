@@ -97,12 +97,39 @@ func (opts *PostgresOptions) Connection() *sqlx.DB {
 			}
 		}
 
+		warmPool(ctx, db, opts.PoolSize, logger)
+
 		observeStats(db)
 
 		opts.connection = db
 	})
 
 	return opts.connection
+}
+
+// warmPool opens the whole pool up front. database/sql connects lazily, so
+// without this the first requests after start (and after PoolSize grows under
+// load) pay the TCP+TLS+auth handshake inline — visible in traces as a BEGIN
+// taking tens of milliseconds. Failures are logged and ignored: a warm pool is
+// an optimisation, and Ping already proved the database reachable.
+func warmPool(ctx context.Context, db *sqlx.DB, size int, logger *slog.Logger) {
+	conns := make([]*sql.Conn, 0, size)
+
+	for range size {
+		conn, err := db.Conn(ctx)
+		if err != nil {
+			logger.Warn("Could not pre-open pool connection", slog.String("err", err.Error()))
+			break
+		}
+
+		// held, not closed, so the next iteration is forced to open a new one
+		// instead of handing back the same connection.
+		conns = append(conns, conn)
+	}
+
+	for _, conn := range conns {
+		_ = conn.Close()
+	}
 }
 
 func observeStats(db *sqlx.DB) {

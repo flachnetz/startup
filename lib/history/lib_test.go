@@ -3,6 +3,7 @@ package history
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"testing"
 	"time"
@@ -284,6 +285,72 @@ func TestTrackMultipleGroupIds(t *testing.T) {
 		records, err := service.Records(ctx, GroupId{"order", "unknown"})
 		require.NoError(t, err)
 		require.Empty(t, records)
+		return nil
+	})
+}
+
+// Several records tracked in one transaction are written with a single INSERT.
+// The batching must not lose records, reorder them, or drop the ones tracked
+// after the first flush was scheduled.
+func TestTrackBatchesRowsWithinOneTransaction(t *testing.T) {
+	db := testx.NewConnection(t, "history_migrations")
+	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
+		return CreateTable(ctx, "history")
+	})
+
+	service := New(db, pgx.Identifier{"history"}, nil)
+	group := GroupId{"order", "batch-1"}
+
+	testx.MustTransact(t, db, func(ctx ql.TxContext) {
+		for _, v := range []string{"one", "two", "three"} {
+			service.Track(ctx, item{Value: v}, group)
+		}
+	})
+
+	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
+		records, err := service.Records(ctx, group)
+		require.NoError(t, err)
+		require.Len(t, records, 3)
+
+		values := make([]string, 0, len(records))
+		for _, rec := range records {
+			var i item
+			require.NoError(t, json.Unmarshal(rec.Payload, &i))
+			values = append(values, i.Value)
+		}
+		require.ElementsMatch(t, []string{"one", "two", "three"}, values)
+
+		return nil
+	})
+}
+
+// A rolled back transaction must not leave buffered rows behind that a later
+// transaction would flush.
+func TestTrackBufferIsDiscardedOnRollback(t *testing.T) {
+	db := testx.NewConnection(t, "history_migrations")
+	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
+		return CreateTable(ctx, "history")
+	})
+
+	service := New(db, pgx.Identifier{"history"}, nil)
+	group := GroupId{"order", "rollback-1"}
+
+	errBoom := errors.New("boom")
+	err := ql.InNewTransaction(t.Context(), db, func(ctx ql.TxContext) error {
+		service.Track(ctx, item{Value: "gone"}, group)
+		return errBoom
+	})
+	require.ErrorIs(t, err, errBoom)
+
+	testx.MustTransact(t, db, func(ctx ql.TxContext) {
+		service.Track(ctx, item{Value: "kept"}, group)
+	})
+
+	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
+		records, err := service.Records(ctx, group)
+		require.NoError(t, err)
+		require.Len(t, records, 1)
+		require.JSONEq(t, `{"value":"kept"}`, string(records[0].Payload))
 		return nil
 	})
 }
