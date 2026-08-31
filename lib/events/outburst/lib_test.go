@@ -113,6 +113,9 @@ func (t *testServices) InsertOutbox(entry outboxEntry) {
 	})
 }
 
+// The NOTIFY listener is no longer wired into Initialize (see Initialize's
+// comment for why), but the code is kept around, so drive it directly here to
+// keep it covered.
 func TestOutburstNotifyListen(t *testing.T) {
 	svc := setupService(t)
 
@@ -122,14 +125,12 @@ func TestOutburstNotifyListen(t *testing.T) {
 
 	producer := svc.Kafka.Producer()
 
-	err := Initialize(ctx, Options{
-		Kafka:                producer,
-		Database:             svc.DB,
-		OutboxTable:          "outbox",
-		testDisableIterBatch: true,
-	})
+	db := outboxDB{DB: svc.DB, Table: "outbox"}
+	require.NoError(t, ensureOutboxTable(ctx, db))
 
-	require.NoError(t, err)
+	go func() {
+		_ = runNotifyListener(ctx, db, producer, 4, 128)
+	}()
 
 	svc.InsertOutbox(outboxEntry{
 		Topic: "foobar",
@@ -150,10 +151,9 @@ func TestOutburstBatch(t *testing.T) {
 	ctx := t.Context()
 
 	err := Initialize(ctx, Options{
-		Kafka:                 svc.Kafka.Producer(),
-		Database:              svc.DB,
-		OutboxTable:           "outbox",
-		testDisableIterNotify: true,
+		Kafka:       svc.Kafka.Producer(),
+		Database:    svc.DB,
+		OutboxTable: "outbox",
 	})
 
 	require.NoError(t, err)
@@ -179,10 +179,9 @@ func TestOutburstHeadersAndNilKey(t *testing.T) {
 	ctx := t.Context()
 
 	err := Initialize(ctx, Options{
-		Kafka:                svc.Kafka.Producer(),
-		Database:             svc.DB,
-		OutboxTable:          "outbox",
-		testDisableIterBatch: true,
+		Kafka:       svc.Kafka.Producer(),
+		Database:    svc.DB,
+		OutboxTable: "outbox",
 	})
 	require.NoError(t, err)
 

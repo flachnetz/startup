@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"hash/fnv"
 	"log/slog"
@@ -43,7 +42,7 @@ type Options struct {
 	// owns its own scheduler.
 	Cron gocron.Scheduler
 
-	// Rows fetched per pass by the fallback sweeper. Defaults to 128.
+	// Rows fetched per pass by the polling sweeper. Defaults to 1024.
 	BatchSize uint
 
 	// Size of the worker pool on the LISTEN/NOTIFY path. Defaults to 4.
@@ -65,8 +64,7 @@ type Options struct {
 	EnableDebugLogging bool
 
 	// test hooks
-	testDisableIterBatch  bool
-	testDisableIterNotify bool
+	testDisableIterBatch bool
 }
 
 // debugEnabled gates every debug log call; mirrors Options.EnableDebugLogging.
@@ -132,29 +130,9 @@ func Initialize(ctx context.Context, opts Options) error {
 		return nil
 	}
 
-	if err := scheduleJobs(ctx, opts, db, opts.Kafka, orDefault(opts.BatchSize, 128)); err != nil {
+	if err := scheduleJobs(ctx, opts, db, opts.Kafka, orDefault(opts.BatchSize, 1024)); err != nil {
 		return fmt.Errorf("schedule cron tasks: %w", err)
 	}
-
-	slog.Info("Starting outburst background task")
-	go func() {
-		if opts.testDisableIterNotify {
-			return
-		}
-
-		for ctx.Err() == nil {
-			err := runNotifyListener(ctx, db, opts.Kafka, orDefault(opts.WorkerCount, 4), orDefault(opts.WorkerQueueBuffer, 128))
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				slog.InfoContext(ctx, "Notify listener stopped on context cancellation", sl.Error(err))
-				return
-			}
-
-			if err != nil {
-				slog.ErrorContext(ctx, "Notify listener failed, restarting shortly", sl.Error(err))
-				time.Sleep(100 * time.Millisecond)
-			}
-		}
-	}()
 
 	return nil
 }
@@ -204,9 +182,11 @@ func scheduleJobs(ctx context.Context, opts Options, db outboxDB, producer *kafk
 	}
 
 	if !opts.testDisableIterBatch {
-		// Safety net that sweeps up rows any missed NOTIFY left behind.
+		// Sole delivery path while the NOTIFY listener is disabled: poll
+		// frequently, serialized across instances by the advisory lock in
+		// sweepOutbox, which itself loops until the outbox is drained.
 		if _, err := scheduler.NewJob(
-			gocron.DurationRandomJob(10*time.Second, 20*time.Second),
+			gocron.DurationJob(500*time.Millisecond),
 			gocron.NewTask(sweepJob(ctx, db, producer, batchSize)),
 			gocron.WithContext(ctx),
 			gocron.WithSingletonMode(gocron.LimitModeReschedule),
@@ -236,7 +216,7 @@ type outboxDB struct {
 
 func sweepJob(ctx context.Context, db outboxDB, producer *kafka.Producer, batchSize uint) func() {
 	return func() {
-		_ = startup_tracing.Trace(ctx, "sweep", func(ctx context.Context, span trace.Span) error {
+		_ = startup_tracing.Trace(ctx, "SweepJob", func(ctx context.Context, span trace.Span) error {
 			sweepOutbox(ctx, db, producer, batchSize)
 			return nil
 		})
@@ -477,50 +457,55 @@ func sweepOutbox(ctx context.Context, db outboxDB, producer *kafka.Producer, bat
 		return
 	}
 
-	defer func(ctx context.Context, conn *sqlx.Conn, lockID int64) {
+	defer func() {
+		ctx := context.WithoutCancel(ctx)
+
 		if err := releaseAdvisoryLock(ctx, conn, lockID); err != nil {
 			slog.ErrorContext(ctx, "Failed to release connection lock", sl.Error(err))
 		}
-	}(context.WithoutCancel(ctx), conn, lockID)
+	}()
 
-	limit := batchSize
-	for {
-		start := time.Now()
+	startup_tracing.Trace(ctx, "RunSweap", func(ctx context.Context, span trace.Span) error {
+		limit := batchSize
 
-		count, err := startup_tracing.TraceWithResult[uint](ctx, "sweepBatch", func(ctx context.Context, span trace.Span) (uint, error) {
-			return sweepBatch(ctx, db, producer, limit)
-		})
+		for {
+			start := time.Now()
 
-		iterationDuration.Observe(time.Since(start).Seconds())
+			count, err := startup_tracing.TraceWithResult[uint](ctx, "SweepBatch", func(ctx context.Context, span trace.Span) (uint, error) {
+				return sweepBatch(ctx, db, producer, limit)
+			})
 
-		if err != nil {
-			log.WarnContext(ctx, "Sweep failed", sl.Error(err))
+			iterationDuration.Observe(time.Since(start).Seconds())
 
-			errorCounter.Inc()
+			if err != nil {
+				log.WarnContext(ctx, "Sweep failed", sl.Error(err))
 
-			// Back off briefly before retrying.
-			time.Sleep(1 * time.Second)
+				errorCounter.Inc()
 
-			continue
-		}
+				// Back off briefly before retrying.
+				time.Sleep(1 * time.Second)
 
-		if count == 0 {
-			debugLog(ctx, log, "Outbox empty, yielding until the next tick")
-			return
-		}
+				continue
+			}
 
-		// A full batch hints there may be more waiting, so keep going after a
-		// short pause. A partial batch means we drained it and can hand control
-		// back to the scheduler.
-		if count == limit {
+			if count == 0 {
+				debugLog(ctx, log, "Outbox empty, yielding until the next tick")
+				return nil
+			}
+
+			// A full batch hints there may be more waiting, so keep going after a
+			// short pause. A partial batch means we drained it and can hand control
+			// back to the scheduler.
+			if count == limit {
+				debugLog(ctx, log, "Published batch to kafka", "count", count)
+				time.Sleep(125 * time.Millisecond)
+				continue
+			}
+
 			debugLog(ctx, log, "Published batch to kafka", "count", count)
-			time.Sleep(500 * time.Millisecond)
-			continue
+			return nil
 		}
-
-		debugLog(ctx, log, "Published batch to kafka", "count", count)
-		return
-	}
+	})
 }
 
 func acquireAdvisoryLock(ctx context.Context, conn *sqlx.Conn, lockID int64) (bool, error) {
@@ -554,7 +539,6 @@ func sweepBatch(ctx context.Context, db outboxDB, producer *kafka.Producer, limi
 		query := fmt.Sprintf(`
 			SELECT id, kafka_topic, kafka_key, kafka_value, kafka_header_keys, kafka_header_values
 			FROM %s
-			WHERE create_time < current_timestamp - interval '2' second
 			ORDER BY id
 			LIMIT $1
 			FOR UPDATE SKIP LOCKED

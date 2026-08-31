@@ -17,25 +17,22 @@ err := outburst.Initialize(ctx, outburst.Options{
 ```
 
 `Initialize` provisions the table when it is missing and launches a background
-relay: a `LISTEN`/`NOTIFY` consumer for low-latency delivery, backed by a
-periodic sweeper that catches anything a missed notification left behind.
+relay: a periodic sweeper that polls the outbox table every 500ms, publishing
+rows to Kafka in `id` order and deleting them once they're delivered.
 
-## Notifying the relay
+## Ordering
 
-Have your insert trigger notify the `kafka-message` channel so a freshly written
-row is forwarded right away; without a notification the sweeper still picks it up
-on its next pass, just later.
+Rows are delivered in `id` order, and the sweep is serialized across instances
+behind a Postgres advisory lock, so at most one instance is ever draining the
+outbox at a time — ordering holds globally, no matter how many instances of
+the service are running.
 
-The payload is a JSON object carrying the row id together with its `kafka_key`:
+## NOTIFY fast path (disabled)
 
-```sql
-SELECT pg_notify('kafka-message', json_build_object('id', id, 'key', kafka_key)::text);
-```
-
-Shipping the key inside the notification lets the relay choose a worker shard
-without a second query. Shards are keyed on `kafka_key`, so every row for a given
-key is published in insertion order — and therefore lands on its Kafka partition
-in order — regardless of `WorkerCount`.
-
-Only this JSON shape is accepted. Any other payload is ignored on the notify path
-and left for the sweeper to forward.
+The outbox table still accepts a `LISTEN`/`NOTIFY`-based low-latency path in
+the code (see `runNotifyListener`), but `Initialize` does not start it:
+`NOTIFY` is broadcast to every listening process, so with more than one
+instance running, the per-key ordering guarantee that path relies on (routing
+a `kafka_key` to a single worker goroutine) only holds inside one process, not
+across the fleet. Re-enabling it needs either a single-instance deployment or
+leader election so only one instance ever listens.
