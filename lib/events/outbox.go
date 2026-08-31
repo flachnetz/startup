@@ -28,14 +28,8 @@ func WriteToOutbox(ctx context.Context, tx sqlx.ExecerContext, metadata EventMet
 
 	// insert event into database and notify listeners
 	stmt := fmt.Sprintf(`
-		WITH
-			ids AS (
-				INSERT INTO %s (kafka_topic, kafka_key, kafka_value, kafka_header_keys, kafka_header_values)
-				VALUES ($1, $2, $3, $4, $5)
-				RETURNING id, kafka_key)
-
-		SELECT pg_notify('kafka-message', json_build_object('id', id, 'key', kafka_key)::text)
-		FROM ids;
+		INSERT INTO %s (kafka_topic, kafka_key, kafka_value, kafka_header_keys, kafka_header_values)
+		VALUES ($1, $2, $3, $4, $5)
 	`, table)
 	_, err := tx.ExecContext(ctx, stmt, topic, key, payload, headerKeys, headerValues)
 	if err != nil {
