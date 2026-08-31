@@ -81,6 +81,17 @@ func Track(ctx context.Context, item Item, groupId GroupId, groupIds ...GroupId)
 	instance.Track(ctx, item, groupId, groupIds...)
 }
 
+// FlushPending uses the global history singleton to write a record stashed by
+// Pending that no transaction picked up. Pending itself needs no instance: it
+// only puts the record on the context.
+func FlushPending(ctx context.Context) {
+	if instance == nil {
+		return
+	}
+
+	instance.FlushPending(ctx)
+}
+
 // RenderPage uses the global history singleton to render the history page for
 // groupId. You need to initialize it using InitializeGlobal first.
 func RenderPage(ctx context.Context, w io.Writer, groupId GroupId, title string) error {

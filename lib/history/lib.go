@@ -167,13 +167,26 @@ func New(txStarter ql.TxStarter, table pgx.Identifier, eventSending *EventSendin
 // transaction is opened, unless async sending was enabled via Service.SendAsync, in which case
 // the record is queued without blocking.
 func (h *Service) Track(ctx context.Context, item Item, groupId GroupId, groupIds ...GroupId) {
-	groupIds = append([]GroupId{groupId}, groupIds...)
+	// A record stashed by Pending describes what triggered this one, so it goes
+	// into the same transaction, first. Outside a transaction it stays stashed:
+	// FlushPending owns it then.
+	if txCtx := ql.TxContextFromContext(ctx); txCtx != nil {
+		h.writePending(txCtx)
+	}
 
 	ctx = context.WithoutCancel(ctx)
 
+	rec := recordOf(ctx, item, append([]GroupId{groupId}, groupIds...))
+
+	h.send(ctx, rec)
+}
+
+// recordOf builds the record for item as of now: the timestamp and the ctx
+// provenance are taken here, not when the record is finally written.
+func recordOf(ctx context.Context, item Item, groupIds []GroupId) RecordToSend {
 	encoded, _ := json.Marshal(item)
 
-	rec := RecordToSend{
+	return RecordToSend{
 		GroupIds:       groupIds,
 		Timestamp:      clock.GlobalClock.Now(),
 		RequestTraceId: requestTraceIdOf(ctx),
@@ -182,9 +195,15 @@ func (h *Service) Track(ctx context.Context, item Item, groupId GroupId, groupId
 		Description:    item.HistoryString(),
 		Payload:        encoded,
 	}
+}
+
+// send writes rec wherever this Service is configured to write it: the
+// transaction in ctx, a new one, the async queue, or the event sender alone.
+func (h *Service) send(ctx context.Context, rec RecordToSend) {
+	groupIds := rec.GroupIds
 
 	logger := sl.LoggerOf(ctx)
-	logger.DebugContext(ctx, "Track history entry", slog.String("step", rec.Step), slog.String("entry", item.HistoryString()))
+	logger.DebugContext(ctx, "Track history entry", slog.String("step", rec.Step), slog.String("entry", rec.Description))
 
 	sendInTx := func(ctx ql.TxContext) error { return h.trackInTx(ctx, rec) }
 
@@ -214,7 +233,7 @@ func (h *Service) Track(ctx context.Context, item Item, groupId GroupId, groupId
 		logger.WarnContext(
 			ctx, "Failed to create trace item",
 			slog.Any("groupIds", groupIds),
-			slog.String("entry", item.HistoryString()),
+			slog.String("entry", rec.Description),
 			sl.Error(err),
 		)
 	}
