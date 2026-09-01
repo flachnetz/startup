@@ -26,7 +26,8 @@ var shell = MustTemplatesFromFS(shellFS)
 // defaultFuncs returns a fresh empty template named "boff" carrying the funcs
 // every boff page template shares, so a page's own block templates can use them
 // without re-declaring: formatTime for timestamps, add for index arithmetic in
-// ranges, formatMoney for amounts, and placeholder render and allowed funcs
+// ranges, formatMoney for amounts, shortId/pipClass/statusClass for the shared
+// console vocabulary, and placeholder render and allowed funcs
 // (rebound per call by RenderTemplate) so templates using {{ . | render }} or
 // {{ if allowed .RequiredRole }} still parse.
 func defaultFuncs() *template.Template {
@@ -34,6 +35,10 @@ func defaultFuncs() *template.Template {
 		"formatTime":  func(t time.Time) string { return t.Format("2006-01-02 15:04:05.000") },
 		"add":         func(a, b int) int { return a + b },
 		"formatMoney": formatMoney,
+		"shortId":     ShortId,
+		"pipClass":    pipClass,
+		"statusClass": statusClass,
+		"payload":     newPayloadModel,
 		"render": func(Block) (template.HTML, error) {
 			return "", fmt.Errorf("render: template executed without RenderTemplate - the render func was never bound to a RenderContext")
 		},
@@ -63,12 +68,21 @@ func formatMoney(minor any, currency string) (string, error) {
 	return fmt.Sprintf("%s%d.%02d %s", sign, n/100, n%100, currency), nil
 }
 
-// Templates returns a fresh, empty page template carrying only the shared default
-// funcs (formatTime, add, formatMoney, render). Parse your own block
+// Templates returns a fresh page template carrying the shared default funcs
+// (formatTime, add, formatMoney, shortId, pipClass, statusClass, payload,
+// render) and the shared console partials (boff/id, boff/payload-chip,
+// boff/payload-panel), so a page's own blocks render a copyable id or a
+// collapsible payload exactly like the built-in ones. Parse your own block
 // sub-templates into it, then pass it to RenderWithShell. It is a fresh template
 // every call, so callers never share (or accidentally execute) a common base.
 func Templates() *template.Template {
-	return defaultFuncs()
+	tpl, err := defaultFuncs().ParseFS(shellFS, "templates/console.gohtml")
+	if err != nil {
+		// An embedded template that does not parse is a build-time bug.
+		panic(fmt.Errorf("parse console partials: %w", err))
+	}
+
+	return tpl
 }
 
 // TemplatesFromFS is Templates with every .gohtml file in fsys parsed in, for a

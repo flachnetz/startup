@@ -200,11 +200,36 @@ func (b PanelBlock) Render(rc RenderContext) (template.HTML, error) {
 }
 
 // summaryCardModel is what the block/summary template renders: the label/value
-// pairs, plus an optional card title (empty renders no heading), so a page
-// with more than one summary section can label each one.
+// pairs as grid facts, the item-shaped entries as full-width rows below them,
+// plus an optional card title (empty renders no heading), so a page with more
+// than one summary section can label each one. Id is a per-card prefix for the
+// ids of the collapsible payload panels, so two summary cards on one page
+// cannot collide.
 type summaryCardModel struct {
 	Title string
-	Items []SummaryItem
+	Id    string
+	Facts []SummaryItem
+	Rows  []SummaryItem
+}
+
+// summaryModelOf splits items into the grid facts and the full-width rows. An
+// item gets its own row when it describes a whole small record rather than one
+// value: either explicitly (it carries a SummaryRow) or implicitly (it carries
+// a JSON payload). A payload has no business in a 164px grid column - it would
+// be clipped by the column it sits in - and a caller that attaches one is
+// describing a record either way.
+func summaryModelOf(title, id string, items []SummaryItem) summaryCardModel {
+	model := summaryCardModel{Title: title, Id: id}
+	for _, item := range items {
+		if item.Row != nil || item.JSON != "" {
+			model.Rows = append(model.Rows, item)
+			continue
+		}
+
+		model.Facts = append(model.Facts, item)
+	}
+
+	return model
 }
 
 // SummaryBlock is a SummaryItem list rendered as the current-state summary card.
@@ -218,7 +243,12 @@ type SummaryBlock []SummaryItem
 func (b SummaryBlock) Render(rc RenderContext) (template.HTML, error) {
 	items := demoteLinks(rc, b)
 
-	return TemplateBlock{Name: "block/summary", Model: summaryCardModel{Items: items}, Skip: len(items) == 0, Template: shell}.Render(rc)
+	return TemplateBlock{
+		Name:     "block/summary",
+		Model:    summaryModelOf("", "summary", items),
+		Skip:     len(items) == 0,
+		Template: shell,
+	}.Render(rc)
 }
 
 // SummaryCard is SummaryBlock under a card title, for a page that shows more
@@ -230,7 +260,7 @@ func SummaryCard(title string, items []SummaryItem) Block {
 
 		return TemplateBlock{
 			Name:     "block/summary",
-			Model:    summaryCardModel{Title: title, Items: gated},
+			Model:    summaryModelOf(title, "summary-"+slug(title), gated),
 			Skip:     len(gated) == 0,
 			Template: shell,
 		}.Render(rc)

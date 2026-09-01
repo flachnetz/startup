@@ -1,0 +1,260 @@
+{{ define "boff/console-style" }}
+<style>
+/* =============================================================
+   Backoffice console styles - the only custom CSS these pages
+   need; everything else is stock Bootstrap 5.3 utilities and
+   components. Every colour resolves from a Bootstrap variable, so
+   a theme switch (data-bs-theme) needs no rule of its own here.
+
+   This lives inside #body on purpose: backoffice embeds a page as
+   a fragment and discards its <head>, so a stylesheet in the head
+   would not survive the embed.
+   ============================================================= */
+:root{
+  --oc-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --oc-row-pad: 5px;
+}
+
+.font-mono{font-family:var(--oc-mono);font-variant-numeric:tabular-nums}
+.ell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.mw0{min-width:0}
+.lbl{
+  font-size:.66rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--bs-secondary-color);
+}
+
+/* ---- severity pip: one vocabulary, used on rows, items and rails ---- */
+.pip{width:7px;height:7px;border-radius:50%;background:var(--bs-secondary-color);display:inline-block;flex:none}
+.pip-ok{background:var(--bs-success)}
+.pip-err{background:var(--bs-danger)}
+.pip-warn{background:var(--bs-warning)}
+.status{display:inline-flex;align-items:center;gap:.4rem;font-size:.8125rem;font-weight:500;white-space:nowrap}
+.status-ok{color:var(--bs-success-text-emphasis)}
+.status-err{color:var(--bs-danger-text-emphasis)}
+.status-warn{color:var(--bs-warning-text-emphasis)}
+
+/* ---- copyable id ----
+   An id is a thing to copy, not to read: it never wraps (a ULID broken across
+   two lines cannot be selected cleanly) and it always carries a visible copy
+   affordance. */
+.id{
+  display:inline-flex;align-items:baseline;gap:.3rem;white-space:nowrap;
+  font-family:var(--oc-mono);cursor:pointer;
+  background:none;border:0;padding:0;color:inherit;
+}
+.id-text{white-space:nowrap;border-bottom:1px dotted transparent}
+.id:hover .id-text{border-bottom-color:var(--bs-border-color)}
+.id-copy{
+  flex:none;width:.85em;height:.85em;opacity:.55;align-self:center;
+  color:var(--bs-secondary-color);
+}
+.id:hover .id-copy{opacity:1;color:var(--bs-primary)}
+.id:focus-visible{outline:2px solid var(--bs-primary);outline-offset:2px;border-radius:.15rem}
+.id.copied,.id.copied .id-copy{color:var(--bs-success);opacity:1}
+/* An id that is a link keeps navigation on the anchor and copying on the button
+   next to it. */
+.id-link{white-space:nowrap}
+
+/* ---- facts grid ----
+   Capped on purpose: on a wide desktop an uncapped auto-fit grid stretches a
+   dozen facts across the whole viewport, so reading one line means crossing the
+   screen. The cap keeps the facts a dense block and lets them wrap into more
+   rows instead of more columns. */
+.fact-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(164px,1fr));gap:.7rem 1.4rem;
+  max-width:var(--oc-facts-max,1320px);
+}
+.fact dd{margin:0;font-size:.8125rem;line-height:1.35}
+.fact .zero{color:var(--bs-secondary-color)}
+
+/* ---- item row: same two-line shape as an event row ---- */
+.item-row{
+  display:flex;gap:.55rem;align-items:flex-start;
+  padding:.55rem .9rem;border-top:1px solid var(--bs-border-color);
+}
+.item-row .pip{margin-top:.42rem}
+.item-tag{font-size:.62rem}
+.item-state{font-size:.7rem}
+/* An unstructured row (label plus whatever the caller wrote) wraps instead of
+   being cut at one line - there is no shape to truncate safely. */
+.item-text{font-size:.8125rem;color:var(--bs-secondary-color);min-width:0}
+
+/* =============================================================
+   TIME RAIL
+   ============================================================= */
+.trace + .trace{border-top:1px solid var(--bs-border-color)}
+.trace-head{
+  display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;
+  padding:.35rem .9rem;background:var(--bs-tertiary-bg);
+  border-bottom:1px solid var(--bs-border-color);
+}
+.trace-head .tid{font-family:var(--oc-mono);font-size:.72rem}
+.trace-head .sum{margin-left:auto;font-size:.69rem;color:var(--bs-secondary-color);font-variant-numeric:tabular-nums}
+
+.ev{
+  display:grid;
+  grid-template-columns:96px 18px minmax(0,1fr);
+  padding:var(--oc-row-pad) .9rem var(--oc-row-pad) .55rem;
+  border-top:1px solid var(--bs-border-color-translucent);
+  /* A long ledger stays cheap to lay out: rows outside the viewport are skipped
+     until they scroll in. Native, so an expanded payload keeps its state.
+     ponytail: replace with real virtualisation only if a ledger ever runs into
+     the thousands of rows. */
+  content-visibility:auto;contain-intrinsic-size:0 34px;
+}
+.trace .ev:first-of-type{border-top:0}
+.ev:hover{background:var(--bs-tertiary-bg)}
+.ev-t{
+  font-family:var(--oc-mono);font-size:.69rem;color:var(--bs-secondary-color);
+  text-align:right;padding-right:.6rem;padding-top:2px;white-space:nowrap;
+}
+.ev-rail{position:relative;display:flex;justify-content:center}
+.ev-rail::before{content:"";position:absolute;top:0;bottom:-14px;width:1px;background:var(--bs-border-color)}
+.ev:last-of-type .ev-rail::before{bottom:auto;height:9px}
+.ev-rail .pip{position:relative;margin-top:5px;box-shadow:0 0 0 2px var(--bs-body-bg)}
+.ev-body{padding-left:.7rem;min-width:0}
+.ev-l1{display:flex;align-items:baseline;gap:.5rem;min-width:0}
+.ev-name{font-size:.8125rem;font-weight:600;flex:none}
+.ev-desc{font-size:.78rem;color:var(--bs-secondary-color)}
+.ev-l2{display:flex;align-items:center;gap:.45rem;font-size:.69rem;color:var(--bs-secondary-color)}
+.ev-l2 .sep{opacity:.45}
+
+/* ---- payload chip + panel ---- */
+.btn-payload{
+  margin-left:auto;flex:none;font-family:var(--oc-mono);font-size:.68rem;line-height:1;
+  padding:.2rem .35rem;border:1px solid var(--bs-border-color);border-radius:.25rem;
+  background:var(--bs-tertiary-bg);color:var(--bs-secondary-color);cursor:pointer;white-space:nowrap;
+}
+.btn-payload:hover{border-color:var(--bs-primary);color:var(--bs-primary)}
+.btn-payload:focus-visible{outline:2px solid var(--bs-primary);outline-offset:1px}
+.btn-payload[aria-expanded="true"]{border-color:var(--bs-primary);color:var(--bs-primary);background:var(--bs-primary-bg-subtle)}
+.payload{
+  margin:0;padding:.6rem .9rem .7rem 6.2rem;background:var(--bs-tertiary-bg);
+  border-top:1px dashed var(--bs-border-color);
+  font-family:var(--oc-mono);font-size:.71rem;line-height:1.6;
+  color:var(--bs-secondary-color);overflow-x:auto;
+}
+.payload-inline{padding-left:.9rem}
+</style>
+{{ end }}
+
+{{/* boff/id renders an identifier the way every backoffice page shows one:
+     shortened, never wrapped, the full value in the title, and one click (on
+     the text or the icon) copies it to the clipboard. */}}
+{{ define "boff/id" }}<button type="button" class="id" data-copy="{{ . }}" title="{{ . }} — click to copy" aria-label="Copy {{ . }}"><span class="id-text">{{ shortId . }}</span>{{ template "boff/copy-icon" }}</button>{{ end }}
+
+{{/* boff/id-copy is the copy control on its own, for an id that is already a
+     link: the anchor navigates, this copies. */}}
+{{ define "boff/id-copy" }}<button type="button" class="id" data-copy="{{ . }}" title="Copy {{ . }}" aria-label="Copy {{ . }}">{{ template "boff/copy-icon" }}</button>{{ end }}
+
+{{/* The familiar two-sheets copy glyph (Bootstrap Icons' bi-copy), inlined:
+     backoffice ships no icon font, and one path is cheaper than a dependency. */}}
+{{ define "boff/copy-icon" }}<svg class="id-copy" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6zM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1H2z"/></svg>{{ end }}
+
+{{ define "boff/payload-chip" }}<button class="btn-payload" type="button" aria-expanded="false" aria-controls="{{ .Id }}" aria-label="Show payload, {{ .Fields }} fields">{ } {{ .Fields }}</button>{{ end }}
+
+{{ define "boff/payload-panel" }}<pre class="payload{{ if .Inline }} payload-inline{{ end }}" id="{{ .Id }}" hidden>{{ .HTML }}</pre>{{ end }}
+
+{{ define "boff/console-script" }}
+<script>
+/* Console interactions. Inside #body on purpose: backoffice embeds this page as
+   a fragment (server side, so the script does run) and discards its <head>. */
+(function () {
+  "use strict";
+
+  // Payload panels are keyed by their own id, so an expanded payload survives a
+  // reload or a refetch of the same page.
+  var STORE = "boff.payloads:" + location.pathname;
+
+  function openSet() {
+    try {
+      return new Set(JSON.parse(sessionStorage.getItem(STORE) || "[]"));
+    } catch (e) {
+      return new Set();
+    }
+  }
+
+  function remember(id, open) {
+    var set = openSet();
+    open ? set.add(id) : set.delete(id);
+    try {
+      sessionStorage.setItem(STORE, JSON.stringify(Array.from(set)));
+    } catch (e) { /* private mode: the page still works, just forgets */ }
+  }
+
+  function toggle(button, open) {
+    var panel = document.getElementById(button.getAttribute("aria-controls"));
+    if (!panel) return;
+    button.setAttribute("aria-expanded", String(open));
+    panel.hidden = !open;
+  }
+
+  function restore() {
+    var set = openSet();
+    document.querySelectorAll(".btn-payload").forEach(function (button) {
+      if (set.has(button.getAttribute("aria-controls"))) toggle(button, true);
+    });
+  }
+
+  document.addEventListener("click", function (event) {
+    var payload = event.target.closest(".btn-payload");
+    if (payload) {
+      var open = payload.getAttribute("aria-expanded") !== "true";
+      toggle(payload, open);
+      remember(payload.getAttribute("aria-controls"), open);
+      return;
+    }
+
+    var all = event.target.closest("[data-expand-all]");
+    if (all) {
+      var expand = all.dataset.open !== "1";
+      document.querySelectorAll(".btn-payload").forEach(function (button) {
+        toggle(button, expand);
+        remember(button.getAttribute("aria-controls"), expand);
+      });
+      all.dataset.open = expand ? "1" : "0";
+      all.textContent = expand ? "Collapse payloads" : "Expand payloads";
+      return;
+    }
+
+    var id = event.target.closest(".id");
+    if (id) {
+      var value = id.dataset.copy || id.textContent;
+      if (navigator.clipboard) navigator.clipboard.writeText(value);
+
+      // Only the text swaps, so the icon survives the confirmation. An
+      // icon-only control has no text to swap and just flashes green.
+      var text = id.querySelector(".id-text");
+      var previous = text && text.textContent;
+      id.classList.add("copied");
+      if (text) text.textContent = "copied \u2713";
+      setTimeout(function () {
+        id.classList.remove("copied");
+        if (text) text.textContent = previous;
+      }, 900);
+    }
+  });
+
+  // Severity filter: "" keeps everything, "warn" keeps warnings and errors,
+  // "err" keeps errors only.
+  document.addEventListener("change", function (event) {
+    var select = event.target.closest("[data-level-filter]");
+    if (!select) return;
+
+    var wanted = select.value;
+    document.querySelectorAll(".ev").forEach(function (row) {
+      var level = row.dataset.level || "";
+      var keep = wanted === "" || level === "err" || (wanted === "warn" && level === "warn");
+      row.hidden = !keep;
+
+      var button = row.querySelector(".btn-payload");
+      var panel = button && document.getElementById(button.getAttribute("aria-controls"));
+      if (panel && !keep) panel.hidden = true;
+      if (panel && keep) panel.hidden = button.getAttribute("aria-expanded") !== "true";
+    });
+  });
+
+  restore();
+})();
+</script>
+{{ end }}
