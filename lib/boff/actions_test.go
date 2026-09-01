@@ -8,25 +8,26 @@ import (
 
 // An action is a plain form POST. No fetch, no inline handler, nothing for the
 // embedding shell to repair.
+//
+// The assertion is scoped to the block, not the page: the shell now ships one
+// shared console script (payload toggles, copy-to-clipboard) inside #body. That
+// script belongs to the page chrome; an action must still work without any
+// script of its own, which is what this checks.
 func TestActionsBlockActionIsAPlainForm(t *testing.T) {
-	var buf bytes.Buffer
-	err := Render(&buf, RenderConfig{Title: "t", Blocks: []Block{ActionsBlock([]Action{{
+	html, err := ActionsBlock([]Action{{
 		Description: "Cancel order", ButtonText: "Cancel",
 		Endpoint: "/orders/backoffice/v1/orders/o1/cancel",
-	}})}})
+	}}).Render(RenderContext{})
 	if err != nil {
 		t.Fatalf("execute template: %v", err)
 	}
-	out := buf.String()
+	out := string(html)
 
 	if !strings.Contains(out, `<form method="POST" action="/orders/backoffice/v1/orders/o1/cancel">`) {
 		t.Errorf("action is not a plain form POST:\n%s", out)
 	}
-	// The body is what gets embedded as a fragment (the <head> is dropped), so it
-	// is the body that must be script-free.
-	_, body, _ := strings.Cut(out, "<body>")
-	if strings.Contains(body, "onclick") || strings.Contains(body, "data-endpoint") || strings.Contains(body, "<script") {
-		t.Errorf("action page still needs JavaScript of its own:\n%s", body)
+	if strings.Contains(out, "onclick") || strings.Contains(out, "data-endpoint") || strings.Contains(out, "<script") {
+		t.Errorf("action block still needs JavaScript of its own:\n%s", out)
 	}
 }
 

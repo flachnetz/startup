@@ -24,28 +24,72 @@
 
 {{ define "block/summary" }}
 <div class="card mb-4 shadow-sm">
-    <div class="card-body">
+    <div class="card-body py-3">
         {{ if .Title }}<h5 class="card-title mb-3">{{ .Title }}</h5>{{ end }}
-        <dl class="row row-cols-1 row-cols-md-2 mb-0 small">
-            {{ range .Items }}
-            <div class="col d-flex align-items-baseline gap-2 py-2">
-                <dt class="text-uppercase text-body-secondary small fw-semibold text-nowrap" style="min-width:11em">{{ .Label }}</dt>
-                <dd class="mb-0 font-monospace text-break">
-                    {{ if .JSON }}
-                        <details>
-                            <summary>{{ .Value }}</summary>
-                            <pre class="small mb-0 mt-1">{{ .JSONHTML }}</pre>
-                        </details>
-                    {{ else if .Link }}<a href="{{ .Link }}" class="text-decoration-none">{{ .Value }}</a>
-                    {{ else if .Tone }}<span class="badge text-bg-{{ .Tone }}">{{ .Value }}</span>
-                    {{ else }}{{ .Value }}{{ end }}
+        <dl class="fact-grid mb-0">
+            {{ $card := .Id }}
+            {{ range $i, $item := .Facts }}
+            <div class="fact mw0">
+                <dt class="lbl"{{ if $item.LabelShortened }} title="{{ $item.Label }}"{{ end }}>{{ $item.ShortLabel }}</dt>
+                <dd class="text-break{{ if $item.Mono }} font-mono{{ end }}{{ if $item.Muted }} zero{{ end }}">
+                    {{ if $item.Tone }}<span class="{{ statusClass $item.Tone }}"><span class="{{ pipClass $item.Tone }}"></span>{{ $item.Value }}</span>
+                    {{ else if and $item.Link $item.IsId }}<span class="id-link"><a href="{{ $item.Link }}" class="text-decoration-none" title="{{ $item.Value }}">{{ shortId $item.Value }}</a>{{ template "boff/id-copy" $item.Value }}</span>
+                    {{ else if $item.Link }}<a href="{{ $item.Link }}" class="text-decoration-none">{{ $item.Value }}</a>
+                    {{ else if $item.IsId }}{{ template "boff/id" $item.Value }}
+                    {{ else }}{{ $item.Value }}{{ end }}
+                    {{ if $item.FieldCount }}
+                    {{ $panel := payload (printf "%s-fact-%d" $card $i) $item.FieldCount $item.JSONHTML true }}
+                    {{ template "boff/payload-chip" $panel }}
+                    {{ template "boff/payload-panel" $panel }}
+                    {{ end }}
                 </dd>
             </div>
             {{ end }}
         </dl>
     </div>
+
+    {{ range $i, $item := .Rows }}
+    {{ $row := $item.Row }}
+    {{ $panel := payload (printf "%s-row-%d" $.Id $i) $item.FieldCount $item.JSONHTML true }}
+    <div class="item-row">
+        {{ if $row }}
+        <span class="{{ pipClass $row.Tone }}"></span>
+        <div class="mw0 flex-grow-1">
+            <div class="ev-l1">
+                <span class="ev-name">{{ $row.Title }}</span>
+                {{ if $row.Subtitle }}<span class="ev-desc ell">{{ $row.Subtitle }}</span>{{ end }}
+                {{ range $row.Tags }}<span class="badge text-body-secondary border rounded-1 fw-normal item-tag">{{ . }}</span>{{ end }}
+                {{ if $row.State }}<span class="{{ statusClass $row.StateTone }} item-state"><span class="{{ pipClass $row.StateTone }}"></span>{{ $row.State }}</span>{{ end }}
+                {{ if $item.FieldCount }}{{ template "boff/payload-chip" $panel }}{{ end }}
+            </div>
+            {{ if $row.Meta }}
+            <div class="ev-l2 ell">
+                {{ range $m, $part := $row.Meta }}
+                {{ if $m }}<span class="sep">&middot;</span>{{ end }}
+                {{ if $part.Link }}<a href="{{ $part.Link }}">{{ $part.Text }}</a>{{ else }}<span>{{ $part.Text }}</span>{{ end }}
+                {{ end }}
+            </div>
+            {{ end }}
+        </div>
+        {{ else }}
+        {{/* No structure given: the label heads the row and the value stays as
+             the caller wrote it, wrapping rather than being truncated. */}}
+        <span class="{{ pipClass $item.Tone }}"></span>
+        <div class="mw0 flex-grow-1">
+            <div class="d-flex align-items-baseline gap-2 flex-wrap">
+                <span class="lbl"{{ if $item.LabelShortened }} title="{{ $item.Label }}"{{ end }}>{{ $item.ShortLabel }}</span>
+                {{ if $item.Link }}<a class="item-text text-decoration-none" href="{{ $item.Link }}">{{ $item.Value }}</a>
+                {{ else }}<span class="item-text">{{ $item.Value }}</span>{{ end }}
+                {{ if $item.FieldCount }}{{ template "boff/payload-chip" $panel }}{{ end }}
+            </div>
+        </div>
+        {{ end }}
+    </div>
+    {{ if $item.FieldCount }}{{ template "boff/payload-panel" $panel }}{{ end }}
+    {{ end }}
 </div>
 {{ end }}
+
 
 {{ define "block/actions" }}
 <div class="card mb-4 shadow-sm">

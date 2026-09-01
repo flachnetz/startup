@@ -1,35 +1,54 @@
 {{ define "block/records" }}
-<div class="ledger">
-    {{ $collapseAll := .CollapseAll }}
-    {{ range $i, $r := .Views }}
-        {{ if $r.ShowSeparator }}
-            </div></div>
-            <div class="card mb-3">
-                <div class="card-header py-2 text-body-secondary small font-monospace">TraceId: {{ $r.RequestTraceId }}</div>
-                <div class="card-body py-2">
-        {{ else if eq $i 0 }}
-            <div class="card mb-3">
-                <div class="card-header py-2 text-body-secondary small font-monospace">TraceId: {{ $r.RequestTraceId }}</div>
-                <div class="card-body py-2">
+<div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+    <h2 class="h6 mb-0">History</h2>
+    {{ if .Traces }}
+    <span class="ev-l2">{{ .TraceCount }} trace{{ if ne .TraceCount 1 }}s{{ end }} &middot; {{ .Events }} event{{ if ne .Events 1 }}s{{ end }}{{ if .Duration }} &middot; {{ .Duration }}{{ end }}</span>
+    <div class="ms-auto d-flex gap-2">
+        {{ if .HasLevels }}
+        <select class="form-select form-select-sm w-auto" data-level-filter aria-label="Filter events by severity">
+            <option value="">All events</option>
+            <option value="warn">Warnings &amp; errors</option>
+            <option value="err">Errors only</option>
+        </select>
         {{ end }}
-        <div class="py-3{{ if gt $i 0 }}{{ if not $r.ShowSeparator }} border-top{{ end }}{{ end }}">
-            <p class="text-body-secondary small font-monospace mb-2">{{ formatTime $r.Timestamp }} &middot; EventSender: {{ $r.EventSender }}{{ if $r.EventSenderVersion }} ({{ $r.EventSenderVersion }}){{ end }}{{ if $r.Trigger.Display }} &middot; Source: {{ $r.Trigger.Display }}{{ end }}</p>
-            <p class="fw-semibold mb-1">{{ $r.Step }}</p>
-            <p class="text-body-secondary small mb-2">{{ $r.Description }}</p>
-            {{ if $r.HasPayload }}
-                {{ if or $collapseAll $r.PayloadCollapsible }}
-                <details class="mt-1">
-                    <summary class="small text-body-secondary">Show full payload</summary>
-                    <pre class="bg-body-tertiary border rounded p-2 mt-2 mb-0 small"><code>{{ $r.JSONHTML }}</code></pre>
-                </details>
-                {{ else }}
-                <pre class="bg-body-tertiary border rounded p-2 mt-1 mb-0 small"><code>{{ $r.JSONHTML }}</code></pre>
-                {{ end }}
-            {{ end }}
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-expand-all>Expand payloads</button>
+    </div>
+    {{ end }}
+</div>
+
+<div class="card mb-4 overflow-hidden">
+    {{ range .Traces }}
+    <div class="trace">
+        <div class="trace-head">
+            <span class="lbl">Trace</span>
+            <span class="tid">{{ template "boff/id" .Id }}</span>
+            <span class="sum">{{ .Count }} event{{ if ne .Count 1 }}s{{ end }} &middot; {{ .Duration }} &middot; {{ .Date }}</span>
         </div>
-        {{ if eq (add $i 1) (len $.Views) }}</div></div>{{ end }}
+        {{ range .Events }}
+        <div class="ev" data-level="{{ .Level }}">
+            <span class="ev-t">{{ .TimeOfDay }}<span class="opacity-50">{{ .Millis }}</span></span>
+            <span class="ev-rail"><span class="{{ pipClass .Level }}"></span></span>
+            <span class="ev-body">
+                <span class="ev-l1">
+                    <span class="ev-name">{{ .Step }}</span>
+                    <span class="ev-desc ell">{{ .Description }}</span>
+                    {{ if .FieldCount }}{{ template "boff/payload-chip" (payload .Key .FieldCount .JSONHTML false) }}{{ end }}
+                </span>
+                <span class="ev-l2 ell">
+                    <span{{ if .EventSenderVersion }} title="build {{ .EventSenderVersion }}"{{ end }}>{{ .EventSender }}</span>
+                    {{ if .HTTPSource }}<span class="sep">&middot;</span><span class="font-mono">{{ .HTTPSource }}</span>{{ end }}
+                    {{ if .SourceRef }}<span class="sep">&middot;</span><span class="font-mono" title="{{ .SourceRefLabel }} {{ .SourceRef }}">{{ shortId .SourceRef }}</span>{{ end }}
+                    {{ if .ActorId }}<span class="sep">&middot;</span><span class="font-mono" title="{{ .ActorType }} {{ .ActorId }}">{{ .ActorType }} {{ shortId .ActorId }}</span>{{ end }}
+                </span>
+            </span>
+        </div>
+        {{ if .FieldCount }}{{ template "boff/payload-panel" (payload .Key .FieldCount .JSONHTML false) }}{{ end }}
+        {{ end }}
+    </div>
     {{ else }}
-        <p class="text-body-secondary">No history records.</p>
+    <div class="card-body py-3">
+        <p class="text-body-secondary mb-0">No history records.</p>
+    </div>
     {{ end }}
 </div>
 {{ end }}
