@@ -34,15 +34,15 @@
 .status-warn{color:var(--bs-warning-text-emphasis)}
 
 /* ---- copyable id ----
-   An id is a thing to copy, not to read: it never wraps (a ULID broken across
-   two lines cannot be selected cleanly) and it always carries a visible copy
-   affordance. */
+   An id is shown in full and always carries a visible copy affordance. A UUID is
+   wider than a fact column, so it breaks anywhere rather than overflowing;
+   copying is the button's job, not the selection's. */
 .id{
-  display:inline-flex;align-items:baseline;gap:.3rem;white-space:nowrap;
+  display:inline-flex;align-items:baseline;gap:.3rem;
   font-family:var(--oc-mono);cursor:pointer;
-  background:none;border:0;padding:0;color:inherit;
+  background:none;border:0;padding:0;color:inherit;text-align:left;
 }
-.id-text{white-space:nowrap;border-bottom:1px dotted transparent}
+.id-text{overflow-wrap:anywhere;border-bottom:1px dotted transparent}
 .id:hover .id-text{border-bottom-color:var(--bs-border-color)}
 .id-copy{
   flex:none;width:.85em;height:.85em;opacity:.55;align-self:center;
@@ -51,9 +51,16 @@
 .id:hover .id-copy{opacity:1;color:var(--bs-primary)}
 .id:focus-visible{outline:2px solid var(--bs-primary);outline-offset:2px;border-radius:.15rem}
 .id.copied,.id.copied .id-copy{color:var(--bs-success);opacity:1}
+.id.copy-failed,.id.copy-failed .id-copy{color:var(--bs-danger);opacity:1}
+/* The confirmation is appended, not swapped in: a control showing only the copy
+   icon confirms the same way one showing the id does. */
+.id.copied::after{content:"\2713";font-family:var(--bs-body-font-family);font-size:.85em}
+.id.copy-failed::after{content:"copy failed";font-family:var(--bs-body-font-family);font-size:.75em}
 /* An id that is a link keeps navigation on the anchor and copying on the button
-   next to it. */
-.id-link{white-space:nowrap}
+   next to it - spaced like the icon inside a plain id button, so the glyph does
+   not read as the last character of the id. */
+.id-link{font-family:var(--oc-mono);overflow-wrap:anywhere}
+.id-link > .id{margin-left:.3rem}
 
 /* ---- facts grid ----
    Capped on purpose: on a wide desktop an uncapped auto-fit grid stretches a
@@ -138,10 +145,10 @@
 </style>
 {{ end }}
 
-{{/* boff/id renders an identifier the way every backoffice page shows one:
-     shortened, never wrapped, the full value in the title, and one click (on
-     the text or the icon) copies it to the clipboard. */}}
-{{ define "boff/id" }}<button type="button" class="id" data-copy="{{ . }}" title="{{ . }} — click to copy" aria-label="Copy {{ . }}"><span class="id-text">{{ shortId . }}</span>{{ template "boff/copy-icon" }}</button>{{ end }}
+{{/* boff/id renders an identifier the way every backoffice page shows one: in
+     full (an id is compared character by character, so a truncated one is
+     useless), and one click (on the text or the icon) copies it. */}}
+{{ define "boff/id" }}<button type="button" class="id" data-copy="{{ . }}" title="{{ . }} — click to copy" aria-label="Copy {{ . }}"><span class="id-text">{{ . }}</span>{{ template "boff/copy-icon" }}</button>{{ end }}
 
 {{/* boff/id-copy is the copy control on its own, for an id that is already a
      link: the anchor navigates, this copies. */}}
@@ -157,8 +164,9 @@
 
 {{ define "boff/console-script" }}
 <script>
-/* Console interactions. Inside #body on purpose: backoffice embeds this page as
-   a fragment (server side, so the script does run) and discards its <head>. */
+/* Console interactions. Lives in <head>, which backoffice discards when it
+   embeds the page as a fragment: an embedded fragment must carry no JavaScript
+   of its own, and innerHTML-inserted <script> would not run either way. */
 (function () {
   "use strict";
 
@@ -180,6 +188,43 @@
     try {
       sessionStorage.setItem(STORE, JSON.stringify(Array.from(set)));
     } catch (e) { /* private mode: the page still works, just forgets */ }
+  }
+
+  // navigator.clipboard exists only in a secure context; backoffice is reached
+  // over plain http, so the textarea + execCommand path is the one that
+  // actually runs there. Resolves false when neither worked, so the page
+  // confirms a copy instead of claiming one.
+  function copy(text) {
+    if (navigator.clipboard) {
+      return navigator.clipboard.writeText(text).then(function () {
+        return true;
+      }, function () {
+        return legacyCopy(text);
+      });
+    }
+
+    return Promise.resolve(legacyCopy(text));
+  }
+
+  function legacyCopy(text) {
+    var area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+
+    var ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch (e) {
+      ok = false;
+    }
+
+    document.body.removeChild(area);
+
+    return ok;
   }
 
   function toggle(button, open) {
@@ -219,19 +264,15 @@
 
     var id = event.target.closest(".id");
     if (id) {
-      var value = id.dataset.copy || id.textContent;
-      if (navigator.clipboard) navigator.clipboard.writeText(value);
-
-      // Only the text swaps, so the icon survives the confirmation. An
-      // icon-only control has no text to swap and just flashes green.
-      var text = id.querySelector(".id-text");
-      var previous = text && text.textContent;
-      id.classList.add("copied");
-      if (text) text.textContent = "copied \u2713";
-      setTimeout(function () {
-        id.classList.remove("copied");
-        if (text) text.textContent = previous;
-      }, 900);
+      copy(id.dataset.copy || id.textContent).then(function (ok) {
+        // Confirmation is a CSS ::after check mark, so an icon-only control
+        // (the copy button next to a linked id) confirms like any other, and
+        // only a copy that really happened confirms at all.
+        id.classList.add(ok ? "copied" : "copy-failed");
+        setTimeout(function () {
+          id.classList.remove("copied", "copy-failed");
+        }, 900);
+      });
     }
   });
 
@@ -254,7 +295,13 @@
     });
   });
 
-  restore();
+  // In <head> the rows do not exist yet; the delegated listeners above are fine
+  // on document, only the restore pass needs the parsed body.
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", restore);
+  } else {
+    restore();
+  }
 })();
 </script>
 {{ end }}

@@ -99,7 +99,7 @@ func TestLedgerTraceHeaderSummarisesTheBlock(t *testing.T) {
 	for _, want := range []string{
 		`<span class="lbl">Trace</span>`,
 		`title="` + traceOld + " \u2014 click to copy\"",
-		">005ad8\u20266e7961</span>",
+		">005ad836695a73d91e08b44f966e7961</span>",
 		// The trace id is a thing to copy, so it carries the copy control.
 		`class="id-copy"`,
 		"2 events",
@@ -184,9 +184,9 @@ func TestLedgerHTTPSourceOnlyForHTTPTriggers(t *testing.T) {
 	if strings.Contains(out, "topic payment_captured") {
 		t.Errorf("non-http trigger detail was rendered as a verb/path segment:\n%s", out)
 	}
-	// Ids on the second line are shortened but keep their full value in a title.
-	if !strings.Contains(out, `title="requestId 01M1ETRD12CEXT501ZYQZ3EHY6"`) || !strings.Contains(out, "01M1ET\u2026Z3EHY6") {
-		t.Errorf("source ref not rendered shortened with a full title:\n%s", out)
+	// Ids on the second line render in full, with the kind of id in the title.
+	if !strings.Contains(out, `title="requestId 01M1ETRD12CEXT501ZYQZ3EHY6">01M1ETRD12CEXT501ZYQZ3EHY6<`) {
+		t.Errorf("source ref not rendered in full:\n%s", out)
 	}
 	if !strings.Contains(out, `title="player 01KXJMFRY454B6BH7Y3TYNWEXR"`) {
 		t.Errorf("actor not rendered:\n%s", out)

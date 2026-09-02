@@ -37,8 +37,8 @@
                 <span class="ev-l2 ell">
                     <span{{ if .EventSenderVersion }} title="build {{ .EventSenderVersion }}"{{ end }}>{{ .EventSender }}</span>
                     {{ if .HTTPSource }}<span class="sep">&middot;</span><span class="font-mono">{{ .HTTPSource }}</span>{{ end }}
-                    {{ if .SourceRef }}<span class="sep">&middot;</span><span class="font-mono" title="{{ .SourceRefLabel }} {{ .SourceRef }}">{{ shortId .SourceRef }}</span>{{ end }}
-                    {{ if .ActorId }}<span class="sep">&middot;</span><span class="font-mono" title="{{ .ActorType }} {{ .ActorId }}">{{ .ActorType }} {{ shortId .ActorId }}</span>{{ end }}
+                    {{ if .SourceRef }}<span class="sep">&middot;</span><span class="font-mono" title="{{ .SourceRefLabel }} {{ .SourceRef }}">{{ .SourceRef }}</span>{{ end }}
+                    {{ if .ActorId }}<span class="sep">&middot;</span><span class="font-mono" title="{{ .ActorType }} {{ .ActorId }}">{{ .ActorType }} {{ .ActorId }}</span>{{ end }}
                 </span>
             </span>
         </div>

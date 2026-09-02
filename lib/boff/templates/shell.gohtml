@@ -6,11 +6,13 @@
     <title>{{ .Title }}</title>
     <!-- Bootstrap only for direct (non-embedded) access: backoffice drops this
          <head> when it embeds the page as a fragment and supplies its own build.
-         The bundle is what drives any confirmation dialogs. The page's own
-         console script (payload toggles, copy-to-clipboard) lives inside #body
-         instead, so it survives that embed. -->
+         The bundle is what drives any confirmation dialogs. The console script
+         lives here too: the fragment contract is "no JavaScript of its own", and
+         markup inserted with innerHTML never executes its <script> anyway, so a
+         script in the body would be dead weight the embedder has to strip. -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
     <script defer src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+    {{ template "boff/console-script" }}
 </head>
 <body>
 
@@ -23,8 +25,6 @@
     {{ template "boff/console-style" }}
 
     {{ .Blocks }}
-
-    {{ template "boff/console-script" }}
 </div>
 </body>
 </html>

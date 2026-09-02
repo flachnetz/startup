@@ -106,7 +106,7 @@ func TestSummaryItemJSONRendersCollapsiblePayload(t *testing.T) {
 }
 
 // The summary card is a fact grid: a small uppercase label above its value,
-// amounts monospaced, a zero amount muted, an id shortened and copyable.
+// amounts monospaced, a zero amount muted, an id shown in full and copyable.
 func TestSummaryRendersFactGrid(t *testing.T) {
 	var buf bytes.Buffer
 	err := Render(&buf, RenderConfig{Title: "t", Blocks: []Block{SummaryBlock([]SummaryItem{
@@ -123,13 +123,13 @@ func TestSummaryRendersFactGrid(t *testing.T) {
 	for _, want := range []string{
 		`<dl class="fact-grid mb-0">`,
 		`<dt class="lbl">Shop</dt>`,
-		// A shop name is prose: neither monospaced nor shortened.
+		// A shop name is prose: not monospaced, not copyable.
 		`showmethemoney-pt`,
 		`class="text-break font-mono">`,
 		`class="text-break font-mono zero">`,
-		// An id is shortened, copyable, and carries the full value.
+		// An id is shown in full and is copyable.
 		`data-copy="01M1ETRDSW0QHC9Y6GAVX23ZQW"`,
-		`<span class="id-text">01M1ET` + "\u2026" + `X23ZQW</span>`,
+		`<span class="id-text">01M1ETRDSW0QHC9Y6GAVX23ZQW</span>`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("fact grid is missing %s:\n%s", want, out)
@@ -145,10 +145,9 @@ func TestSummaryRendersFactGrid(t *testing.T) {
 	}
 }
 
-// A linked id is shortened too, but keeps the full value in its title - and
-// gets its own copy control next to it, since the anchor itself navigates
-// rather than copying.
-func TestSummaryLinkedIdIsShortenedWithFullTitle(t *testing.T) {
+// A linked id renders in full inside the anchor and gets its own copy control
+// next to it, since the anchor itself navigates rather than copying.
+func TestSummaryLinkedIdRendersInFullWithACopyControl(t *testing.T) {
 	var buf bytes.Buffer
 	err := Render(&buf, RenderConfig{Title: "t", Blocks: []Block{SummaryBlock([]SummaryItem{
 		{Label: "Player", Value: "01KXJMFRY454B6BH7Y3TYNWEXR", Link: "/players/backoffice/player/01KXJMFRY454B6BH7Y3TYNWEXR"},
@@ -158,8 +157,8 @@ func TestSummaryLinkedIdIsShortenedWithFullTitle(t *testing.T) {
 	}
 
 	out := buf.String()
-	if !strings.Contains(out, `title="01KXJMFRY454B6BH7Y3TYNWEXR"`) || !strings.Contains(out, "01KXJM\u2026YNWEXR</a>") {
-		t.Errorf("linked id was not shortened with a full title:\n%s", out)
+	if !strings.Contains(out, `>01KXJMFRY454B6BH7Y3TYNWEXR</a>`) {
+		t.Errorf("linked id was not rendered in full:\n%s", out)
 	}
 	if !strings.Contains(out, `title="Copy 01KXJMFRY454B6BH7Y3TYNWEXR"`) || !strings.Contains(out, `class="id-copy"`) {
 		t.Errorf("linked id has no copy control of its own:\n%s", out)
@@ -313,12 +312,12 @@ func TestSummaryIdCarriesACopyControl(t *testing.T) {
 	for _, want := range []string{
 		`data-copy="01M1ETRDSW0QHC9Y6GAVX23ZQW"`,
 		`aria-label="Copy 01M1ETRDSW0QHC9Y6GAVX23ZQW"`,
-		`<span class="id-text">01M1ET` + "\u2026" + `X23ZQW</span>`,
+		`<span class="id-text">01M1ETRDSW0QHC9Y6GAVX23ZQW</span>`,
 		`class="id-copy"`,
 		// The glyph is decorative: the button already has an accessible name.
 		`aria-hidden="true"`,
-		// An id must not break across lines.
-		".id-text{white-space:nowrap",
+		// A full id is wider than a fact column, so it may break anywhere.
+		".id-text{overflow-wrap:anywhere",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("copyable id is missing %s:\n%s", want, out)
@@ -326,12 +325,12 @@ func TestSummaryIdCarriesACopyControl(t *testing.T) {
 	}
 }
 
-// A label that carries an id is shortened too, so it cannot wrap across three
-// lines of a grid column - with the full label in the title.
-func TestSummaryLabelWithAnIdIsShortened(t *testing.T) {
+// A label is rendered as the caller wrote it - no truncation, no title
+// attribute of its own.
+func TestSummaryLabelIsRenderedVerbatim(t *testing.T) {
 	var buf bytes.Buffer
 	err := Render(&buf, RenderConfig{Title: "t", Blocks: []Block{SummaryBlock([]SummaryItem{
-		{Label: "Draw 01M1DTGTM47SC9XFPEBAJRRD65", Value: "open draw history", Link: "/draws/d1"},
+		{Label: "Draw", Value: "01M1DTGTM47SC9XFPEBAJRRD65", Link: "/draws/d1"},
 		{Label: "Payment method", Value: "card"},
 	})}})
 	if err != nil {
@@ -339,11 +338,15 @@ func TestSummaryLabelWithAnIdIsShortened(t *testing.T) {
 	}
 	out := buf.String()
 
-	if !strings.Contains(out, `<dt class="lbl" title="Draw 01M1DTGTM47SC9XFPEBAJRRD65">Draw 01M1DT`+"\u2026"+`JRRD65</dt>`) {
-		t.Errorf("label id was not shortened:\n%s", out)
-	}
-	// A label without an id keeps no needless title attribute.
-	if !strings.Contains(out, `<dt class="lbl">Payment method</dt>`) {
-		t.Errorf("plain label was altered:\n%s", out)
+	for _, want := range []string{
+		`<dt class="lbl">Draw</dt>`,
+		`<dt class="lbl">Payment method</dt>`,
+		// The id itself is the linked, copyable value.
+		`>01M1DTGTM47SC9XFPEBAJRRD65</a>`,
+		`title="Copy 01M1DTGTM47SC9XFPEBAJRRD65"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("summary is missing %s:\n%s", want, out)
+		}
 	}
 }

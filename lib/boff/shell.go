@@ -26,7 +26,7 @@ var shell = MustTemplatesFromFS(shellFS)
 // defaultFuncs returns a fresh empty template named "boff" carrying the funcs
 // every boff page template shares, so a page's own block templates can use them
 // without re-declaring: formatTime for timestamps, add for index arithmetic in
-// ranges, formatMoney for amounts, shortId/pipClass/statusClass for the shared
+// ranges, formatMoney for amounts, pipClass/statusClass for the shared
 // console vocabulary, and placeholder render and allowed funcs
 // (rebound per call by RenderTemplate) so templates using {{ . | render }} or
 // {{ if allowed .RequiredRole }} still parse.
@@ -35,7 +35,6 @@ func defaultFuncs() *template.Template {
 		"formatTime":  func(t time.Time) string { return t.Format("2006-01-02 15:04:05.000") },
 		"add":         func(a, b int) int { return a + b },
 		"formatMoney": formatMoney,
-		"shortId":     ShortId,
 		"pipClass":    pipClass,
 		"statusClass": statusClass,
 		"payload":     newPayloadModel,
@@ -69,7 +68,7 @@ func formatMoney(minor any, currency string) (string, error) {
 }
 
 // Templates returns a fresh page template carrying the shared default funcs
-// (formatTime, add, formatMoney, shortId, pipClass, statusClass, payload,
+// (formatTime, add, formatMoney, pipClass, statusClass, payload,
 // render) and the shared console partials (boff/id, boff/payload-chip,
 // boff/payload-panel), so a page's own blocks render a copyable id or a
 // collapsible payload exactly like the built-in ones. Parse your own block
