@@ -220,8 +220,7 @@ func (ch channelCloser) Close() error {
 }
 
 func ErrIsForeignKeyViolation(err error) bool {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
 		return pgErr.Code == "23503"
 	}
 
@@ -229,8 +228,7 @@ func ErrIsForeignKeyViolation(err error) bool {
 }
 
 func ErrIsUniqueViolation(err error) bool {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
 		return pgErr.Code == "23505"
 	}
 

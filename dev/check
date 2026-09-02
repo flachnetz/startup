@@ -1,0 +1,44 @@
+#!/bin/bash
+
+set -e
+
+echo "Running checks..."
+
+# Run go fmt
+echo "Checking code formatting..."
+gofumpt -l -w .
+
+# DEV-NOTE: since Go 1.27 `go fix` applies the modernize analysers and rewrites
+# sources in place. errors.As(err, &target) becomes errors.AsType[T](err), which
+# requires T to satisfy error - so an interface used as an As target must embed error
+# (see internal/service/fulfilment.Permanent). Review the diff after a run; the
+# rewrites are checked in, not fought.
+echo "Running go fix..."
+go fix ./...
+
+# Run golangci-lint
+echo "Running linter..."
+golangci-lint run
+
+# Rule coverage: every numbered BDR/ADR rule needs a test named after it.
+# Blocking: all declared rules are covered, so a new rule needs its test in the
+# same change (a peer-owned rule is marked "(peer: <repo>)" in the record).
+echo "Checking decision-record rule coverage..."
+dev/rule-coverage --strict
+
+# Run SonarQube scan if the CLI is installed.
+# DEV-NOTE: sonar is advisory - it needs the system keychain, which is unavailable
+# in sandboxes/CI ("Failed to access the system keychain ... (code: -50)"). A failure
+# must warn, not abort the run, or the tests below never execute.
+if command -v sonar >/dev/null 2>&1; then
+  echo "Running SonarQube scan..."
+  if ! sonar analyze --base main --depth DEEP; then
+    echo "WARNING: SonarQube scan could not run, continuing without it" >&2
+  fi
+fi
+
+# Run tests
+echo "Running tests..."
+go test -race ./...
+
+echo "All checks passed!"

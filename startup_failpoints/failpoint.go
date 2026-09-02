@@ -188,8 +188,7 @@ func (f *FailPointService) ReturnErrorIfFailPointActive(ctx context.Context, loc
 				}
 			}
 
-			var timeoutError timeoutError
-			if errors.As(fp.Error, &timeoutError) {
+			if timeoutError, ok := errors.AsType[timeoutError](fp.Error); ok {
 				// we just wait as long as the client keeps the connection open
 				if timeoutError.forever {
 					<-ctx.Done()

@@ -37,7 +37,7 @@ func Get() Id {
 	g := getg()
 
 	// calculate pointer to goid field
-	ptrToGoid := (*uint64)(unsafe.Pointer(uintptr(g) + goidOffset))
+	ptrToGoid := (*uint64)(unsafe.Add(g, goidOffset))
 
 	// and read value
 	return Id(*ptrToGoid)

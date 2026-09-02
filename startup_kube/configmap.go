@@ -135,14 +135,10 @@ func WriteConfigMap(ctx context.Context, cs *kubernetes.Clientset, writer, names
 
 func valuesToConfigMap(name string, namespace string, data ConfigMapValues) (*v1.ConfigMap, error) {
 	cm := &v1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ConfigMap",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
+		Kind:       "ConfigMap",
+		APIVersion: "v1",
+		Name:       name,
+		Namespace:  namespace,
 		Data:       make(map[string]string),
 		BinaryData: make(map[string][]byte),
 	}

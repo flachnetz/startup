@@ -10,9 +10,9 @@ import (
 // embedding shell to repair.
 //
 // The assertion is scoped to the block, not the page: the shell ships one shared
-// console script (payload toggles, copy-to-clipboard) in its <head>. That script
-// belongs to the page chrome and is dropped when the page is embedded; an action
-// must work without any script of its own, which is what this checks.
+// console script (payload toggles, copy-to-clipboard) at the end of #body. That
+// script is page chrome with delegated listeners; an action must still work as a
+// plain form POST with no script of its own, which is what this checks.
 func TestActionsBlockActionIsAPlainForm(t *testing.T) {
 	html, err := ActionsBlock([]Action{{
 		Description: "Cancel order", ButtonText: "Cancel",

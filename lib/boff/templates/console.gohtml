@@ -164,9 +164,9 @@
 
 {{ define "boff/console-script" }}
 <script>
-/* Console interactions. Lives in <head>, which backoffice discards when it
-   embeds the page as a fragment: an embedded fragment must carry no JavaScript
-   of its own, and innerHTML-inserted <script> would not run either way. */
+/* Console interactions. Lives at the end of #body, the one part backoffice
+   embeds - it renders the extracted markup into its own shell server-side, so
+   this runs there. Delegated listeners on document only, no per-row wiring. */
 (function () {
   "use strict";
 
@@ -295,8 +295,8 @@
     });
   });
 
-  // In <head> the rows do not exist yet; the delegated listeners above are fine
-  // on document, only the restore pass needs the parsed body.
+  // The rows above this script are already parsed, but the shell may still be
+  // streaming the rest of the document - restore once the body is complete.
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", restore);
   } else {

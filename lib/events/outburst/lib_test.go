@@ -227,7 +227,7 @@ func TestOutboxSizeJob(t *testing.T) {
 	db := outboxDB{DB: svc.DB, Table: "outbox"}
 	require.NoError(t, ensureOutboxTable(ctx, db))
 
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		svc.InsertOutbox(outboxEntry{Topic: "foobar", Value: []byte("x")})
 	}
 
