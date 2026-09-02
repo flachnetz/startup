@@ -19,16 +19,14 @@ func at(second int, millis int) time.Time {
 // view is a RecordView as renderPage builds one, minus the database.
 func view(traceId string, ts time.Time, step, description, payload, level string) RecordView {
 	return RecordView{
-		Record: Record{
-			Timestamp:   ts,
-			Step:        step,
-			Description: description,
-			Payload:     json.RawMessage(payload),
-			EventSender: "order_service",
-		},
-		JSON:  payload,
-		Level: level,
-		Key:   "ev-" + traceId + "-" + step,
+		Timestamp:   ts,
+		Step:        step,
+		Description: description,
+		Payload:     json.RawMessage(payload),
+		EventSender: "order_service",
+		JSON:        payload,
+		Level:       level,
+		Key:         "ev-" + traceId + "-" + step,
 	}
 }
 
