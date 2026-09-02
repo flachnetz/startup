@@ -123,10 +123,6 @@ type TraceView struct {
 	Events []RecordView
 }
 
-// ShortId is the trace id as the header shows it: a 32 character trace id reads
-// better as its first eight and last six characters.
-func (t TraceView) ShortId() string { return boff.ShortIdN(t.Id, 8, 6) }
-
 // Start is when the trace's first record was written, whichever end of the
 // block that record now sits at.
 func (t TraceView) Start() time.Time {

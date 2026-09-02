@@ -140,15 +140,6 @@ func (i SummaryItem) Muted() bool { return IsZeroAmount(i.Value) }
 // payload chip shows. Zero means no chip.
 func (i SummaryItem) FieldCount() int { return JSONFieldCount(i.JSON) }
 
-// ShortLabel is Label with any id embedded in it shortened, so a label like
-// "Draw 01M1DTGTM47SC9XFPEBAJRRD65" does not wrap across three lines of a grid
-// column.
-func (i SummaryItem) ShortLabel() string { return ShortIdsIn(i.Label) }
-
-// LabelShortened reports whether ShortLabel dropped anything, i.e. whether the
-// label needs a title attribute carrying the full text.
-func (i SummaryItem) LabelShortened() bool { return i.ShortLabel() != i.Label }
-
 // JSONHTML is SummaryItem.JSON colourised, same treatment as a record payload.
 func (i SummaryItem) JSONHTML() template.HTML {
 	return template.HTML(HighlightJSON(i.JSON)) //nolint:gosec // HighlightJSON escapes its input

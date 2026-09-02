@@ -9,10 +9,10 @@ import (
 // An action is a plain form POST. No fetch, no inline handler, nothing for the
 // embedding shell to repair.
 //
-// The assertion is scoped to the block, not the page: the shell now ships one
-// shared console script (payload toggles, copy-to-clipboard) inside #body. That
-// script belongs to the page chrome; an action must still work without any
-// script of its own, which is what this checks.
+// The assertion is scoped to the block, not the page: the shell ships one shared
+// console script (payload toggles, copy-to-clipboard) in its <head>. That script
+// belongs to the page chrome and is dropped when the page is embedded; an action
+// must work without any script of its own, which is what this checks.
 func TestActionsBlockActionIsAPlainForm(t *testing.T) {
 	html, err := ActionsBlock([]Action{{
 		Description: "Cancel order", ButtonText: "Cancel",

@@ -7,44 +7,6 @@ import (
 	"strings"
 )
 
-// idHeadRunes and idTailRunes are how much of a long id survives shortening:
-// the first six characters disambiguate it among the ids on the page, the last
-// four match what an operator reads off a support ticket. An id no longer than
-// idShortenThreshold is left alone - shortening it would save nothing.
-const (
-	idHeadRunes        = 6
-	idTailRunes        = 6
-	idShortenThreshold = 12
-)
-
-// ShortId renders a long identifier as its first six and last six characters,
-// e.g. "01M1ET…X23ZQW". A "type:" prefix (as a history GroupId or a locally
-// generated request id carries) is kept intact and only the id after it is
-// shortened, so "local:01M1…" still reads as a local id. Short values are
-// returned unchanged.
-//
-// The full value belongs in a title attribute next to it - the display form is
-// lossy on purpose, the page must still let an operator copy the whole thing.
-func ShortId(value string) string {
-	return ShortIdN(value, idHeadRunes, idTailRunes)
-}
-
-// ShortIdN is ShortId with an explicit head and tail length, for ids with
-// another shape than a ULID - a 32 character trace id reads better as 8 and 6.
-func ShortIdN(value string, head, tail int) string {
-	prefix, raw := "", value
-	if before, after, ok := strings.Cut(value, ":"); ok {
-		prefix, raw = before+":", after
-	}
-
-	runes := []rune(raw)
-	if len(runes) <= max(idShortenThreshold, head+tail) {
-		return value
-	}
-
-	return prefix + string(runes[:head]) + "\u2026" + string(runes[len(runes)-tail:])
-}
-
 // idPattern matches a value that is an identifier rather than prose: one
 // unbroken run of id characters, at least as long as the shortest id shape in
 // use (a 26 character ULID, a 32 character trace id, a 36 character UUID). An
@@ -52,28 +14,17 @@ func ShortIdN(value string, head, tail int) string {
 // id).
 //
 // The length floor is what keeps a slug out: "showmethemoney-pt" is a shop
-// name an operator reads, not an id they copy, and shortening it would destroy
-// the only readable thing about it.
+// name an operator reads, not an id they copy.
 var idPattern = regexp.MustCompile(`^(?:[A-Za-z][A-Za-z0-9_-]*:)?[A-Za-z0-9_-]{20,}$`)
 
 // IsId reports whether value looks like an identifier - used to decide whether a
-// displayed value is shortened and made copyable rather than printed in full.
+// displayed value renders monospaced and copyable rather than as prose. An id is
+// always shown in full: an operator compares it character by character against a
+// support ticket, and a truncated ULID or UUID cannot be compared at all.
 // Deliberately conservative: anything with whitespace or punctuation, and
 // anything short enough to be a human-readable name, is prose.
 func IsId(value string) bool {
 	return idPattern.MatchString(value)
-}
-
-// idTokenPattern matches an id embedded in a longer text, e.g. the id inside a
-// label like "Draw 01M1DTGTM47SC9XFPEBAJRRD65". Same length floor as idPattern,
-// for the same reason.
-var idTokenPattern = regexp.MustCompile(`[A-Za-z0-9_-]{20,}`)
-
-// ShortIdsIn shortens every id embedded in text, leaving the rest alone - for a
-// label or a sentence that carries an id inside it. The full text belongs in a
-// title attribute next to it.
-func ShortIdsIn(text string) string {
-	return idTokenPattern.ReplaceAllStringFunc(text, ShortId)
 }
 
 // amountPattern matches a rendered money amount ("2.50 EUR", "-12,34 EUR"), the

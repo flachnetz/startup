@@ -30,10 +30,10 @@
             {{ $card := .Id }}
             {{ range $i, $item := .Facts }}
             <div class="fact mw0">
-                <dt class="lbl"{{ if $item.LabelShortened }} title="{{ $item.Label }}"{{ end }}>{{ $item.ShortLabel }}</dt>
+                <dt class="lbl">{{ $item.Label }}</dt>
                 <dd class="text-break{{ if $item.Mono }} font-mono{{ end }}{{ if $item.Muted }} zero{{ end }}">
                     {{ if $item.Tone }}<span class="{{ statusClass $item.Tone }}"><span class="{{ pipClass $item.Tone }}"></span>{{ $item.Value }}</span>
-                    {{ else if and $item.Link $item.IsId }}<span class="id-link"><a href="{{ $item.Link }}" class="text-decoration-none" title="{{ $item.Value }}">{{ shortId $item.Value }}</a>{{ template "boff/id-copy" $item.Value }}</span>
+                    {{ else if and $item.Link $item.IsId }}<span class="id-link"><a href="{{ $item.Link }}" class="text-decoration-none" >{{ $item.Value }}</a>{{ template "boff/id-copy" $item.Value }}</span>
                     {{ else if $item.Link }}<a href="{{ $item.Link }}" class="text-decoration-none">{{ $item.Value }}</a>
                     {{ else if $item.IsId }}{{ template "boff/id" $item.Value }}
                     {{ else }}{{ $item.Value }}{{ end }}
@@ -77,7 +77,7 @@
         <span class="{{ pipClass $item.Tone }}"></span>
         <div class="mw0 flex-grow-1">
             <div class="d-flex align-items-baseline gap-2 flex-wrap">
-                <span class="lbl"{{ if $item.LabelShortened }} title="{{ $item.Label }}"{{ end }}>{{ $item.ShortLabel }}</span>
+                <span class="lbl">{{ $item.Label }}</span>
                 {{ if $item.Link }}<a class="item-text text-decoration-none" href="{{ $item.Link }}">{{ $item.Value }}</a>
                 {{ else }}<span class="item-text">{{ $item.Value }}</span>{{ end }}
                 {{ if $item.FieldCount }}{{ template "boff/payload-chip" $panel }}{{ end }}
