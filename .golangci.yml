@@ -69,6 +69,11 @@ linters:
       - path: _test\.go
         linters:
           - goconst
+      # Test doubles and handlers must match a required signature, so unused
+      # parameters and always-nil errors are the contract, not dead weight.
+      - path: _test\.go
+        linters:
+          - unparam
 
 issues:
   max-issues-per-linter: 0

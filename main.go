@@ -35,6 +35,9 @@ func MustParseCommandLineWithOptions(ctx context.Context, opts any, options flag
 	}
 }
 
+// defaultEnvFile is the dotenv file read when ENV_FILE is unset.
+const defaultEnvFile = ".env"
+
 func ParseCommandLine(ctx context.Context, opts any) error {
 	return ParseCommandLineWithOptions(ctx, opts, flags.HelpFlag|flags.PassDoubleDash)
 }
@@ -47,15 +50,8 @@ func ParseCommandLineWithOptions(ctx context.Context, opts any, options flags.Op
 
 	propagateInputs(opts)
 
-	envFile := os.Getenv("ENV_FILE")
-	if envFile == "" {
-		envFile = ".env"
-	}
-
-	if err := godotenv.Load(envFile); err != nil {
-		if !os.IsNotExist(err) {
-			return fmt.Errorf("load env file %q: %w", envFile, err)
-		}
+	if err := loadEnvFile(); err != nil {
+		return err
 	}
 
 	if options&flags.IgnoreUnknown != 0 {
@@ -75,12 +71,45 @@ func ParseCommandLineWithOptions(ctx context.Context, opts any, options flags.Op
 	}
 
 	// validate all input values after argument parsing
+	if err := validateOptions(opts); err != nil {
+		return err
+	}
+
+	initializeFields(ctx, opts)
+
+	return nil
+}
+
+// loadEnvFile loads the dotenv file named by ENV_FILE, defaulting to
+// defaultEnvFile. A missing file is not an error - the environment alone is a
+// valid setup.
+func loadEnvFile() error {
+	envFile := os.Getenv("ENV_FILE")
+	if envFile == "" {
+		envFile = defaultEnvFile
+	}
+
+	if err := godotenv.Load(envFile); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("load env file %q: %w", envFile, err)
+	}
+
+	return nil
+}
+
+// validateOptions runs struct validation on the parsed options, including the
+// custom "hostport" rule.
+func validateOptions(opts any) error {
 	v := validator.New()
 
 	// validate host:port values
 	_ = v.RegisterValidation("hostport", func(fl validator.FieldLevel) bool {
-		value := fl.Field().Interface().(string)
+		value, ok := fl.Field().Interface().(string)
+		if !ok {
+			return false
+		}
+
 		_, _, err := net.SplitHostPort(value)
+
 		return err == nil
 	})
 
@@ -88,9 +117,14 @@ func ParseCommandLineWithOptions(ctx context.Context, opts any, options flags.Op
 		return fmt.Errorf("validate options struct: %w", err)
 	}
 
+	return nil
+}
+
+// initializeFields calls Initialize() on every struct field that has one, in
+// declaration order, injecting the option structs seen so far.
+func initializeFields(ctx context.Context, opts any) {
 	seen := make(map[reflect.Type]reflect.Value)
 
-	// now do the initialization for all fields
 	value := reflect.ValueOf(opts).Elem()
 	for fieldValue := range fieldsIter(value) {
 		if fieldValue.Kind() != reflect.Struct {
@@ -102,50 +136,59 @@ func ParseCommandLineWithOptions(ctx context.Context, opts any, options flags.Op
 		seen[fieldValue.Type()] = fieldValue
 		seen[reflect.PointerTo(fieldValue.Type())] = fieldValue.Addr()
 
-		if init := findInitializerMethod(fieldValue); init.IsValid() {
-			var inputValues []reflect.Value
-
-			initType := init.Type()
-			for in := range initType.Ins() {
-				var inputValue reflect.Value
-
-				switch {
-				case in == reflect.TypeFor[context.Context]():
-					inputValue = reflect.ValueOf(ctx)
-
-				case seen[in].IsValid():
-					inputValue = seen[in]
-
-				case in.Kind() == reflect.Pointer:
-					// get T instead of *T
-					inType := in.Elem()
-
-					// pointers indicate optional values
-					if value := seen[inType]; value.IsValid() {
-						// set inputValue to (*T)(&value)
-						inputValue = value.Addr()
-					} else {
-						// set inputValue to (*T)(nil)
-						inputValue = reflect.New(in).Elem()
-					}
-
-				default:
-					startup_base.Panicf("Can not find value of type %q to inject into %q",
-						in.String(), fieldValue.Type())
-				}
-
-				inputValues = append(inputValues, inputValue)
-			}
-
-			if _, ok := fieldValue.Interface().(startup_base.BaseOptions); !ok {
-				log.Info("Calling Initialize()", slog.String("type", fieldValue.Type().String()))
-			}
-
-			init.Call(inputValues)
+		init := findInitializerMethod(fieldValue)
+		if !init.IsValid() {
+			continue
 		}
+
+		if _, ok := fieldValue.Interface().(startup_base.BaseOptions); !ok {
+			log.Info("Calling Initialize()", slog.String("type", fieldValue.Type().String()))
+		}
+
+		init.Call(initializerArgs(ctx, init, fieldValue, seen))
+	}
+}
+
+// initializerArgs resolves the arguments of one Initialize() method from the
+// option structs seen so far.
+func initializerArgs(ctx context.Context, init reflect.Value, owner reflect.Value, seen map[reflect.Type]reflect.Value) []reflect.Value {
+	initType := init.Type()
+
+	inputValues := make([]reflect.Value, 0, initType.NumIn())
+
+	for in := range initType.Ins() {
+		inputValues = append(inputValues, initializerArg(ctx, in, owner, seen))
 	}
 
-	return nil
+	return inputValues
+}
+
+// initializerArg resolves a single Initialize() parameter. A pointer parameter
+// marks an optional value and stays nil when nothing of that type was seen.
+func initializerArg(ctx context.Context, in reflect.Type, owner reflect.Value, seen map[reflect.Type]reflect.Value) reflect.Value {
+	switch {
+	case in == reflect.TypeFor[context.Context]():
+		return reflect.ValueOf(ctx)
+
+	case seen[in].IsValid():
+		return seen[in]
+
+	case in.Kind() == reflect.Pointer:
+		// pointers indicate optional values: get T instead of *T
+		if value := seen[in.Elem()]; value.IsValid() {
+			// (*T)(&value)
+			return value.Addr()
+		}
+
+		// (*T)(nil)
+		return reflect.New(in).Elem()
+
+	default:
+		startup_base.Panicf("Can not find value of type %q to inject into %q",
+			in.String(), owner.Type())
+
+		return reflect.Value{}
+	}
 }
 
 func propagateInputs(opts any) {
@@ -160,30 +203,34 @@ func propagateInputs(opts any) {
 
 func fieldsIter(value reflect.Value) iter.Seq[reflect.Value] {
 	return func(yield func(reflect.Value) bool) {
-		if value.Kind() != reflect.Struct {
-			return
+		yieldFields(value, yield)
+	}
+}
+
+// yieldFields yields every exported field of value, recursing into embedded
+// fields first. It reports whether iteration should continue.
+func yieldFields(value reflect.Value, yield func(reflect.Value) bool) bool {
+	if value.Kind() != reflect.Struct {
+		return true
+	}
+
+	for sf, field := range value.Fields() {
+		if sf.PkgPath != "" {
+			// field is not exported
+			continue
 		}
 
-		for sf, field := range value.Fields() {
-			if sf.PkgPath != "" {
-				// field is not exported
-				continue
-			}
+		// this is an embedded field, recurse
+		if sf.Anonymous && !yieldFields(field, yield) {
+			return false
+		}
 
-			if sf.Anonymous {
-				// this is an embedded field, recurse
-				for sub := range fieldsIter(field) {
-					if !yield(sub) {
-						return
-					}
-				}
-			}
-
-			if !yield(field) {
-				return
-			}
+		if !yield(field) {
+			return false
 		}
 	}
+
+	return true
 }
 
 func findInitializerMethod(v reflect.Value) reflect.Value {

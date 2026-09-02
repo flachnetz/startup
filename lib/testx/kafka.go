@@ -13,6 +13,8 @@ import (
 
 // Kafka is a handle to a running in-memory mock Kafka cluster together with a
 // producer for sending messages to it.
+const bootstrapServersKey = "bootstrap.servers"
+
 type Kafka struct {
 	BootstrapServers string
 
@@ -39,7 +41,7 @@ func KafkaCluster(t *testing.T) *Kafka {
 	servers := cluster.BootstrapServers()
 	require.NotEmpty(t, servers)
 
-	config := &kafka.ConfigMap{"bootstrap.servers": servers}
+	config := &kafka.ConfigMap{bootstrapServersKey: servers}
 	producer, err := kafka.NewProducer(config)
 	require.NoError(t, err)
 
@@ -114,7 +116,7 @@ func (k *Kafka) TestConsumer(topic string, moreTopics ...string) *KafkaConsumer 
 func (k *Kafka) Consumer() *kafka.Consumer {
 	config := &kafka.ConfigMap{
 		"group.id":          time.Now().String(),
-		"bootstrap.servers": k.BootstrapServers,
+		bootstrapServersKey: k.BootstrapServers,
 		"auto.offset.reset": "earliest",
 	}
 
@@ -127,7 +129,7 @@ func (k *Kafka) Consumer() *kafka.Consumer {
 }
 
 func (k *Kafka) Producer() *kafka.Producer {
-	config := &kafka.ConfigMap{"bootstrap.servers": k.cluster.BootstrapServers()}
+	config := &kafka.ConfigMap{bootstrapServersKey: k.cluster.BootstrapServers()}
 
 	producer, err := kafka.NewProducer(config)
 	require.NoError(k.testing, err, "Create producer")

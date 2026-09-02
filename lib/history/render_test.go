@@ -19,14 +19,16 @@ func at(second int, millis int) time.Time {
 // view is a RecordView as renderPage builds one, minus the database.
 func view(traceId string, ts time.Time, step, description, payload, level string) RecordView {
 	return RecordView{
-		Timestamp:   ts,
-		Step:        step,
-		Description: description,
-		Payload:     json.RawMessage(payload),
-		EventSender: "order_service",
-		JSON:        payload,
-		Level:       level,
-		Key:         "ev-" + traceId + "-" + step,
+		Record: Record{
+			Timestamp:   ts,
+			Step:        step,
+			Description: description,
+			Payload:     json.RawMessage(payload),
+			EventSender: "order_service",
+		},
+		JSON:  payload,
+		Level: level,
+		Key:   "ev-" + traceId + "-" + step,
 	}
 }
 
@@ -37,7 +39,7 @@ func withTrace(v RecordView, hexTraceId string) RecordView {
 	if err := id.Scan(hexTraceId); err != nil {
 		panic(err)
 	}
-	v.Record.RequestTraceId = id
+	v.RequestTraceId = id
 
 	return v
 }
@@ -165,10 +167,10 @@ func TestLedgerEmptyPayloadHasNoChip(t *testing.T) {
 // rendering an empty one; an HTTP record shows it.
 func TestLedgerHTTPSourceOnlyForHTTPTriggers(t *testing.T) {
 	consumed := withTrace(view(traceOld, at(41, 835), "PaymentCaptured", "captured", "{}", ""), traceOld)
-	consumed.Record.Trigger = Trigger{Source: "message-broker", Detail: "topic payment_captured", RefType: "kafkaEventId", Ref: "01M1ETRDQ8FJ4W2K7ZP0X5NVB1"}
+	consumed.Trigger = Trigger{Source: "message-broker", Detail: "topic payment_captured", RefType: "kafkaEventId", Ref: "01M1ETRDQ8FJ4W2K7ZP0X5NVB1"}
 
 	served := withTrace(view(traceOld, at(41, 902), "OrderCreated", "created", "{}", ""), traceOld)
-	served.Record.Trigger = Trigger{
+	served.Trigger = Trigger{
 		Source: "http", Detail: "POST /public/v1/checkout",
 		RefType: "requestId", Ref: "01M1ETRD12CEXT501ZYQZ3EHY6",
 		Actor: actor.Actor{Type: "player", Id: "01KXJMFRY454B6BH7Y3TYNWEXR"},

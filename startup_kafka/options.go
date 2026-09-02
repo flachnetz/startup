@@ -33,9 +33,9 @@ type KafkaOptions struct {
 	}
 
 	KafkaAddresses        []string `long:"kafka-address" env:"KAFKA_ADDRESS" validate:"dive,hostport" description:"Address of kafka server to use. Can be specified multiple times to connect to multiple brokers."`
-	KafkaOffsetReset      string   `long:"kafka-offset-reset" env:"KAFKA_OFFSET_RESET" default:"smallest" description:"Offset reset for kafka topic" choice:"smallest" choice:"largest"`
+	KafkaOffsetReset      string   `long:"kafka-offset-reset" env:"KAFKA_OFFSET_RESET" default:"smallest" description:"Offset reset for kafka topic" choice:"smallest" choice:"largest"` //nolint:staticcheck // go-flags reads repeated choice tags
 	KafkaReplication      int16    `long:"kafka-replication" env:"KAFKA_REPLICATION" default:"3" description:"Default kafka replication for new topics." validate:"gt=0"`
-	KafkaSecurityProtocol string   `long:"kafka-security-protocol" env:"KAFKA_SECURITY_PROTOCOL" default:"ssl" description:"Security protocol" choice:"ssl" choice:"plaintext"`
+	KafkaSecurityProtocol string   `long:"kafka-security-protocol" env:"KAFKA_SECURITY_PROTOCOL" default:"ssl" description:"Security protocol" choice:"ssl" choice:"plaintext"` //nolint:staticcheck // go-flags reads repeated choice tags
 	KafkaProperties       []string `long:"kafka-property" env:"KAFKA_PROPERTY" description:"Rdkafka properties in key=value format"`
 
 	DefaultConsumerGroup string `long:"kafka-default-consumer-group" env:"KAFKA_DEFAULT_CONSUMER_GROUP" description:"Set default consumer group. Can be set to RANDOM."`

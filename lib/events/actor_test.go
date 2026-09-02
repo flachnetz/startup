@@ -176,7 +176,7 @@ func TestActorFromKafkaHeaders(t *testing.T) {
 func TestActorKafkaHeadersRoundTrip(t *testing.T) {
 	a := actor.Actor{Type: actor.TypeUser, Id: "sub-1", Label: "staff@example.com"}
 
-	var headers []kafka.Header
+	headers := make([]kafka.Header, 0, len(actorHeaders(a)))
 	for _, h := range actorHeaders(a) {
 		headers = append(headers, kafkaHeader(h.Key, h.Value))
 	}

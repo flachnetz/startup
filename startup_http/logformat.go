@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"time"
 
 	"github.com/felixge/httpsnoop"
 )
@@ -16,18 +15,19 @@ type loggingHandler struct {
 }
 
 func (h loggingHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	startTime := time.Now()
-
-	var metrics httpsnoop.Metrics
+	// Code defaults to 200, like httpsnoop.CaptureMetrics does: a handler that
+	// only writes a body never calls WriteHeader, and would otherwise be logged
+	// with status 0.
+	metrics := httpsnoop.Metrics{Code: http.StatusOK}
 	metrics.CaptureMetrics(w, func(writer http.ResponseWriter) {
 		h.handler.ServeHTTP(writer, req)
 	})
 
-	attrs := buildAccessLogAttrs(req, startTime, metrics)
+	attrs := buildAccessLogAttrs(req, metrics)
 	h.log(req.Context(), attrs)
 }
 
-func buildAccessLogAttrs(req *http.Request, ts time.Time, metrics httpsnoop.Metrics) []slog.Attr {
+func buildAccessLogAttrs(req *http.Request, metrics httpsnoop.Metrics) []slog.Attr {
 	host, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
 		host = req.RemoteAddr

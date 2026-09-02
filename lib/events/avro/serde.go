@@ -61,7 +61,7 @@ func SerializeWithSchema(client confluent.Client, event Event) ([]byte, error) {
 		return nil, fmt.Errorf("register schema %T: %w", eventType, err)
 	}
 
-	return SerializeWithSchemaId(uint32(schemaId), event)
+	return SerializeWithSchemaId(uint32(schemaId), event) // #nosec G115 -- schema ids are small positive ints from the registry
 }
 
 func SerializeWithSchemaId(schemaId uint32, event Event) ([]byte, error) {

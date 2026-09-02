@@ -232,7 +232,7 @@ func (t *TokenSource) request(ctx context.Context, audience string) (string, tim
 	if err != nil {
 		return "", 0, fmt.Errorf("fetch token for %q: %w", audience, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		// the body can carry the client secret back in an error description,

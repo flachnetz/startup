@@ -32,7 +32,7 @@ func OpenWriter(name string) (*os.File, error) {
 
 	default:
 		// some output file
-		return os.Create(name)
+		return os.Create(name) // #nosec G304 -- log file path comes from operator configuration
 	}
 }
 

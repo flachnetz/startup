@@ -51,6 +51,10 @@ type partitionWorker struct {
 	errCh     chan error
 }
 
+// offsetStoreInterval is how often handled offsets are stored for auto-commit
+// while the consumer is running.
+const offsetStoreInterval = 5 * time.Second
+
 // Consume subscribes to the configured topics and dispatches every consumed
 // message to handle. Each assigned partition is processed by its own worker
 // goroutine, so messages within a partition are handled in order while
@@ -64,19 +68,73 @@ type partitionWorker struct {
 // or a worker fails (because its handler exhausted its retries or panicked),
 // in which case it shuts the workers down and returns an error.
 func (c *PartitionConsumer) Consume(ctx context.Context, handle HandleMessage) error {
-	workers := partitionsWorkers{
+	workers := &partitionsWorkers{
 		Consumer: c.Consumer,
 		Workers:  map[topicPartition]*partitionWorker{},
 	}
 
-	// The rebalance callback is invoked from within ReadMessage on this
-	// goroutine, so it is safe to touch the workers map here. Worker state
-	// must never survive an assignment change: on revoke we drain all workers
-	// and store their offsets. We do NOT call Commit() here — the broker
-	// rejects explicit commits during a rebalance. Instead, StoreOffsets marks
-	// them in librdkafka's internal state, and the library automatically
-	// commits stored offsets as part of the rebalance protocol.
-	rebalanceCb := func(consumer *kafka.Consumer, event kafka.Event) error {
+	if err := c.Consumer.SubscribeTopics(c.Topics, rebalanceCallback(ctx, workers)); err != nil {
+		return fmt.Errorf("subscribe to %v: %w", c.Topics, err)
+	}
+
+	// try to cleanup a little by unsubscribing in the end
+	defer func() { _ = c.Consumer.Unsubscribe() }()
+
+	defer workers.Shutdown()
+
+	slog.InfoContext(ctx, "Partition consumer started", slog.Any("topics", c.Topics))
+
+	lastStored := time.Now()
+
+	for {
+		if err := ctx.Err(); err != nil {
+			slog.InfoContext(ctx, "Context closed, shutting consumer down", sl.Error(err))
+
+			return fmt.Errorf("context: %w", err)
+		}
+
+		// check all workers for done or errors, including workers that
+		// failed while being drained during a rebalance
+		if err := workers.Failed(); err != nil {
+			return err
+		}
+
+		// store offsets periodically. This runs before ReadMessage so offsets
+		// are also stored while the topic is idle.
+		if time.Since(lastStored) >= offsetStoreInterval {
+			workers.StoreOffsets()
+			lastStored = time.Now()
+		}
+
+		msg, err := c.readMessage(ctx)
+		if err != nil {
+			return err
+		}
+
+		if msg == nil {
+			// nothing to handle right now
+			continue
+		}
+
+		w := workers.Get(ctx, *msg.TopicPartition.Topic, msg.TopicPartition.Partition, handle)
+		if err := dispatch(w, msg); err != nil {
+			return err
+		}
+	}
+}
+
+// rebalanceCallback returns the callback librdkafka invokes on assignment
+// changes.
+//
+// It is invoked from within ReadMessage on the Consume goroutine, so it is safe
+// to touch the workers map here. Worker state must never survive an assignment
+// change: on revoke we drain all workers and store their offsets. We do NOT
+// call Commit() here - the broker rejects explicit commits during a rebalance.
+// Instead, StoreOffsets marks them in librdkafka's internal state, and the
+// library automatically commits stored offsets as part of the rebalance
+// protocol.
+func rebalanceCallback(ctx context.Context, workers *partitionsWorkers) kafka.RebalanceCb {
+	return func(consumer *kafka.Consumer, event kafka.Event) error {
 		slog.InfoContext(ctx, "Rebalance event", slog.String("event", event.String()))
 
 		switch event.(type) {
@@ -91,72 +149,46 @@ func (c *PartitionConsumer) Consume(ctx context.Context, handle HandleMessage) e
 
 		return nil
 	}
+}
 
-	if err := c.Consumer.SubscribeTopics(c.Topics, rebalanceCb); err != nil {
-		return fmt.Errorf("subscribe to %v: %w", c.Topics, err)
+// readMessage polls the consumer once. A nil message together with a nil error
+// means "nothing to handle, keep polling"; a returned error is fatal and stops
+// the consumer.
+func (c *PartitionConsumer) readMessage(ctx context.Context) (*kafka.Message, error) {
+	msg, err := c.Consumer.ReadMessage(DefaultPollTimeout)
+	if err == nil {
+		return msg, nil
 	}
 
-	// try to cleanup a little by unsubscribing in the end
-	defer c.Consumer.Unsubscribe()
-
-	defer workers.Shutdown()
-
-	slog.InfoContext(ctx, "Partition consumer started", slog.Any("topics", c.Topics))
-
-	lastStored := time.Now()
-
-	for {
-		if err := ctx.Err(); err != nil {
-			slog.InfoContext(ctx, "Context closed, shutting consumer down", sl.Error(err))
-			return fmt.Errorf("context: %w", err)
+	if ke, ok := errors.AsType[kafka.Error](err); ok {
+		if ke.IsTimeout() {
+			return nil, nil
 		}
 
-		// check all workers for done or errors, including workers that
-		// failed while being drained during a rebalance
-		if err := workers.Failure(); err != nil {
-			return err
+		if ke.IsFatal() {
+			return nil, fmt.Errorf("fatal kafka error: %w", ke)
 		}
+	}
 
-		for _, w := range workers.Workers {
-			if err := w.stopped(); err != nil {
-				return err
-			}
-		}
+	slog.WarnContext(ctx, "Error reading message", slog.Any("error", err))
 
-		// store offsets periodically. This runs before ReadMessage so offsets
-		// are also stored while the topic is idle.
-		if time.Since(lastStored) >= 5*time.Second {
-			workers.StoreOffsets()
-			lastStored = time.Now()
-		}
+	return nil, nil
+}
 
-		msg, err := c.Consumer.ReadMessage(DefaultPollTimeout)
-		if err != nil {
-			if ke, ok := errors.AsType[kafka.Error](err); ok {
-				if ke.IsTimeout() {
-					continue
-				}
-				if ke.IsFatal() {
-					return fmt.Errorf("fatal kafka error: %w", ke)
-				}
-			}
-			slog.WarnContext(ctx, "Error reading message", slog.Any("error", err))
-			continue
-		}
+// dispatch hands msg to its partition worker, or reports that the worker died
+// before it could take the message.
+func dispatch(w *partitionWorker, msg *kafka.Message) error {
+	select {
+	case w.msgs <- msg:
+		return nil
 
-		w := workers.Get(ctx, *msg.TopicPartition.Topic, msg.TopicPartition.Partition, handle)
+	case err := <-w.errCh:
+		return fmt.Errorf("worker for partition %d died with error: %w", w.partition, err)
 
-		select {
-		case w.msgs <- msg:
-
-		case err := <-w.errCh:
-			return fmt.Errorf("worker for partition %d died with error: %w", w.partition, err)
-
-		case <-w.done:
-			// The worker always writes to errCh before closing done, so prefer
-			// the concrete error if one is available.
-			return w.stopped()
-		}
+	case <-w.done:
+		// The worker always writes to errCh before closing done, so prefer
+		// the concrete error if one is available.
+		return w.stopped()
 	}
 }
 
@@ -327,15 +359,26 @@ func (p *partitionsWorkers) DrainAll() {
 	}
 }
 
-// Failure returns the first error observed while draining workers, if any.
-func (p *partitionsWorkers) Failure() error {
-	return p.err
+// Failed reports the first worker failure, whether it was observed while
+// draining workers during a rebalance or by a worker that stopped on its own.
+func (p *partitionsWorkers) Failed() error {
+	if p.err != nil {
+		return p.err
+	}
+
+	for _, w := range p.Workers {
+		if err := w.stopped(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Commit synchronously commits all stored offsets. A commit without any
 // stored offsets is not an error.
 func (p *partitionsWorkers) Commit() {
-	slog.Debug("Comitting offsets now")
+	slog.Debug("Committing offsets now")
 	if _, err := p.Consumer.Commit(); err != nil {
 		if ke, ok := errors.AsType[kafka.Error](err); ok && ke.Code() == kafka.ErrNoOffset {
 			return

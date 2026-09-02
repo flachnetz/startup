@@ -44,12 +44,12 @@ func (t *testServices) Consume(topic string, n int) []kafka.Message {
 	consumer, err := kafka.NewConsumer(&configMap)
 	require.NoError(t, err)
 
-	defer consumer.Close()
+	defer func() { _ = consumer.Close() }()
 
 	err = consumer.Subscribe(topic, nil)
 	require.NoError(t, err)
 
-	defer consumer.Unsubscribe()
+	defer func() { _ = consumer.Unsubscribe() }()
 
 	var messages []kafka.Message
 	for len(messages) < n {
@@ -259,7 +259,7 @@ func TestVacuumJob(t *testing.T) {
 	// forced to give up without error
 	conn, err := db.Connx(ctx)
 	require.NoError(t, err)
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	locked, err := acquireAdvisoryLock(ctx, conn, advisoryLockID("outburst:vacuum"))
 	require.NoError(t, err)

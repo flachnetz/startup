@@ -93,7 +93,7 @@ func (esi *eventSenderInitializer) registerSchemaCache() (map[reflect.Type]uint3
 		}
 
 		// and cache the schema id for serializing later
-		schemaIdCache[eventType] = uint32(schemaId)
+		schemaIdCache[eventType] = uint32(schemaId) // #nosec G115 -- schema ids are small positive ints from the registry
 	}
 
 	return schemaIdCache, nil

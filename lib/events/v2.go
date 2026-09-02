@@ -143,43 +143,56 @@ func (ev *eventSender) Close() error {
 }
 
 func (ev *eventSender) launchAsyncTasks() {
-	ev.wg.Go(func() {
-		defer func() {
-			if ev.KafkaSender != nil {
-				for {
-					count := ev.KafkaSender.Flush(5_000)
-					if count == 0 {
-						break
-					}
-
-					slog.Warn("Flush says there are still queued messages to be send.", slog.Int("count", count))
-				}
-
-				ev.KafkaSender.Close()
-			}
-		}()
-
-		for event := range ev.AsyncBufferCh {
-			ev.doSendAsync(event)
-		}
-	})
+	ev.wg.Go(ev.drainAsyncBuffer)
 
 	if ev.KafkaSender != nil {
-		ev.wg.Go(func() {
-			for e := range ev.KafkaSender.Events() {
-				switch ev := e.(type) {
-				case *kafka.Message:
-					if ev.TopicPartition.Error != nil {
-						slog.Warn(
-							"Event delivery failed",
-							slog.Any("topicPartition", ev.TopicPartition),
-							slog.String("key", string(ev.Key)),
-							sl.Error(ev.TopicPartition.Error),
-						)
-					}
-				}
-			}
-		})
+		ev.wg.Go(ev.logDeliveryFailures)
+	}
+}
+
+// drainAsyncBuffer sends every buffered event until the buffer is closed, then
+// flushes the kafka sender.
+func (ev *eventSender) drainAsyncBuffer() {
+	defer ev.flushKafkaSender()
+
+	for event := range ev.AsyncBufferCh {
+		ev.doSendAsync(event)
+	}
+}
+
+// flushKafkaSender waits for the producer queue to drain before closing it, so a
+// buffered event is not lost on shutdown.
+func (ev *eventSender) flushKafkaSender() {
+	if ev.KafkaSender == nil {
+		return
+	}
+
+	for {
+		count := ev.KafkaSender.Flush(5_000)
+		if count == 0 {
+			break
+		}
+
+		slog.Warn("Flush says there are still queued messages to be send.", slog.Int("count", count))
+	}
+
+	ev.KafkaSender.Close()
+}
+
+// logDeliveryFailures reports every delivery the producer could not complete.
+func (ev *eventSender) logDeliveryFailures() {
+	for e := range ev.KafkaSender.Events() {
+		msg, ok := e.(*kafka.Message)
+		if !ok || msg.TopicPartition.Error == nil {
+			continue
+		}
+
+		slog.Warn(
+			"Event delivery failed",
+			slog.Any("topicPartition", msg.TopicPartition),
+			slog.String("key", string(msg.Key)),
+			sl.Error(msg.TopicPartition.Error),
+		)
 	}
 }
 

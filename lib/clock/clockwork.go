@@ -18,12 +18,12 @@ type adapter struct {
 }
 
 func (a adapter) NewTicker(d time.Duration) clockwork.Ticker {
-	ticker := a.Clock.Ticker(d)
+	ticker := a.Ticker(d)
 	return tickerAdapter{Ticker: ticker}
 }
 
 func (a adapter) NewTimer(d time.Duration) clockwork.Timer {
-	timer := a.Clock.Timer(d)
+	timer := a.Timer(d)
 	return timerAdapter{timer}
 }
 
@@ -37,7 +37,7 @@ type tickerAdapter struct {
 }
 
 func (t tickerAdapter) Chan() <-chan time.Time {
-	return t.Ticker.C
+	return t.C
 }
 
 type timerAdapter struct {
@@ -45,5 +45,5 @@ type timerAdapter struct {
 }
 
 func (t timerAdapter) Chan() <-chan time.Time {
-	return t.Timer.C
+	return t.C
 }

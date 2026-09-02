@@ -23,7 +23,7 @@ type EventTopics struct {
 }
 
 func (topics *EventTopics) Topics() Topics {
-	var result Topics
+	result := make(Topics, 0, len(topics.EventTypes))
 
 	for _, topic := range topics.EventTypes {
 		result = append(result, topic)

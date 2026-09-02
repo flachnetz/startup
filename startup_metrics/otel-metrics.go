@@ -36,7 +36,7 @@ func (opts *OTELMetricsOptions) Initialize() {
 		startup_base.PanicOnError(err, "Failed to create resource")
 
 		// Create readers slice for multiple exporters
-		var readers []sdkmetric.Option
+		readers := make([]sdkmetric.Option, 0, 1)
 
 		promExporter, err := prometheus.New()
 		startup_base.PanicOnError(err, "Failed to create Prometheus exporter")

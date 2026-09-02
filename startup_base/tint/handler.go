@@ -81,6 +81,9 @@ const (
 
 const errKey = "err"
 
+// prefixKey marks an attribute rendered as a source-style prefix.
+const prefixKey = "prefix"
+
 var (
 	defaultLevel      = slog.LevelInfo
 	defaultTimeFormat = time.StampMilli
@@ -171,79 +174,7 @@ func (h *handler) Handle(_ context.Context, r slog.Record) error {
 	buf := newBuffer()
 	defer buf.Free()
 
-	rep := h.replaceAttr
-
-	// write time
-	if !r.Time.IsZero() {
-		val := r.Time.Round(0) // strip monotonic to match Attr behavior
-		if rep == nil {
-			h.appendTime(buf, r.Time)
-			_ = buf.WriteByte(' ')
-		} else if a := rep(h.groups, slog.Time(slog.TimeKey, val)); a.Key != "" {
-			if a.Value.Kind() == slog.KindTime {
-				h.appendTime(buf, r.Time)
-			} else {
-				appendValue(buf, a.Value, false)
-			}
-			_ = buf.WriteByte(' ')
-		}
-	}
-
-	// write level
-	if rep == nil {
-		h.appendLevel(buf, r.Level)
-		_ = buf.WriteByte(' ')
-	} else if a := rep(h.groups, slog.Int(slog.LevelKey, int(r.Level))); a.Key != "" {
-		if a.Value.Kind() == slog.KindInt64 {
-			h.appendLevel(buf, slog.Level(a.Value.Int64()))
-		} else {
-			appendValue(buf, a.Value, false)
-		}
-		_ = buf.WriteByte(' ')
-	}
-
-	// write source
-	if h.addSource {
-		fs := runtime.CallersFrames([]uintptr{r.PC})
-		f, _ := fs.Next()
-		if f.File != "" {
-			src := &slog.Source{
-				Function: f.Function,
-				File:     f.File,
-				Line:     f.Line,
-			}
-
-			if rep == nil {
-				h.appendSource(buf, src)
-				_ = buf.WriteByte(' ')
-			} else if a := rep(h.groups, slog.Any(slog.SourceKey, src)); a.Key != "" {
-				appendValue(buf, a.Value, false)
-				_ = buf.WriteByte(' ')
-			}
-		}
-	} else {
-		r.Attrs(func(attr slog.Attr) bool {
-			if attr.Key == "prefix" {
-				h.appendSourceValue(buf, attr.Value)
-
-				_ = buf.WriteByte(' ')
-
-				// stop iteration
-				return false
-			}
-
-			return true
-		})
-	}
-
-	// write message
-	if rep == nil {
-		_, _ = buf.WriteString(r.Message)
-		_ = buf.WriteByte(' ')
-	} else if a := rep(h.groups, slog.String(slog.MessageKey, r.Message)); a.Key != "" {
-		appendValue(buf, a.Value, false)
-		_ = buf.WriteByte(' ')
-	}
+	h.appendHeader(buf, r)
 
 	// write handler attributes
 	if len(h.attrsPrefix) > 0 {
@@ -252,28 +183,160 @@ func (h *handler) Handle(_ context.Context, r slog.Record) error {
 
 	// write attributes
 	r.Attrs(func(attr slog.Attr) bool {
-		if rep != nil {
-			attr = rep(h.groups, attr)
+		if h.replaceAttr != nil {
+			attr = h.replaceAttr(h.groups, attr)
 		}
 
-		if attr.Key == "prefix" {
+		// the prefix was already rendered in the source position
+		if attr.Key == prefixKey {
 			return true
 		}
 
 		h.appendAttr(buf, attr, h.groupPrefix)
+
 		return true
 	})
 
 	if len(*buf) == 0 {
 		return nil
 	}
+
 	(*buf)[len(*buf)-1] = '\n' // replace last space with newline
 
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	_, err := h.w.Write(*buf)
+
 	return err
+}
+
+// appendHeader writes everything a record shows before its attributes: time,
+// level, source (or the prefix attribute standing in for it) and message.
+func (h *handler) appendHeader(buf *buffer, r slog.Record) {
+	h.appendRecordTime(buf, r)
+	h.appendRecordLevel(buf, r)
+	h.appendRecordSource(buf, r)
+	h.appendRecordMessage(buf, r)
+}
+
+// appendRecordTime writes the record time, unless it is zero or ReplaceAttr
+// drops it.
+func (h *handler) appendRecordTime(buf *buffer, r slog.Record) {
+	if r.Time.IsZero() {
+		return
+	}
+
+	if h.replaceAttr == nil {
+		h.appendTime(buf, r.Time)
+		_ = buf.WriteByte(' ')
+
+		return
+	}
+
+	val := r.Time.Round(0) // strip monotonic to match Attr behavior
+
+	a := h.replaceAttr(h.groups, slog.Time(slog.TimeKey, val))
+	if a.Key == "" {
+		return
+	}
+
+	if a.Value.Kind() == slog.KindTime {
+		h.appendTime(buf, r.Time)
+	} else {
+		appendValue(buf, a.Value, false)
+	}
+
+	_ = buf.WriteByte(' ')
+}
+
+// appendRecordLevel writes the record level, unless ReplaceAttr drops it.
+func (h *handler) appendRecordLevel(buf *buffer, r slog.Record) {
+	if h.replaceAttr == nil {
+		h.appendLevel(buf, r.Level)
+		_ = buf.WriteByte(' ')
+
+		return
+	}
+
+	a := h.replaceAttr(h.groups, slog.Int(slog.LevelKey, int(r.Level)))
+	if a.Key == "" {
+		return
+	}
+
+	if a.Value.Kind() == slog.KindInt64 {
+		h.appendLevel(buf, slog.Level(a.Value.Int64()))
+	} else {
+		appendValue(buf, a.Value, false)
+	}
+
+	_ = buf.WriteByte(' ')
+}
+
+// appendRecordSource writes the call site when AddSource is set. Without it the
+// record's "prefix" attribute takes that position, if it has one.
+func (h *handler) appendRecordSource(buf *buffer, r slog.Record) {
+	if !h.addSource {
+		h.appendPrefixAttr(buf, r)
+
+		return
+	}
+
+	fs := runtime.CallersFrames([]uintptr{r.PC})
+
+	f, _ := fs.Next()
+	if f.File == "" {
+		return
+	}
+
+	src := &slog.Source{
+		Function: f.Function,
+		File:     f.File,
+		Line:     f.Line,
+	}
+
+	if h.replaceAttr == nil {
+		h.appendSource(buf, src)
+		_ = buf.WriteByte(' ')
+
+		return
+	}
+
+	if a := h.replaceAttr(h.groups, slog.Any(slog.SourceKey, src)); a.Key != "" {
+		appendValue(buf, a.Value, false)
+		_ = buf.WriteByte(' ')
+	}
+}
+
+// appendPrefixAttr writes the record's "prefix" attribute, which stands in for
+// the source location when AddSource is off.
+func (h *handler) appendPrefixAttr(buf *buffer, r slog.Record) {
+	r.Attrs(func(attr slog.Attr) bool {
+		if attr.Key != prefixKey {
+			return true
+		}
+
+		h.appendSourceValue(buf, attr.Value)
+		_ = buf.WriteByte(' ')
+
+		// stop iteration
+		return false
+	})
+}
+
+// appendRecordMessage writes the message, unless ReplaceAttr drops it.
+func (h *handler) appendRecordMessage(buf *buffer, r slog.Record) {
+	if h.replaceAttr == nil {
+		_, _ = buf.WriteString(r.Message)
+		_ = buf.WriteByte(' ')
+
+		return
+	}
+
+	if a := h.replaceAttr(h.groups, slog.String(slog.MessageKey, r.Message)); a.Key != "" {
+		appendValue(buf, a.Value, false)
+		_ = buf.WriteByte(' ')
+	}
 }
 
 func (h *handler) WithAttrs(attrs []slog.Attr) slog.Handler {
@@ -291,7 +354,7 @@ func (h *handler) WithAttrs(attrs []slog.Attr) slog.Handler {
 			attr = h.replaceAttr(h.groups, attr)
 		}
 
-		if attr.Key == "prefix" {
+		if attr.Key == prefixKey {
 			continue
 		}
 
@@ -322,7 +385,12 @@ func (h *handler) appendLevel(buf *buffer, level slog.Level) {
 		if val == 0 {
 			return
 		}
-		_ = buf.WriteByte('+')
+
+		// AppendInt writes the sign for a negative delta itself
+		if val > 0 {
+			_ = buf.WriteByte('+')
+		}
+
 		*buf = strconv.AppendInt(*buf, int64(val), 10)
 	}
 

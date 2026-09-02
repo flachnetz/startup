@@ -36,7 +36,7 @@ func TestPartitionConsumer(t *testing.T) {
 
 	// t.Context() is cancelled when the test finishes; we wrap it so we can
 	// cancel the consumer ourselves once all expected messages arrived.
-	ctx, cancelContext := context.WithCancel(t.Context())
+	ctx, cancelContext := context.WithCancel(ctx)
 	defer cancelContext()
 
 	var (
@@ -283,99 +283,124 @@ func TestPartitionConsumer_OffsetCommittedOnShutdown(t *testing.T) {
 
 	groupID := fmt.Sprintf("offset-test-%d", time.Now().UnixNano())
 
-	newConsumer := func() *kafka.Consumer {
-		c, err := kafka.NewConsumer(&kafka.ConfigMap{
-			"group.id":              groupID,
-			"bootstrap.servers":     cluster.BootstrapServers,
-			"auto.offset.reset":     "earliest",
-			"session.timeout.ms":    3000,
-			"heartbeat.interval.ms": 1000,
-		})
-		require.NoError(t, err)
-		t.Cleanup(func() { _ = c.Close() })
-		return c
-	}
-
 	// First consumer: handle all 3 messages then shut down.
-	ctx1, cancel1 := context.WithCancel(t.Context())
-	defer cancel1()
+	drainThree(t, cluster, groupID, topic)
+
+	// Second consumer in the same group should not get any old messages. Send a
+	// new message so we can confirm the consumer is working.
+	cluster.Send(messageOf(topic, 0, "msg-3"))
+
+	values := readOnce(t, cluster, groupID, topic)
+
+	_, gotOld := values.Load("msg-0")
+	require.False(t, gotOld, "second consumer re-read msg-0; offset was not committed")
+	_, gotNew := values.Load("msg-3")
+	require.True(t, gotNew, "second consumer did not receive msg-3")
+}
+
+// drainThree consumes exactly three messages and then shuts the consumer down
+// cleanly, which is what should commit the offset.
+func drainThree(t *testing.T, cluster *testx.Kafka, groupID, topic string) {
+	t.Helper()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 
 	var count atomic.Int64
+
 	done := make(chan struct{})
 
-	pc1 := &PartitionConsumer{
-		Consumer: newConsumer(),
-		Topics:   []string{topic},
-	}
-
-	errCh := make(chan error, 1)
-	go func() {
-		_ = pc1.Consume(ctx1, func(ctx context.Context, msg *kafka.Message) error {
+	pc, _ := runConsumer(ctx, groupConsumer(t, cluster, groupID), topic,
+		func(ctx context.Context, msg *kafka.Message) error {
 			if count.Add(1) == 3 {
 				close(done)
 			}
+
 			return nil
 		})
-
-		// close the actual consumer
-		errCh <- pc1.Consumer.Close()
-	}()
 
 	select {
 	case <-done:
-		cancel1()
 	case <-time.After(15 * time.Second):
-		cancel1()
 		require.Fail(t, "first consumer timed out")
 	}
 
-	// wait for the consumer to be closed
-	<-errCh
+	cancel()
 
-	// Second consumer in the same group should not get any old messages.
-	// Send a new message so we can confirm the consumer is working.
-	cluster.Send(messageOf(topic, 0, "msg-3"))
+	// wait for Consume to return before closing the underlying consumer
+	require.Eventually(t, func() bool { return pc.Consumer.Close() == nil },
+		15*time.Second, 100*time.Millisecond)
+}
 
-	ctx2, cancel2 := context.WithCancel(t.Context())
-	defer cancel2()
+// readOnce consumes until the first message arrives, waits briefly for any
+// further (unwanted) message and returns everything it saw.
+func readOnce(t *testing.T, cluster *testx.Kafka, groupID, topic string) *sync.Map {
+	t.Helper()
 
-	var received2 atomic.Int64
-	var values2 sync.Map
-	done2 := make(chan struct{})
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 
-	pc2 := &PartitionConsumer{
-		Consumer: newConsumer(),
-		Topics:   []string{topic},
-	}
+	var (
+		received atomic.Int64
+		values   sync.Map
+	)
 
-	errCh2 := make(chan error, 1)
-	go func() {
-		errCh2 <- pc2.Consume(ctx2, func(ctx context.Context, msg *kafka.Message) error {
-			values2.Store(string(msg.Value), true)
-			if received2.Add(1) == 1 {
-				close(done2)
+	done := make(chan struct{})
+
+	_, errCh := runConsumer(ctx, groupConsumer(t, cluster, groupID), topic,
+		func(ctx context.Context, msg *kafka.Message) error {
+			values.Store(string(msg.Value), true)
+
+			if received.Add(1) == 1 {
+				close(done)
 			}
+
 			return nil
 		})
-	}()
 
 	select {
-	case <-done2:
+	case <-done:
 		// Give a brief moment for any extra (unwanted) messages to arrive.
 		time.Sleep(500 * time.Millisecond)
-		cancel2()
 	case <-time.After(15 * time.Second):
-		cancel2()
 		require.Fail(t, "second consumer timed out")
 	}
 
-	<-errCh2
+	cancel()
+	<-errCh
 
-	// The second consumer should only have received msg-3.
-	_, gotOld := values2.Load("msg-0")
-	require.False(t, gotOld, "second consumer re-read msg-0; offset was not committed")
-	_, gotNew := values2.Load("msg-3")
-	require.True(t, gotNew, "second consumer did not receive msg-3")
+	return &values
+}
+
+// groupConsumer creates a consumer in groupID against the test cluster. It is
+// closed on test cleanup.
+func groupConsumer(t *testing.T, cluster *testx.Kafka, groupID string) *kafka.Consumer {
+	t.Helper()
+
+	c, err := kafka.NewConsumer(&kafka.ConfigMap{
+		"group.id":              groupID,
+		"bootstrap.servers":     cluster.BootstrapServers,
+		"auto.offset.reset":     "earliest",
+		"session.timeout.ms":    3000,
+		"heartbeat.interval.ms": 1000,
+	})
+	require.NoError(t, err)
+
+	t.Cleanup(func() { _ = c.Close() })
+
+	return c
+}
+
+// runConsumer runs a PartitionConsumer for topic in the background and returns
+// both the consumer and the channel carrying Consume's result.
+func runConsumer(ctx context.Context, consumer *kafka.Consumer, topic string, handle HandleMessage) (*PartitionConsumer, <-chan error) {
+	pc := &PartitionConsumer{Consumer: consumer, Topics: []string{topic}}
+
+	errCh := make(chan error, 1)
+
+	go func() { errCh <- pc.Consume(ctx, handle) }()
+
+	return pc, errCh
 }
 
 // TestPartitionConsumer_Rebalance verifies that when a second consumer joins the
@@ -389,19 +414,6 @@ func TestPartitionConsumer_Rebalance(t *testing.T) {
 
 	groupID := fmt.Sprintf("rebalance-test-%d", time.Now().UnixNano())
 
-	newConsumer := func() *kafka.Consumer {
-		c, err := kafka.NewConsumer(&kafka.ConfigMap{
-			"group.id":              groupID,
-			"bootstrap.servers":     cluster.BootstrapServers,
-			"auto.offset.reset":     "earliest",
-			"session.timeout.ms":    3000,
-			"heartbeat.interval.ms": 1000,
-		})
-		require.NoError(t, err)
-		t.Cleanup(func() { _ = c.Close() })
-		return c
-	}
-
 	// Pre-produce messages to both partitions.
 	for i := range 10 {
 		cluster.Send(messageOf(topic, i%2, fmt.Sprintf("msg-%d", i)))
@@ -410,50 +422,38 @@ func TestPartitionConsumer_Rebalance(t *testing.T) {
 	// Allow producer to flush.
 	time.Sleep(200 * time.Millisecond)
 
-	// First consumer handles messages.
 	ctx1, cancel1 := context.WithCancel(t.Context())
 	defer cancel1()
 
 	var handled1 atomic.Int64
-	pc1 := &PartitionConsumer{
-		Consumer: newConsumer(),
-		Topics:   []string{topic},
-	}
 
-	errCh1 := make(chan error, 1)
-	go func() {
-		errCh1 <- pc1.Consume(ctx1, func(ctx context.Context, msg *kafka.Message) error {
+	_, errCh1 := runConsumer(ctx1, groupConsumer(t, cluster, groupID), topic,
+		func(ctx context.Context, msg *kafka.Message) error {
 			handled1.Add(1)
+
 			return nil
 		})
-	}()
 
-	// Wait until first consumer has handled some messages.
-	require.Eventually(t, func() bool {
-		return handled1.Load() >= 5
-	}, 10*time.Second, 50*time.Millisecond)
+	// Wait until the first consumer has handled some messages.
+	require.Eventually(t, func() bool { return handled1.Load() >= 5 },
+		10*time.Second, 50*time.Millisecond)
 
 	time.Sleep(10 * time.Second)
 
-	// Now start a second consumer in the same group to trigger rebalance.
+	// Now start a second consumer in the same group to trigger a rebalance.
 	ctx2, cancel2 := context.WithCancel(t.Context())
 	defer cancel2()
 
 	var handled2Values sync.Map
-	pc2 := &PartitionConsumer{
-		Consumer: newConsumer(),
-		Topics:   []string{topic},
-	}
 
-	errCh2 := make(chan error, 1)
-	go func() {
-		errCh2 <- pc2.Consume(ctx2, func(ctx context.Context, msg *kafka.Message) error {
+	_, errCh2 := runConsumer(ctx2, groupConsumer(t, cluster, groupID), topic,
+		func(ctx context.Context, msg *kafka.Message) error {
 			handled2Values.Store(string(msg.Value), true)
+
 			return nil
 		})
-	}()
 
-	// Give time for rebalance and second consumer to process.
+	// Give time for the rebalance and the second consumer to process.
 	time.Sleep(5 * time.Second)
 
 	cancel1()
@@ -467,9 +467,12 @@ func TestPartitionConsumer_Rebalance(t *testing.T) {
 	// duplicates. We can't perfectly assert zero duplicates with at-least-once
 	// semantics, but we can confirm the second consumer didn't start from zero.
 	totalHandled := handled1.Load()
+
 	var handled2Count int64
+
 	handled2Values.Range(func(_, _ any) bool {
 		handled2Count++
+
 		return true
 	})
 
@@ -484,7 +487,7 @@ func messageOf(topic string, partition int, payload string) *kafka.Message {
 	return &kafka.Message{
 		TopicPartition: kafka.TopicPartition{
 			Topic:     new(topic),
-			Partition: int32(partition),
+			Partition: int32(partition), // #nosec G115 -- test partition numbers are small
 		},
 		Value: []byte(payload),
 	}
