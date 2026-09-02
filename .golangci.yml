@@ -1,0 +1,75 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+formatters:
+  enable:
+    - gofumpt
+
+linters:
+  enable:
+    # Default
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    # Security
+    - gosec
+    # Bugs
+    - nilerr
+    # Style & maintainability
+    #- revive
+    - goconst
+    - gocritic
+    - misspell
+    - prealloc
+    - unconvert
+    - unparam
+    - funlen
+    - gocognit
+    - errname
+
+  settings:
+    govet:
+      # The 'inline' analyser wants single-use type aliases replaced by the
+      # aliased type. internal/history re-exports lib/history types on purpose,
+      # so handlers never import lib/history directly; inlining them would undo
+      # that boundary.
+      disable:
+        - inline
+    funlen:
+      lines: 80
+      statements: 60
+    gocognit:
+      min-complexity: 20
+    goconst:
+      min-len: 3
+      min-occurrences: 3
+    revive:
+      rules:
+        - name: exported
+        - name: var-naming
+        - name: error-return
+        - name: error-naming
+        - name: receiver-naming
+        - name: increment-decrement
+        - name: range
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: blank-imports
+        - name: unexported-return
+    gosec:
+      excludes: []
+
+  exclusions:
+    rules:
+      # Test files: duplicate literals are test data, not magic strings.
+      - path: _test\.go
+        linters:
+          - goconst
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

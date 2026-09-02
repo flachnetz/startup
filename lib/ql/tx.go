@@ -185,8 +185,7 @@ func requiresTxRollback(err error) (error, bool) {
 
 	// user does not want to rollback but still wants
 	// to return an error to the caller
-	var nrtxerr noRollbackTxError
-	if errors.As(err, &nrtxerr) {
+	if nrtxerr, ok := errors.AsType[noRollbackTxError](err); ok {
 		return nrtxerr.wrapped, false
 	}
 

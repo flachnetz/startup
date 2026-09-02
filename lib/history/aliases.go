@@ -37,13 +37,13 @@ const PageParam = boff.PageParam
 // RenderOverview forwards to boff.RenderOverview.
 //
 //go:fix inline
-func RenderOverview(w io.Writer, title string, headers []string, rows []OverviewRow) error {
+func RenderOverview(w io.Writer, title string, headers []string, rows []boff.OverviewRow) error {
 	return boff.RenderOverview(w, title, headers, rows)
 }
 
 // RenderOverviewWithConfig forwards to boff.RenderOverviewWithConfig.
 //
 //go:fix inline
-func RenderOverviewWithConfig(w io.Writer, cfg OverviewConfig) error {
+func RenderOverviewWithConfig(w io.Writer, cfg boff.OverviewConfig) error {
 	return boff.RenderOverviewWithConfig(w, cfg)
 }

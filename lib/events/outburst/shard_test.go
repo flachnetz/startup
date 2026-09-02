@@ -13,7 +13,7 @@ func TestShardFor(t *testing.T) {
 	// a given key must always resolve to the same shard
 	k := sql.NullString{String: "offer-42", Valid: true}
 	got := shardFor(k, n)
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		if s := shardFor(k, n); s != got {
 			t.Fatalf("non-deterministic shard: %d != %d", s, got)
 		}

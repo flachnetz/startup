@@ -1,0 +1,15 @@
+#!/bin/bash
+
+set -e
+
+echo "Running fixes..."
+
+# Format code
+echo "Formatting code..."
+gofumpt -l -w .
+
+# Tidy modules
+echo "Tidying modules..."
+go mod tidy
+
+echo "Fixes applied!"

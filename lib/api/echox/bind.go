@@ -45,7 +45,7 @@ func makeValidator() echoValidator {
 
 	v.RegisterTagNameFunc(func(fld reflect.StructField) string {
 		// Split the JSON tag at the first comma
-		name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
+		name, _, _ := strings.Cut(fld.Tag.Get("json"), ",")
 
 		// If the JSON tag is "-" (meaning "don't include this field in JSON"),
 		// return an empty string so the validator uses the original field name
