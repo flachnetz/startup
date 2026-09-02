@@ -105,7 +105,7 @@ func withRenderContext(tmpl *template.Template, rc RenderContext) *template.Temp
 type HTMLBlock template.HTML
 
 func (b HTMLBlock) Render(RenderContext) (template.HTML, error) {
-	return template.HTML(b), nil
+	return template.HTML(b), nil //nolint:gosec // HTMLBlock is pre-rendered markup by contract
 }
 
 // BlockFunc adapts a plain function to a Block, so a one-off block needs no

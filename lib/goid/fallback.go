@@ -36,7 +36,7 @@ func getViaStack() Id {
 		panic(fmt.Sprintf("No space found in %q", bClone))
 	}
 
-	str := unsafe.String(&b[0], i)
+	str := unsafe.String(&b[0], i) // #nosec G103 -- audited: b is a live stack buffer, i is within bounds
 
 	n, err := strconv.ParseUint(str, 10, 64)
 	if err != nil {

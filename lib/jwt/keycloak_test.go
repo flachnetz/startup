@@ -283,7 +283,7 @@ func TestKeycloakRoleMiddleware_DevActorCookieInDevelopment(t *testing.T) {
 	t.Cleanup(func() { startup_base.SetEnvironment("") })
 
 	rec := callWith(t, []string{jwt.RoleAdmin}, func(r *http.Request) {
-		r.AddCookie(&http.Cookie{Name: jwt.DevActorName, Value: "bob@example.com"})
+		r.AddCookie(&http.Cookie{Name: jwt.DevActorName, Value: "bob@example.com", HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
 	})
 
 	require.Equal(t, http.StatusOK, rec.Code)

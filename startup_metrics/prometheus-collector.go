@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/flachnetz/startup/v2/startup_http"
 	"github.com/gorilla/handlers"
@@ -36,8 +37,9 @@ func startPrometheusMetrics(opts PrometheusConfig) *http.Server {
 	mux.Handle(opts.Path, handler)
 
 	opts.httpServer = &http.Server{
-		Addr:    opts.Port,
-		Handler: mux,
+		Addr:              opts.Port,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	go func() {

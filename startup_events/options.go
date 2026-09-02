@@ -115,5 +115,5 @@ func fileSender(file string) (io.WriteCloser, error) {
 		return nil, nil
 	}
 
-	return os.OpenFile(file, os.O_CREATE|os.O_WRONLY, 0o644)
+	return os.OpenFile(file, os.O_CREATE|os.O_WRONLY, 0o644) // #nosec G304 G302 -- event dump path comes from operator configuration
 }

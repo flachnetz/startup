@@ -46,7 +46,7 @@ func BreadcrumbRemote(key string) Breadcrumb {
 // BreadcrumbRemoteWithLabel creates a Breadcrumb for an ancestor resource whose
 // label is known to the calling service, but whose path is not. It will be
 // rendered without a link unless a cached entry with the same Key is
-// already known. BreadcrumbRemote should be prefered.
+// already known. BreadcrumbRemote should be preferred.
 func BreadcrumbRemoteWithLabel(key, label string) Breadcrumb {
 	return Breadcrumb{Key: key, Label: label}
 }

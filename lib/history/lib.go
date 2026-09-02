@@ -462,7 +462,7 @@ func (ids GroupIds) FirstOf(ty string) GroupId {
 
 // Strings returns all GroupId values mapped to strings
 func (ids GroupIds) Strings() []string {
-	var strings []string
+	strings := make([]string, 0, len(ids))
 	for _, groupId := range ids {
 		strings = append(strings, groupId.String())
 	}

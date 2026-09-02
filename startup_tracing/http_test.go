@@ -14,106 +14,108 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-func TestResourceOf(t *testing.T) {
-	cases := []struct {
-		name   string
-		method string
-		rawURL string
-		want   string
-	}{
-		{
-			name:   "host and query are dropped",
-			method: "POST",
-			rawURL: "http://api-gateway-internal.platform.svc.cluster.local/payments/v1/sessions?debug=1",
-			want:   "POST /payments/v1/sessions",
-		},
-		{
-			name:   "uuid is named after its collection",
-			method: "GET",
-			rawURL: "http://host/orders/v1/orders/3f1a2b4c-1111-4222-8333-444455556666",
-			want:   "GET /orders/v1/orders/ORDER_ID",
-		},
-		{
-			name:   "id in the middle keeps the trailing segments",
-			method: "PUT",
-			rawURL: "http://host/orders/3f1a2b4c-1111-4222-8333-444455556666/config",
-			want:   "PUT /orders/ORDER_ID/config",
-		},
-		{
-			name:   "numeric id is named after its collection",
-			method: "DELETE",
-			rawURL: "http://host/limits/v1/reservations/4711",
-			want:   "DELETE /limits/v1/reservations/RESERVATION_ID",
-		},
-		{
-			name:   "two ids in one path stay distinguishable",
-			method: "GET",
-			rawURL: "http://host/orders/4711/items/0815",
-			want:   "GET /orders/ORDER_ID/items/ITEM_ID",
-		},
-		{
-			name:   "opaque hex token is an id too",
-			method: "GET",
-			rawURL: "http://host/payments/v1/sessions/a1b2c3d4e5f60718",
-			want:   "GET /payments/v1/sessions/SESSION_ID",
-		},
-		{
-			name:   "ulid is an id",
-			method: "GET",
-			rawURL: "http://host/v1/orders/01ARZ3NDEKTSV4RRFFQ69G5FAV",
-			want:   "GET /v1/orders/ORDER_ID",
-		},
-		{
-			name:   "lowercase ulid is an id",
-			method: "GET",
-			rawURL: "http://host/v1/orders/01arz3ndektsv4rrffq69g5fav",
-			want:   "GET /v1/orders/ORDER_ID",
-		},
-		{
-			name:   "ksuid is an id",
-			method: "GET",
-			rawURL: "http://host/v1/payments/0ujsswThIGTUYm2K8FjOOfXtY1K",
-			want:   "GET /v1/payments/PAYMENT_ID",
-		},
-		{
-			name:   "uppercase uuid is an id",
-			method: "GET",
-			rawURL: "http://host/v1/orders/3F1A2B4C-1111-4222-8333-444455556666",
-			want:   "GET /v1/orders/ORDER_ID",
-		},
-		{
-			name:   "a plain word is not an id",
-			method: "POST",
-			rawURL: "http://host/v1/orders/checkout",
-			want:   "POST /v1/orders/checkout",
-		},
-		{
-			name:   "long dashed word stays literal",
-			method: "GET",
-			rawURL: "http://host/v1/orders/unsubscribe-confirmation-page",
-			want:   "GET /v1/orders/unsubscribe-confirmation-page",
-		},
-		{
-			name:   "known collection normalises a slug id",
-			method: "GET",
-			rawURL: "http://host/v1/tenants/bmg-portugal/config",
-			want:   "GET /v1/tenants/TENANT_ID/config",
-		},
-		{
-			name:   "version segment is not an id",
-			method: "GET",
-			rawURL: "http://host/v1/orders",
-			want:   "GET /v1/orders",
-		},
-		{
-			name:   "empty path becomes root",
-			method: "GET",
-			rawURL: "http://host",
-			want:   "GET /",
-		},
-	}
+// resourceOfCases lives outside the test so the table stays readable and the
+// test body keeps to the loop.
+var resourceOfCases = []struct {
+	name   string
+	method string
+	rawURL string
+	want   string
+}{
+	{
+		name:   "host and query are dropped",
+		method: "POST",
+		rawURL: "http://api-gateway-internal.platform.svc.cluster.local/payments/v1/sessions?debug=1",
+		want:   "POST /payments/v1/sessions",
+	},
+	{
+		name:   "uuid is named after its collection",
+		method: "GET",
+		rawURL: "http://host/orders/v1/orders/3f1a2b4c-1111-4222-8333-444455556666",
+		want:   "GET /orders/v1/orders/ORDER_ID",
+	},
+	{
+		name:   "id in the middle keeps the trailing segments",
+		method: "PUT",
+		rawURL: "http://host/orders/3f1a2b4c-1111-4222-8333-444455556666/config",
+		want:   "PUT /orders/ORDER_ID/config",
+	},
+	{
+		name:   "numeric id is named after its collection",
+		method: "DELETE",
+		rawURL: "http://host/limits/v1/reservations/4711",
+		want:   "DELETE /limits/v1/reservations/RESERVATION_ID",
+	},
+	{
+		name:   "two ids in one path stay distinguishable",
+		method: "GET",
+		rawURL: "http://host/orders/4711/items/0815",
+		want:   "GET /orders/ORDER_ID/items/ITEM_ID",
+	},
+	{
+		name:   "opaque hex token is an id too",
+		method: "GET",
+		rawURL: "http://host/payments/v1/sessions/a1b2c3d4e5f60718",
+		want:   "GET /payments/v1/sessions/SESSION_ID",
+	},
+	{
+		name:   "ulid is an id",
+		method: "GET",
+		rawURL: "http://host/v1/orders/01ARZ3NDEKTSV4RRFFQ69G5FAV",
+		want:   "GET /v1/orders/ORDER_ID",
+	},
+	{
+		name:   "lowercase ulid is an id",
+		method: "GET",
+		rawURL: "http://host/v1/orders/01arz3ndektsv4rrffq69g5fav",
+		want:   "GET /v1/orders/ORDER_ID",
+	},
+	{
+		name:   "ksuid is an id",
+		method: "GET",
+		rawURL: "http://host/v1/payments/0ujsswThIGTUYm2K8FjOOfXtY1K",
+		want:   "GET /v1/payments/PAYMENT_ID",
+	},
+	{
+		name:   "uppercase uuid is an id",
+		method: "GET",
+		rawURL: "http://host/v1/orders/3F1A2B4C-1111-4222-8333-444455556666",
+		want:   "GET /v1/orders/ORDER_ID",
+	},
+	{
+		name:   "a plain word is not an id",
+		method: "POST",
+		rawURL: "http://host/v1/orders/checkout",
+		want:   "POST /v1/orders/checkout",
+	},
+	{
+		name:   "long dashed word stays literal",
+		method: "GET",
+		rawURL: "http://host/v1/orders/unsubscribe-confirmation-page",
+		want:   "GET /v1/orders/unsubscribe-confirmation-page",
+	},
+	{
+		name:   "known collection normalises a slug id",
+		method: "GET",
+		rawURL: "http://host/v1/tenants/bmg-portugal/config",
+		want:   "GET /v1/tenants/TENANT_ID/config",
+	},
+	{
+		name:   "version segment is not an id",
+		method: "GET",
+		rawURL: "http://host/v1/orders",
+		want:   "GET /v1/orders",
+	},
+	{
+		name:   "empty path becomes root",
+		method: "GET",
+		rawURL: "http://host",
+		want:   "GET /",
+	},
+}
 
-	for _, c := range cases {
+func TestResourceOf(t *testing.T) {
+	for _, c := range resourceOfCases {
 		t.Run(c.name, func(t *testing.T) {
 			u, err := url.Parse(c.rawURL)
 			require.NoError(t, err)
@@ -141,7 +143,7 @@ func TestTracingRoundTripper_SpanNamedAfterRequest(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	var names []string
+	names := make([]string, 0, len(recorder.Ended()))
 	for _, span := range recorder.Ended() {
 		names = append(names, span.Name())
 	}
@@ -166,7 +168,7 @@ func TestTracing_ServerSpanNamedAfterRequest(t *testing.T) {
 
 	attrs := map[string]string{}
 	for _, kv := range ended[0].Attributes() {
-		attrs[string(kv.Key)] = kv.Value.Emit()
+		attrs[string(kv.Key)] = kv.Value.String()
 	}
 	assert.Equal(t, "serve", attrs["operation"], "op stays queryable as an attribute")
 	assert.Equal(t, "GET /v1/orders/ORDER_ID", attrs["resource.name"])
@@ -211,7 +213,7 @@ func TestTracing_ServerSpanIsCreatedForAPropagatedRequest(t *testing.T) {
 
 	attrs := map[string]string{}
 	for _, kv := range ended[0].Attributes() {
-		attrs[string(kv.Key)] = kv.Value.Emit()
+		attrs[string(kv.Key)] = kv.Value.String()
 	}
 	assert.Equal(t, "order-service", attrs["peer.service"])
 	assert.Equal(t, "200", attrs["http.status_code"])

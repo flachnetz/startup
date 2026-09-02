@@ -292,7 +292,7 @@ func TestSummaryStacksSeveralItemRows(t *testing.T) {
 	}
 	// Order is the order given.
 	first, second, third := strings.Index(out, "Item 0"), strings.Index(out, "Item 1"), strings.Index(out, "Item 2")
-	if !(first < second && second < third) {
+	if first >= second || second >= third {
 		t.Errorf("item rows are out of order:\n%s", out)
 	}
 }

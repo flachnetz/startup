@@ -22,7 +22,7 @@ func (h *RequestTraceId) Scan(src any) error {
 	traceId, err := trace.TraceIDFromHex(hex)
 	if err != nil {
 		// '00' placeholder or any other non-trace value: treat as no trace id.
-		return nil
+		return nil //nolint:nilerr // an unparsable value means "no trace id", not a scan failure
 	}
 
 	h.traceId = traceId

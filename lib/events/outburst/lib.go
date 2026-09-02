@@ -465,7 +465,7 @@ func sweepOutbox(ctx context.Context, db outboxDB, producer *kafka.Producer, bat
 		}
 	}()
 
-	startup_tracing.Trace(ctx, "RunSweap", func(ctx context.Context, span trace.Span) error {
+	_ = startup_tracing.Trace(ctx, "RunSweap", func(ctx context.Context, span trace.Span) error {
 		limit := batchSize
 
 		for {
@@ -611,6 +611,7 @@ func publishToKafka(ctx context.Context, producer *kafka.Producer, rows []Messag
 
 	sendType := "single"
 	operation := "publishSingle"
+
 	if batch {
 		sendType = "batch"
 		operation = "publishBatch"
@@ -620,65 +621,94 @@ func publishToKafka(ctx context.Context, producer *kafka.Producer, rows []Messag
 
 	return startup_tracing.Trace(ctx, operation, func(ctx context.Context, span trace.Span) error {
 		for _, row := range rows {
-			var key []byte
-			if row.Key.Valid && len(row.Key.String) > 0 {
-				key = []byte(row.Key.String)
-			}
-
-			var headers []kafka.Header
-			if len(row.HeaderKeys) > 0 && len(row.HeaderValues) > 0 {
-				for idx, hk := range row.HeaderKeys {
-					headers = append(headers, kafka.Header{Key: hk, Value: []byte(row.HeaderValues[idx])})
-				}
-			}
-
-			msg := &kafka.Message{
-				TopicPartition: kafka.TopicPartition{Topic: &row.Topic, Partition: kafka.PartitionAny},
-				Value:          row.Value,
-				Key:            key,
-				Timestamp:      row.Timestamp,
-				Headers:        headers,
-			}
-
 			debugLog(ctx, slog.Default(), "Producing message", "id", row.ID)
 
-			if err := producer.Produce(msg, deliveries); err != nil {
+			if err := producer.Produce(kafkaMessageOf(row), deliveries); err != nil {
 				return fmt.Errorf("produce message %d: %w", row.ID, err)
 			}
+
 			eventsCounter.WithLabelValues(row.Topic, sendType).Inc()
 		}
 
-		debugLog(ctx, slog.Default(), "Awaiting delivery reports")
-		for range rows {
-			var ev kafka.Event
-			select {
-			case ev = <-deliveries:
-			case <-ctx.Done():
-				// Don't hold the transaction open forever if delivery stalls.
-				return ctx.Err()
-			}
-
-			debugLog(ctx, slog.Default(), "Delivery report", "event", ev)
-
-			switch e := ev.(type) {
-			case *kafka.Message:
-				if e.TopicPartition.Error != nil {
-					return fmt.Errorf("delivery failed for partition %d: %w",
-						e.TopicPartition.Partition, e.TopicPartition.Error)
-				}
-			case kafka.Error:
-				return fmt.Errorf("sending kafka event: %w", e)
-			case error:
-				return fmt.Errorf("sending kafka event: %w", e)
-			default:
-				// Unknown event type: fail closed so the row is retried instead
-				// of being deleted as if it had been delivered.
-				return fmt.Errorf("unexpected delivery event %T: %v", ev, ev)
-			}
-		}
-		debugLog(ctx, slog.Default(), "All deliveries confirmed")
-		return nil
+		return awaitDeliveries(ctx, deliveries, len(rows))
 	})
+}
+
+// kafkaMessageOf turns one outbox row into the message to produce. An absent or
+// empty key stays nil, so the broker partitions the message round-robin instead
+// of keying it on an empty string.
+func kafkaMessageOf(row Message) *kafka.Message {
+	var key []byte
+	if row.Key.Valid && len(row.Key.String) > 0 {
+		key = []byte(row.Key.String)
+	}
+
+	headers := make([]kafka.Header, 0, len(row.HeaderKeys))
+
+	if len(row.HeaderKeys) > 0 && len(row.HeaderValues) > 0 {
+		for idx, hk := range row.HeaderKeys {
+			headers = append(headers, kafka.Header{Key: hk, Value: []byte(row.HeaderValues[idx])})
+		}
+	}
+
+	return &kafka.Message{
+		TopicPartition: kafka.TopicPartition{Topic: &row.Topic, Partition: kafka.PartitionAny},
+		Value:          row.Value,
+		Key:            key,
+		Timestamp:      row.Timestamp,
+		Headers:        headers,
+	}
+}
+
+// awaitDeliveries waits for exactly count delivery reports and fails on the
+// first one that is not a successful delivery.
+func awaitDeliveries(ctx context.Context, deliveries <-chan kafka.Event, count int) error {
+	debugLog(ctx, slog.Default(), "Awaiting delivery reports")
+
+	for range count {
+		var ev kafka.Event
+
+		select {
+		case ev = <-deliveries:
+		case <-ctx.Done():
+			// Don't hold the transaction open forever if delivery stalls.
+			return ctx.Err()
+		}
+
+		debugLog(ctx, slog.Default(), "Delivery report", "event", ev)
+
+		if err := deliveryError(ev); err != nil {
+			return err
+		}
+	}
+
+	debugLog(ctx, slog.Default(), "All deliveries confirmed")
+
+	return nil
+}
+
+// deliveryError reports why a delivery report is not a confirmed delivery, or
+// nil when the message was delivered. An unknown event type fails closed, so the
+// row is retried instead of being deleted as if it had been delivered.
+func deliveryError(ev kafka.Event) error {
+	switch e := ev.(type) {
+	case *kafka.Message:
+		if e.TopicPartition.Error != nil {
+			return fmt.Errorf("delivery failed for partition %d: %w",
+				e.TopicPartition.Partition, e.TopicPartition.Error)
+		}
+
+		return nil
+
+	case kafka.Error:
+		return fmt.Errorf("sending kafka event: %w", e)
+
+	case error:
+		return fmt.Errorf("sending kafka event: %w", e)
+
+	default:
+		return fmt.Errorf("unexpected delivery event %T: %v", ev, ev)
+	}
 }
 
 // Message is a single outbox row ready to be published to Kafka.

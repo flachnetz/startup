@@ -25,7 +25,7 @@ func (c Cleanup) Run(ctx context.Context, service *Service) {
 		// wait until we start the next cleanup run
 		delay := c.Interval
 		if c.Jitter > 0 {
-			delay += time.Duration(rand.Intn(int(c.Jitter)))
+			delay += time.Duration(rand.Intn(int(c.Jitter))) // #nosec G404 -- cleanup jitter, not security relevant
 		}
 
 		select {

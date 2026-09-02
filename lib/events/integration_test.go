@@ -55,7 +55,7 @@ func TestSendAsync_DeliversToKafka(t *testing.T) {
 		64,
 	)
 	require.NoError(t, err)
-	defer initializer.Close()
+	defer func() { _ = initializer.Close() }()
 
 	t.Log("Initialize")
 	sender, err := initializer.Initialize()
@@ -125,7 +125,7 @@ func TestSendAsync_PropagatesTraceContext(t *testing.T) {
 		64,
 	)
 	require.NoError(t, err)
-	defer initializer.Close()
+	defer func() { _ = initializer.Close() }()
 
 	sender, err := initializer.Initialize()
 	require.NoError(t, err)

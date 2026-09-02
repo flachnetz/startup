@@ -42,7 +42,7 @@ func (u ULID) MarshalText() (text []byte, err error) {
 }
 
 func (u ULID) Timestamp() time.Time {
-	return time.UnixMilli(int64(ulid.ULID(u).Time()))
+	return time.UnixMilli(int64(ulid.ULID(u).Time())) // #nosec G115 -- ULID timestamps are 48-bit millisecond values
 }
 
 //goland:noinspection GoMixedReceiverTypes

@@ -109,6 +109,7 @@ func asEventType[T Event](event Event) (T, bool) {
 type EventHeaders []EventHeader
 
 func (headers EventHeaders) ToKafka() []kafka.Header {
+	//nolint:prealloc // a nil result is part of the contract, see TestEventHeaders_ToKafka_Nil
 	var result []kafka.Header
 
 	for _, header := range headers {

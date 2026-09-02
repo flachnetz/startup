@@ -52,7 +52,7 @@ func (t timeoutError) Error() string {
 }
 
 func timeoutErrorFailPoints(durations []int) []FailPoint {
-	var result []FailPoint
+	result := make([]FailPoint, 0, len(durations))
 	for _, v := range durations {
 		name := fmt.Sprintf("timeout_%02d_seconds", v*int(time.Second.Seconds()))
 		result = append(result, FailPoint{
@@ -165,7 +165,7 @@ func (f *FailPointService) GetFailPointLocations() map[FailPointLocation]FailPoi
 func (f *FailPointService) GetFailPoints() []FailPoint {
 	f.failPointsLock.Lock()
 	defer f.failPointsLock.Unlock()
-	var resp []FailPoint
+	resp := make([]FailPoint, 0, len(f.failPoints))
 	resp = append(resp, f.failPoints...)
 	return resp
 }

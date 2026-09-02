@@ -3,97 +3,104 @@ package startup
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
 	goflags "github.com/jessevdk/go-flags"
+	"github.com/stretchr/testify/require"
 )
 
 type testStruct struct {
 	PostgresURL string `long:"postgres-url" env:"POSTGRES_URL" description:"Read data from postgres."`
 }
 
+// parseArgs is one command line invocation for the table below.
+type parseArgs struct {
+	opts       testStruct
+	options    goflags.Options
+	osArgs     []string
+	nonPointer bool
+}
+
+// parseCases lives outside the test so the table stays readable and the test
+// body keeps to the loop.
+var parseCases = []struct {
+	name       string
+	args       parseArgs
+	wantErr    bool
+	checkError func(t *testing.T, err error)
+}{
+	{
+		name: "ignored args",
+		args: parseArgs{
+			opts:    testStruct{PostgresURL: "url"},
+			options: goflags.IgnoreUnknown,
+			osArgs:  []string{"cmd", "-user=bla", "--postgres-url=fancyurl"},
+		},
+		wantErr: false,
+	},
+	{
+		name: "valid args",
+		args: parseArgs{
+			opts:    testStruct{},
+			options: goflags.HelpFlag | goflags.PassDoubleDash,
+			osArgs:  []string{"cmd", "--postgres-url=myurl"},
+		},
+		wantErr: false,
+	},
+	{
+		name: "help flag returns flags.Error with ErrHelp",
+		args: parseArgs{
+			opts:    testStruct{},
+			options: goflags.HelpFlag,
+			osArgs:  []string{"cmd", "--help"},
+		},
+		wantErr: true,
+		checkError: func(t *testing.T, err error) {
+			t.Helper()
+			var flagsErr *goflags.Error
+			if !errors.As(err, &flagsErr) {
+				t.Fatalf("expected *flags.Error, got %T", err)
+			}
+			if flagsErr.Type != goflags.ErrHelp {
+				t.Errorf("expected ErrHelp, got %v", flagsErr.Type)
+			}
+		},
+	},
+	{
+		name: "unknown flag without IgnoreUnknown returns error",
+		args: parseArgs{
+			opts:    testStruct{},
+			options: goflags.HelpFlag | goflags.PassDoubleDash,
+			osArgs:  []string{"cmd", "--unknown-flag=value"},
+		},
+		wantErr: true,
+		checkError: func(t *testing.T, err error) {
+			t.Helper()
+			var flagsErr *goflags.Error
+			if !errors.As(err, &flagsErr) {
+				t.Fatalf("expected *flags.Error, got %T", err)
+			}
+			if flagsErr.Type == goflags.ErrHelp {
+				t.Error("expected non-help error type")
+			}
+		},
+	},
+	{
+		name: "non-pointer opts returns error",
+		args: parseArgs{
+			opts:       testStruct{},
+			options:    goflags.HelpFlag,
+			osArgs:     []string{"cmd"},
+			nonPointer: true,
+		},
+		wantErr: true,
+	},
+}
+
 func TestParseCommandLineWithOptions(t *testing.T) {
-	type args struct {
-		opts       testStruct
-		options    goflags.Options
-		osArgs     []string
-		nonPointer bool
-	}
-	tests := []struct {
-		name       string
-		args       args
-		wantErr    bool
-		checkError func(t *testing.T, err error)
-	}{
-		{
-			name: "ignored args",
-			args: args{
-				opts:    testStruct{PostgresURL: "url"},
-				options: goflags.IgnoreUnknown,
-				osArgs:  []string{"cmd", "-user=bla", "--postgres-url=fancyurl"},
-			},
-			wantErr: false,
-		},
-		{
-			name: "valid args",
-			args: args{
-				opts:    testStruct{},
-				options: goflags.HelpFlag | goflags.PassDoubleDash,
-				osArgs:  []string{"cmd", "--postgres-url=myurl"},
-			},
-			wantErr: false,
-		},
-		{
-			name: "help flag returns flags.Error with ErrHelp",
-			args: args{
-				opts:    testStruct{},
-				options: goflags.HelpFlag,
-				osArgs:  []string{"cmd", "--help"},
-			},
-			wantErr: true,
-			checkError: func(t *testing.T, err error) {
-				t.Helper()
-				var flagsErr *goflags.Error
-				if !errors.As(err, &flagsErr) {
-					t.Fatalf("expected *flags.Error, got %T", err)
-				}
-				if flagsErr.Type != goflags.ErrHelp {
-					t.Errorf("expected ErrHelp, got %v", flagsErr.Type)
-				}
-			},
-		},
-		{
-			name: "unknown flag without IgnoreUnknown returns error",
-			args: args{
-				opts:    testStruct{},
-				options: goflags.HelpFlag | goflags.PassDoubleDash,
-				osArgs:  []string{"cmd", "--unknown-flag=value"},
-			},
-			wantErr: true,
-			checkError: func(t *testing.T, err error) {
-				t.Helper()
-				var flagsErr *goflags.Error
-				if !errors.As(err, &flagsErr) {
-					t.Fatalf("expected *flags.Error, got %T", err)
-				}
-				if flagsErr.Type == goflags.ErrHelp {
-					t.Error("expected non-help error type")
-				}
-			},
-		},
-		{
-			name: "non-pointer opts returns error",
-			args: args{
-				opts:       testStruct{},
-				options:    goflags.HelpFlag,
-				osArgs:     []string{"cmd"},
-				nonPointer: true,
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
+	for _, tt := range parseCases {
 		t.Run(tt.name, func(t *testing.T) {
 			os.Args = tt.args.osArgs
 
@@ -213,4 +220,41 @@ func TestFieldsIter_EmbeddedInitializedBeforeParent(t *testing.T) {
 		t.Errorf("expected GrandChild (idx %d) before Mid (idx %d); Initialize() of embedded field must be called first. order: %v",
 			gcIdx, midIdx, structOrder)
 	}
+}
+
+// TestLoadEnvFile covers the three cases loadEnvFile has to handle: an explicit
+// ENV_FILE that exists, one that does not exist (not an error), and a broken
+// file (an error).
+func TestLoadEnvFile(t *testing.T) {
+	t.Run("reads the file named by ENV_FILE", func(t *testing.T) {
+		file := filepath.Join(t.TempDir(), "custom.env")
+		require.NoError(t, os.WriteFile(file, []byte("STARTUP_TEST_VALUE=from-file\n"), 0o600))
+
+		t.Setenv("ENV_FILE", file)
+		require.NoError(t, loadEnvFile())
+		require.Equal(t, "from-file", os.Getenv("STARTUP_TEST_VALUE"))
+	})
+
+	t.Run("a missing file is not an error", func(t *testing.T) {
+		t.Setenv("ENV_FILE", filepath.Join(t.TempDir(), "does-not-exist"))
+		require.NoError(t, loadEnvFile())
+	})
+
+	t.Run("an unparsable file is an error", func(t *testing.T) {
+		file := filepath.Join(t.TempDir(), "broken.env")
+		require.NoError(t, os.WriteFile(file, []byte("not a key value line\n"), 0o600))
+
+		t.Setenv("ENV_FILE", file)
+		require.Error(t, loadEnvFile())
+	})
+}
+
+// TestValidateOptions covers the custom "hostport" validation rule.
+func TestValidateOptions(t *testing.T) {
+	type opts struct {
+		Address string `validate:"hostport"`
+	}
+
+	require.NoError(t, validateOptions(&opts{Address: "localhost:9092"}))
+	require.Error(t, validateOptions(&opts{Address: "localhost"}))
 }

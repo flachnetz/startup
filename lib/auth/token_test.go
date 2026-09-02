@@ -63,7 +63,8 @@ func newTokenServer(t *testing.T) *tokenServer {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"access_token":%q,"expires_in":%d}`,
+		// #nosec G705 -- test stub writing a fixed JSON body
+		_, _ = fmt.Fprintf(w, `{"access_token":%q,"expires_in":%d}`,
 			fmt.Sprintf("token-%s-%d", scope, ts.serialNum.Add(1)),
 			int64(lifetime.Seconds()))
 	}))
@@ -282,7 +283,7 @@ func TestTokenSource_UpstreamErrorPropagates(t *testing.T) {
 func TestTokenSource_MissingAccessTokenIsAnError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `{"expires_in":300}`)
+		_, _ = fmt.Fprint(w, `{"expires_in":300}`)
 	}))
 	t.Cleanup(srv.Close)
 
