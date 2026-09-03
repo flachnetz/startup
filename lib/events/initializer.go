@@ -86,14 +86,19 @@ func (esi *eventSenderInitializer) registerSchemaCache() (map[reflect.Type]uint3
 		event := reflect.New(eventType).Interface().(Event)
 
 		// register the schema with confluent
+		subject := avro.EventTypeOf(event)
 		schemaInfo := confluent.SchemaInfo{Schema: event.Schema()}
-		schemaId, err := esi.ConfluentClient.Register(avro.EventTypeOf(event), schemaInfo, true)
+		schemaId, err := esi.ConfluentClient.Register(subject, schemaInfo, true)
 		if err != nil {
 			return nil, fmt.Errorf("register schema for event type %q: %w", eventType, err)
 		}
 
 		// and cache the schema id for serializing later
 		schemaIdCache[eventType] = uint32(schemaId) // #nosec G115 -- schema ids are small positive ints from the registry
+
+		slog.Info("Registered event schema on confluent",
+			slog.String("subject", subject),
+			slog.Int("schemaId", schemaId))
 	}
 
 	return schemaIdCache, nil
