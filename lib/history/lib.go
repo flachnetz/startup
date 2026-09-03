@@ -16,7 +16,10 @@ import (
 	"github.com/flachnetz/startup/v2/lib/events"
 	"github.com/flachnetz/startup/v2/lib/ql"
 	sl "github.com/flachnetz/startup/v2/startup_logging"
+	"github.com/flachnetz/startup/v2/startup_tracing"
 	"github.com/jackc/pgx/v5"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var ErrNoTable = errors.New("no trace table configured")
@@ -104,6 +107,11 @@ type Service struct {
 	// transaction commits. Keyed by the *sqlx.Tx behind the TxContext.
 	pendingMu sync.Mutex
 	pending   map[any][]RecordToSend
+
+	// events buffered per open transaction, all sent by one hook under one
+	// parent span. Keyed like pending.
+	pendingEventsMu sync.Mutex
+	pendingEvents   map[any][]events.Event
 }
 
 // Option customizes a Service created with New.
@@ -222,7 +230,7 @@ func (h *Service) send(ctx context.Context, rec RecordToSend) {
 		// but if we do have a transaction, we send the trace
 		// on successful commit, otherwise we send it directly
 		if txCtx := ql.TxContextFromContext(ctx); txCtx != nil {
-			txCtx.OnCommit(func() { h.trackAsyncEvent(txCtx, rec) })
+			h.bufferEvent(txCtx, h.eventOf(rec))
 		} else {
 			// no transaction: send the event directly
 			h.trackAsyncEvent(ctx, rec)
@@ -317,8 +325,94 @@ func (h *Service) requireTransaction() bool {
 }
 
 func (h *Service) trackAsyncEvent(ctx context.Context, rec RecordToSend) {
-	event := h.eventSending.EventCreator(h.eventSending.ServiceId, h.eventSending.ServiceVersion, rec)
-	h.eventSending.EventSender.SendAsync(ctx, event)
+	h.eventSending.EventSender.SendAsync(ctx, h.eventOf(rec))
+}
+
+func (h *Service) eventOf(rec RecordToSend) events.Event {
+	return h.eventSending.EventCreator(h.eventSending.ServiceId, h.eventSending.ServiceVersion, rec)
+}
+
+// bufferEvent queues one history event of this transaction. All of them are
+// handed to the EventSender by a single hook, inside one parent span, so a
+// request that tracks several records shows up as one collapsible group in the
+// trace view instead of N sibling spans.
+//
+// Outbox events are written in the BeforeCommit hook: still inside the
+// transaction, but as the last thing it does. Async events are sent after the
+// commit, as before. Business events are unaffected by this - they go to the
+// EventSender directly, not through history.
+//
+// A TxContext not created by ql (test doubles) has no transaction to key the
+// buffer on and is flushed immediately.
+func (h *Service) bufferEvent(ctx ql.TxContext, event events.Event) {
+	tx := ql.TryTxFromContext(ctx)
+	if tx == nil {
+		_ = h.flushEvents(ctx, []events.Event{event})
+		return
+	}
+
+	h.pendingEventsMu.Lock()
+	defer h.pendingEventsMu.Unlock()
+
+	if pending, ok := h.pendingEvents[tx]; ok {
+		h.pendingEvents[tx] = append(pending, event)
+		return
+	}
+
+	if h.pendingEvents == nil {
+		h.pendingEvents = map[any][]events.Event{}
+	}
+
+	h.pendingEvents[tx] = []events.Event{event}
+
+	if h.eventSending.WriteToOutbox {
+		// DEV-NOTE: an encode failure now aborts the commit instead of only being
+		// logged per record. A history event that cannot be written should take
+		// the transaction with it.
+		ctx.BeforeCommit(func(ctx ql.TxContext) error {
+			return h.flushEvents(ctx, h.takeEvents(tx))
+		})
+	} else {
+		ctx.OnCommit(func() { _ = h.flushEvents(ctx, h.takeEvents(tx)) })
+	}
+
+	// a rolled back transaction never flushes, so drop the buffer either way.
+	ctx.OnDone(func() { h.takeEvents(tx) })
+}
+
+// takeEvents removes and returns the events buffered for tx.
+func (h *Service) takeEvents(tx any) []events.Event {
+	h.pendingEventsMu.Lock()
+	defer h.pendingEventsMu.Unlock()
+
+	evs := h.pendingEvents[tx]
+	delete(h.pendingEvents, tx)
+
+	return evs
+}
+
+// flushEvents hands all history events of one transaction to the EventSender
+// inside a single span.
+func (h *Service) flushEvents(txCtx ql.TxContext, evs []events.Event) error {
+	if len(evs) == 0 {
+		return nil
+	}
+
+	return startup_tracing.Trace(txCtx, "HistoryEvents", func(ctx context.Context, span trace.Span) error {
+		span.SetAttributes(attribute.Int("event.count", len(evs)))
+
+		var result error
+
+		for _, event := range evs {
+			if h.eventSending.WriteToOutbox {
+				result = errors.Join(result, h.eventSending.EventSender.SendInTx(ctx, txCtx, event))
+			} else {
+				h.eventSending.EventSender.SendAsync(ctx, event)
+			}
+		}
+
+		return result
+	}, trace.WithSpanKind(trace.SpanKindProducer))
 }
 
 func (h *Service) trackInTx(ctx ql.TxContext, rec RecordToSend) error {
@@ -328,18 +422,9 @@ func (h *Service) trackInTx(ctx ql.TxContext, rec RecordToSend) error {
 	result = errors.Join(result, h.bufferRow(ctx, rec))
 
 	if h.eventSending != nil {
-		// convert to an event
-		event := h.eventSending.EventCreator(h.eventSending.ServiceId, h.eventSending.ServiceVersion, rec)
-
-		if h.eventSending.WriteToOutbox {
-			// write the event to the outbox table as part of this transaction
-			if err := h.eventSending.EventSender.SendInTx(ctx, ctx, event); err != nil {
-				result = errors.Join(result, err)
-			}
-		} else {
-			// enqueue a commit action to send the event to kafka if this transaction is committed
-			ctx.OnCommit(func() { h.eventSending.EventSender.SendAsync(ctx, event) })
-		}
+		// buffer the event: written to the outbox at the end of this transaction,
+		// or sent async after the commit. See bufferEvent.
+		h.bufferEvent(ctx, h.eventOf(rec))
 	}
 
 	return result

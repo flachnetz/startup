@@ -35,8 +35,13 @@ func (h *Service) sendAsyncTask(ctx context.Context, records []RecordToSend) {
 	for {
 		select {
 		case <-ctx.Done():
-			// hard exit, we can not even send the pending messages
-			// if the context is done
+			// shutting down: the records are already batched here, so they are
+			// flushed on a context that survives the cancellation, bounded in time
+			// so a dead database cannot block shutdown. Without this they were lost.
+			flushCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), flushShutdownTimeout)
+			h.flush(flushCtx, records)
+			cancel()
+
 			return
 
 		case <-b.Await():
@@ -57,6 +62,14 @@ func (h *Service) sendAsyncTask(ctx context.Context, records []RecordToSend) {
 	}
 }
 
+// flushShutdownTimeout bounds the final flush of a cancelled sendAsyncTask, so
+// shutdown cannot block forever on a dead database.
+const flushShutdownTimeout = 5 * time.Second
+
+// DEV-QUESTION: a failed flush loses its records - the transaction rolls back and
+// the failure is only logged. Do we want them retried instead? That needs a
+// durable spool (or a retry with backoff that blocks shutdown), so it is not
+// free. Decide when we see this warning in production.
 func (h *Service) flush(ctx context.Context, records []RecordToSend) {
 	if len(records) == 0 {
 		return
