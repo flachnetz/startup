@@ -104,8 +104,9 @@ func (ev *eventSender) SendAsync(ctx context.Context, event Event) {
 		}, trace.WithSpanKind(trace.SpanKindProducer))
 	}
 
+	// DEV-NOTE: the buffer lives as long as the service, not as long as the
+	// request, so a cancelled ctx must not drop the event. It used to, silently.
 	select {
-	case <-ctx.Done():
 	case ev.AsyncBufferCh <- event:
 	default:
 		slog.WarnContext(ctx, "Async event queue is full, discarding event", slog.String("event", eventToString(event)))

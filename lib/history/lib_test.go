@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"testing"
 	"time"
@@ -12,7 +13,12 @@ import (
 	"github.com/flachnetz/startup/v2/lib/ql"
 	"github.com/flachnetz/startup/v2/lib/testx"
 	"github.com/jackc/pgx/v5"
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type item struct {
@@ -345,6 +351,109 @@ func TestTrackBufferIsDiscardedOnRollback(t *testing.T) {
 	testx.MustTransact(t, db, func(ctx ql.TxContext) {
 		service.Track(ctx, item{Value: "kept"}, group)
 	})
+
+	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
+		records, err := service.Records(ctx, group)
+		require.NoError(t, err)
+		require.Len(t, records, 1)
+		require.JSONEq(t, `{"value":"kept"}`, string(records[0].Payload))
+		return nil
+	})
+}
+
+// spanSender records the span the sender was handed for every event.
+type spanSender struct {
+	t     *testing.T
+	spans []trace.SpanContext
+}
+
+func (s *spanSender) record(ctx context.Context) {
+	s.spans = append(s.spans, trace.SpanContextFromContext(ctx))
+}
+
+func (s *spanSender) SendAsync(ctx context.Context, _ events.Event) { s.record(ctx) }
+
+func (s *spanSender) SendInTx(ctx context.Context, _ sqlx.ExecerContext, _ events.Event) error {
+	// the outbox write must still happen inside the transaction
+	require.NotNil(s.t, ql.TxContextFromContext(ctx))
+	s.record(ctx)
+	return nil
+}
+
+func (s *spanSender) Close() error { return nil }
+
+// All events of one transaction hang under a single "HistoryEvents" parent span,
+// so they collapse into one group in the trace view.
+func TestTrackGroupsEventsInOneSpan(t *testing.T) {
+	db := testx.NewConnection(t, "history_migrations")
+	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
+		return CreateTable(ctx, "history")
+	})
+
+	recorder := tracetest.NewSpanRecorder()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(recorder))
+	prev := otel.GetTracerProvider()
+	otel.SetTracerProvider(tp)
+	t.Cleanup(func() {
+		otel.SetTracerProvider(prev)
+		_ = tp.Shutdown(context.Background())
+	})
+
+	for _, outbox := range []bool{true, false} {
+		t.Run(fmt.Sprintf("outbox=%v", outbox), func(t *testing.T) {
+			sender := &spanSender{t: t}
+			service := New(db, pgx.Identifier{"history"}, &EventSending{
+				EventSender:   sender,
+				EventCreator:  dummyEventCreator,
+				WriteToOutbox: outbox,
+			})
+
+			testx.MustTransact(t, db, func(ctx ql.TxContext) {
+				for _, v := range []string{"one", "two", "three"} {
+					service.Track(ctx, item{Value: v}, GroupId{"order", "span-1"})
+				}
+
+				// nothing is handed to the sender while the transaction still runs:
+				// history events are flushed at the end of it.
+				require.Empty(t, sender.spans)
+			})
+
+			var parents []sdktrace.ReadOnlySpan
+			for _, span := range recorder.Ended() {
+				if span.Name() == "HistoryEvents" {
+					parents = append(parents, span)
+				}
+			}
+			require.Len(t, parents, 1, "exactly one parent span per transaction")
+
+			// every event was sent with that parent span as its context
+			require.Len(t, sender.spans, 3)
+			for _, sc := range sender.spans {
+				require.Equal(t, parents[0].SpanContext().SpanID(), sc.SpanID())
+			}
+
+			recorder.Reset()
+		})
+	}
+}
+
+// Records already batched in sendAsyncTask must still be written when the
+// background task's context is cancelled - shutdown must not lose them.
+func TestSendAsyncFlushesBatchedRecordsOnShutdown(t *testing.T) {
+	db := testx.NewConnection(t, "history_migrations")
+	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
+		return CreateTable(ctx, "history")
+	})
+
+	service := New(db, pgx.Identifier{"history"}, nil)
+	group := GroupId{"order", "shutdown-1"}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	// the task returns right away because the context is already cancelled, and
+	// flushes what it holds on the way out.
+	service.sendAsyncTask(ctx, []RecordToSend{recordOf(ctx, item{Value: "kept"}, []GroupId{group})})
 
 	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
 		records, err := service.Records(ctx, group)

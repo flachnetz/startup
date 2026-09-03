@@ -1,6 +1,7 @@
 package events
 
 import (
+	"context"
 	"io"
 	"reflect"
 	"testing"
@@ -304,4 +305,36 @@ func TestByteSliceOf_Nil(t *testing.T) {
 func TestByteSliceOf_Value(t *testing.T) {
 	s := "hello"
 	assert.Equal(t, []byte("hello"), byteSliceOf(&s))
+}
+
+// A cancelled context must not make SendAsync drop the event: the async buffer
+// is drained by the service, not by the request that queued the event.
+func TestSendAsync_CancelledContextStillQueues(t *testing.T) {
+	sender := &eventSender{AsyncBufferCh: make(chan Event, 1)}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	sender.SendAsync(ctx, &testEvent{Name: "queued"})
+
+	require.Len(t, sender.AsyncBufferCh, 1)
+	require.Equal(t, "queued", contextlessEvent[*testEvent](t, <-sender.AsyncBufferCh).Name)
+}
+
+// A full buffer drops the event, but only with a warning, and does not block.
+func TestSendAsync_FullBufferDropsEvent(t *testing.T) {
+	sender := &eventSender{AsyncBufferCh: make(chan Event)}
+
+	sender.SendAsync(context.Background(), &testEvent{Name: "dropped"})
+
+	require.Empty(t, sender.AsyncBufferCh)
+}
+
+func contextlessEvent[T Event](t *testing.T, event Event) T {
+	t.Helper()
+
+	typed, ok := asEventType[T](event)
+	require.True(t, ok)
+
+	return typed
 }
