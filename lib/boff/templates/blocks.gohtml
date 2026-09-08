@@ -37,11 +37,6 @@
                     {{ else if $item.Link }}<a href="{{ $item.Link }}" class="text-decoration-none">{{ $item.Value }}</a>
                     {{ else if $item.IsId }}{{ template "boff/id" $item.Value }}
                     {{ else }}{{ $item.Value }}{{ end }}
-                    {{ if $item.FieldCount }}
-                    {{ $panel := payload (printf "%s-fact-%d" $card $i) $item.FieldCount $item.JSONHTML true }}
-                    {{ template "boff/payload-chip" $panel }}
-                    {{ template "boff/payload-panel" $panel }}
-                    {{ end }}
                 </dd>
             </div>
             {{ end }}

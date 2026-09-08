@@ -25,24 +25,19 @@
             <span class="sum">{{ .Count }} event{{ if ne .Count 1 }}s{{ end }} &middot; {{ .Duration }} &middot; {{ .Date }}</span>
         </div>
         {{ range .Events }}
-        <div class="ev" data-level="{{ .Level }}">
-            <span class="ev-t">{{ .TimeOfDay }}<span class="opacity-50">{{ .Millis }}</span></span>
-            <span class="ev-rail"><span class="{{ pipClass .Level }}"></span></span>
-            <span class="ev-body">
-                <span class="ev-l1">
-                    <span class="ev-name">{{ .Step }}</span>
-                    <span class="ev-desc ell">{{ .Description }}</span>
-                    {{ if .FieldCount }}{{ template "boff/payload-chip" (payload .Key .FieldCount .JSONHTML false) }}{{ end }}
-                </span>
-                <span class="ev-l2 ell">
-                    <span{{ if .EventSenderVersion }} title="build {{ .EventSenderVersion }}"{{ end }}>{{ .EventSender }}</span>
-                    {{ if .HTTPSource }}<span class="sep">&middot;</span><span class="font-mono">{{ .HTTPSource }}</span>{{ end }}
-                    {{ if .SourceRef }}<span class="sep">&middot;</span><span class="font-mono" title="{{ .SourceRefLabel }} {{ .SourceRef }}">{{ .SourceRef }}</span>{{ end }}
-                    {{ if .ActorId }}<span class="sep">&middot;</span><span class="font-mono" title="{{ .ActorType }} {{ .ActorId }}">{{ .ActorType }} {{ .ActorId }}</span>{{ end }}
-                </span>
-            </span>
-        </div>
-        {{ if .FieldCount }}{{ template "boff/payload-panel" (payload .Key .FieldCount .JSONHTML false) }}{{ end }}
+        {{ if .FieldCount }}
+        {{/* A record with a payload is a <details>: the whole row opens it, the
+             browser does the opening (so it works by keyboard and find-in-page
+             can reach into a closed payload), and the script only has to
+             remember which ones were open. */}}
+        <details class="ev-p" data-level="{{ .Level }}" data-payload="{{ .Key }}">
+            <summary class="ev">{{ template "history/event" . }}</summary>
+            <pre class="payload">{{ .JSONHTML }}</pre>
+        </details>
+        {{ else }}
+        {{/* Nothing to open, so nothing that behaves as if it could be opened. */}}
+        <div class="ev" data-level="{{ .Level }}">{{ template "history/event" . }}</div>
+        {{ end }}
         {{ end }}
     </div>
     {{ else }}
@@ -51,4 +46,24 @@
     </div>
     {{ end }}
 </div>
+{{ end }}
+
+{{/* history/event is the row itself, shared by both shapes above: the same three
+     grid columns whether the row can be opened or not. */}}
+{{ define "history/event" }}
+<span class="ev-t">{{ .TimeOfDay }}<span class="opacity-50">{{ .Millis }}</span></span>
+<span class="ev-rail"><span class="{{ pipClass .Level }}"></span></span>
+<span class="ev-body">
+    <span class="ev-l1">
+        <span class="ev-name">{{ .Step }}</span>
+        <span class="ev-desc ell">{{ .Description }}</span>
+        {{ if .FieldCount }}{{ template "boff/payload-count" .FieldCount }}{{ end }}
+    </span>
+    <span class="ev-l2 ell">
+        <span{{ if .EventSenderVersion }} title="build {{ .EventSenderVersion }}"{{ end }}>{{ .EventSender }}</span>
+        {{ if .HTTPSource }}<span class="sep">&middot;</span><span class="font-mono">{{ .HTTPSource }}</span>{{ end }}
+        {{ if .SourceRef }}<span class="sep">&middot;</span><span class="font-mono" title="{{ .SourceRefLabel }} {{ .SourceRef }}">{{ .SourceRef }}</span>{{ end }}
+        {{ if .ActorId }}<span class="sep">&middot;</span><span class="font-mono" title="{{ .ActorType }} {{ .ActorId }}">{{ .ActorType }} {{ .ActorId }}</span>{{ end }}
+    </span>
+</span>
 {{ end }}

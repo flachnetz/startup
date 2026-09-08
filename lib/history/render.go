@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -111,10 +112,12 @@ func (v RecordView) HasPayload() bool {
 	}
 }
 
-// TraceView is one request trace: every record written while handling the same
-// incoming request, in the order they happened. The ledger renders one block
-// per trace, so a page reads as "what did this request do" rather than as one
-// long undifferentiated list.
+// TraceView is one uninterrupted run of a request trace: the records written
+// while handling the same incoming request, back to back on the timeline and in
+// the order they happened. The ledger renders one block per run, so a page reads
+// as "what did this request do" rather than as one long undifferentiated list.
+// A trace that comes back after other traces wrote in between gets a second
+// block, keeping the page in chronological order.
 type TraceView struct {
 	// Id is the request trace id shared by every record in the block.
 	Id string
@@ -206,49 +209,52 @@ type TraceOrder struct {
 	NewestEventsFirst bool
 }
 
-// tracesOf groups records into trace blocks and orders both the blocks and the
-// records inside them according to order (see TraceOrder for the default).
+// tracesOf puts the records on one timeline and then cuts that timeline into
+// blocks wherever the trace id changes, ordering the blocks and the records
+// inside them according to order (see TraceOrder for the default).
+//
+// A block is therefore a *run* of one trace, not everything that trace ever
+// did: a trace id that comes back later - a retried job, a second request on a
+// kept-alive connection, a background task that outlives the records it
+// interleaves with - opens a new block instead of pulling those later records
+// back up next to the earlier ones and dragging the rest of the page out of
+// chronological order.
+//
 // Sorting is stable, so records sharing a timestamp keep the order they arrived
-// in whichever direction is chosen.
+// in, which is what decides where a run is cut when two traces share an instant.
 func tracesOf(views []RecordView, order TraceOrder) []TraceView {
-	var traces []TraceView
-
-	index := make(map[string]int, len(views))
-	for _, view := range views {
-		id := view.RequestTraceId.String()
-		at, ok := index[id]
-		if !ok {
-			index[id] = len(traces)
-			traces = append(traces, TraceView{Id: id})
-			at = len(traces) - 1
-		}
-
-		traces[at].Events = append(traces[at].Events, view)
-	}
-
-	for _, trace := range traces {
-		sort.SliceStable(trace.Events, func(i, j int) bool {
-			return earlier(trace.Events[i].Timestamp, trace.Events[j].Timestamp, order.NewestEventsFirst)
-		})
-	}
-
-	// Blocks are ordered by when the trace started, which is now the first record
-	// of the block only in the default direction - hence Start, not Events[0].
-	sort.SliceStable(traces, func(i, j int) bool {
-		return earlier(traces[i].Start(), traces[j].Start(), order.NewestTracesFirst)
+	// Grouping reads the timeline forwards regardless of the render direction;
+	// the requested direction is applied afterwards by reversing.
+	sorted := slices.Clone(views)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		return sorted[i].Timestamp.Before(sorted[j].Timestamp)
 	})
 
-	return traces
-}
+	var traces []TraceView
+	for _, view := range sorted {
+		id := view.RequestTraceId.String()
+		if len(traces) == 0 || traces[len(traces)-1].Id != id {
+			traces = append(traces, TraceView{Id: id})
+		}
 
-// earlier is the less function of both sorts: a is before b, or after it when
-// reversed.
-func earlier(a, b time.Time, reversed bool) bool {
-	if reversed {
-		return a.After(b)
+		block := &traces[len(traces)-1]
+		block.Events = append(block.Events, view)
 	}
 
-	return a.Before(b)
+	// The runs are disjoint stretches of a single sorted timeline, so both
+	// directions are a plain reversal - no second sort can disagree with the cuts
+	// that were just made.
+	if order.NewestEventsFirst {
+		for _, trace := range traces {
+			slices.Reverse(trace.Events)
+		}
+	}
+
+	if order.NewestTracesFirst {
+		slices.Reverse(traces)
+	}
+
+	return traces
 }
 
 // recordsModel is the template model for "block/records": the trace blocks plus
@@ -298,11 +304,12 @@ func recordsModelOf(views []RecordView, order TraceOrder) recordsModel {
 	return model
 }
 
-// HistoryItemsBlock renders the record ledger: one block per request trace,
-// oldest trace first, each block a top-to-bottom timeline of its records - the
-// whole page reads as one timeline, oldest at the top. Every
-// payload starts collapsed behind a chip showing its field count. Always
-// renders (shows a "No history records." note when views is empty).
+// HistoryItemsBlock renders the record ledger: one block per uninterrupted run
+// of a request trace, oldest first, each block a top-to-bottom timeline of its
+// records - the whole page reads as one timeline, oldest at the top. A record
+// with a payload is a <details> row: it starts collapsed behind a chip showing
+// its field count, and the whole row opens it. Always renders (shows a
+// "No history records." note when views is empty).
 //
 // Use HistoryItemsBlockOrdered to read the ledger in the other direction.
 func HistoryItemsBlock(views []RecordView) boff.Block {
@@ -383,7 +390,8 @@ func (d DefaultBlocks) All() []boff.Block {
 
 // RenderPage writes a standalone HTML history page for groupId to w. Records are
 // loaded in a new read transaction, sorted by Timestamp (Service.Records is
-// unordered), and each RequestTraceId group is rendered in its own card.
+// unordered), and each uninterrupted run of one RequestTraceId is rendered in
+// its own block.
 //
 // ponytail: payload is rendered as pretty JSON only; add a key/value table when
 // an item needs structured display.
