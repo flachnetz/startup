@@ -92,7 +92,9 @@
 .trace + .trace{border-top:1px solid var(--bs-border-color)}
 .trace-head{
   display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;
-  padding:.35rem .9rem;background:var(--bs-tertiary-bg);
+  /* Extra room above the label sets each trace off from the rows of the one
+     before it, so a long ledger reads as blocks rather than one wall. */
+  padding:1rem .9rem .35rem;background:var(--bs-tertiary-bg);
   border-bottom:1px solid var(--bs-border-color);
 }
 .trace-head .tid{font-family:var(--oc-mono);font-size:.72rem}
@@ -109,15 +111,24 @@
      the thousands of rows. */
   content-visibility:auto;contain-intrinsic-size:0 34px;
 }
-.trace .ev:first-of-type{border-top:0}
-.ev:hover{background:var(--bs-tertiary-bg)}
+/* A row is either a plain div or the <summary> of a row that opens, so the
+   first and last row of a block are addressed by position, not by type. */
+.trace-head + .ev,.trace-head + .ev-p > .ev{border-top:0}
+/* Only a row with a payload opens, so only that row invites the click. A row
+   without one stays flat instead of promising a detail view that is not there.
+   The disclosure triangle is dropped: the chip at the end of the line already
+   says there is something to open, and it doubles as the open indicator. */
+.ev-p > summary{cursor:pointer;list-style:none}
+.ev-p > summary::-webkit-details-marker{display:none}
+.ev-p > summary:hover{background:var(--bs-tertiary-bg)}
+.ev-p > summary:focus-visible{outline:2px solid var(--bs-primary);outline-offset:-2px}
 .ev-t{
   font-family:var(--oc-mono);font-size:.69rem;color:var(--bs-secondary-color);
   text-align:right;padding-right:.6rem;padding-top:2px;white-space:nowrap;
 }
 .ev-rail{position:relative;display:flex;justify-content:center}
 .ev-rail::before{content:"";position:absolute;top:0;bottom:-14px;width:1px;background:var(--bs-border-color)}
-.ev:last-of-type .ev-rail::before{bottom:auto;height:9px}
+.trace > :last-child .ev-rail::before{bottom:auto;height:9px}
 .ev-rail .pip{position:relative;margin-top:5px;box-shadow:0 0 0 2px var(--bs-body-bg)}
 .ev-body{padding-left:.7rem;min-width:0}
 .ev-l1{display:flex;align-items:baseline;gap:.5rem;min-width:0}
@@ -132,9 +143,9 @@
   padding:.2rem .35rem;border:1px solid var(--bs-border-color);border-radius:.25rem;
   background:var(--bs-tertiary-bg);color:var(--bs-secondary-color);cursor:pointer;white-space:nowrap;
 }
-.btn-payload:hover{border-color:var(--bs-primary);color:var(--bs-primary)}
+.btn-payload:hover,.ev-p > summary:hover .btn-payload{border-color:var(--bs-primary);color:var(--bs-primary)}
 .btn-payload:focus-visible{outline:2px solid var(--bs-primary);outline-offset:1px}
-.btn-payload[aria-expanded="true"]{border-color:var(--bs-primary);color:var(--bs-primary);background:var(--bs-primary-bg-subtle)}
+.btn-payload[aria-expanded="true"],.ev-p[open] .btn-payload{border-color:var(--bs-primary);color:var(--bs-primary);background:var(--bs-primary-bg-subtle)}
 .payload{
   margin:0;padding:.6rem .9rem .7rem 6.2rem;background:var(--bs-tertiary-bg);
   border-top:1px dashed var(--bs-border-color);
@@ -159,6 +170,12 @@
 {{ define "boff/copy-icon" }}<svg class="id-copy" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M4 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6zM2 5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1h1v1a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1v1H2z"/></svg>{{ end }}
 
 {{ define "boff/payload-chip" }}<button class="btn-payload" type="button" aria-expanded="false" aria-controls="{{ .Id }}" aria-label="Show payload, {{ .Fields }} fields">{ } {{ .Fields }}</button>{{ end }}
+
+{{/* boff/payload-count is the same chip as a label rather than a control, for a
+     payload that lives in a <details>: there the row is the control, and a
+     button nested inside a <summary> would be a second one. Takes the field
+     count. */}}
+{{ define "boff/payload-count" }}<span class="btn-payload">{ } {{ . }}</span>{{ end }}
 
 {{ define "boff/payload-panel" }}<pre class="payload{{ if .Inline }} payload-inline{{ end }}" id="{{ .Id }}" hidden>{{ .HTML }}</pre>{{ end }}
 
@@ -234,28 +251,63 @@
     panel.hidden = !open;
   }
 
-  function restore() {
-    var set = openSet();
-    document.querySelectorAll(".btn-payload").forEach(function (button) {
-      if (set.has(button.getAttribute("aria-controls"))) toggle(button, true);
+  // Flip a payload and record the new state, from wherever the click came in.
+  function togglePayload(button) {
+    var open = button.getAttribute("aria-expanded") !== "true";
+    toggle(button, open);
+    remember(button.getAttribute("aria-controls"), open);
+  }
+
+  // A page holds two shapes of payload. A ledger row is a <details> that opens
+  // itself; a row whose panel cannot be a sibling of its chip - the panel is
+  // full width below a row the chip sits inside - keeps the chip plus a hidden
+  // panel. Both are keyed by the same id, so both are expanded, remembered and
+  // restored the same way. fn receives that id and a setter.
+  function eachPayload(fn) {
+    document.querySelectorAll("details[data-payload]").forEach(function (details) {
+      fn(details.getAttribute("data-payload"), function (open) {
+        details.open = open;
+      });
+    });
+
+    document.querySelectorAll(".btn-payload[aria-controls]").forEach(function (button) {
+      fn(button.getAttribute("aria-controls"), function (open) {
+        toggle(button, open);
+      });
     });
   }
 
+  function restore() {
+    var set = openSet();
+    eachPayload(function (id, open) {
+      if (set.has(id)) open(true);
+    });
+  }
+
+  // <details> fires toggle on itself and it does not bubble, so this listens in
+  // the capture phase. It is what records a payload the browser opened.
+  document.addEventListener("toggle", function (event) {
+    var details = event.target;
+    if (details.matches && details.matches("details[data-payload]")) {
+      remember(details.getAttribute("data-payload"), details.open);
+    }
+  }, true);
+
   document.addEventListener("click", function (event) {
-    var payload = event.target.closest(".btn-payload");
+    // Only the chip that is a real control: the one inside a <summary> is a
+    // label, and its row has already handled the click.
+    var payload = event.target.closest(".btn-payload[aria-controls]");
     if (payload) {
-      var open = payload.getAttribute("aria-expanded") !== "true";
-      toggle(payload, open);
-      remember(payload.getAttribute("aria-controls"), open);
+      togglePayload(payload);
       return;
     }
 
     var all = event.target.closest("[data-expand-all]");
     if (all) {
       var expand = all.dataset.open !== "1";
-      document.querySelectorAll(".btn-payload").forEach(function (button) {
-        toggle(button, expand);
-        remember(button.getAttribute("aria-controls"), expand);
+      eachPayload(function (id, open) {
+        open(expand);
+        remember(id, expand);
       });
       all.dataset.open = expand ? "1" : "0";
       all.textContent = expand ? "Collapse payloads" : "Expand payloads";
@@ -277,21 +329,16 @@
   });
 
   // Severity filter: "" keeps everything, "warn" keeps warnings and errors,
-  // "err" keeps errors only.
+  // "err" keeps errors only. A hidden row takes its payload with it, because the
+  // payload is inside the row it belongs to.
   document.addEventListener("change", function (event) {
     var select = event.target.closest("[data-level-filter]");
     if (!select) return;
 
     var wanted = select.value;
-    document.querySelectorAll(".ev").forEach(function (row) {
+    document.querySelectorAll(".trace > [data-level]").forEach(function (row) {
       var level = row.dataset.level || "";
-      var keep = wanted === "" || level === "err" || (wanted === "warn" && level === "warn");
-      row.hidden = !keep;
-
-      var button = row.querySelector(".btn-payload");
-      var panel = button && document.getElementById(button.getAttribute("aria-controls"));
-      if (panel && !keep) panel.hidden = true;
-      if (panel && keep) panel.hidden = button.getAttribute("aria-expanded") !== "true";
+      row.hidden = !(wanted === "" || level === "err" || (wanted === "warn" && level === "warn"));
     });
   });
 

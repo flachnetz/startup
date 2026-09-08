@@ -70,10 +70,11 @@ func formatMoney(minor any, currency string) (string, error) {
 // Templates returns a fresh page template carrying the shared default funcs
 // (formatTime, add, formatMoney, pipClass, statusClass, payload,
 // render) and the shared console partials (boff/id, boff/payload-chip,
-// boff/payload-panel), so a page's own blocks render a copyable id or a
-// collapsible payload exactly like the built-in ones. Parse your own block
-// sub-templates into it, then pass it to RenderWithShell. It is a fresh template
-// every call, so callers never share (or accidentally execute) a common base.
+// boff/payload-count, boff/payload-panel), so a page's own blocks render a
+// copyable id or a collapsible payload exactly like the built-in ones. Parse
+// your own block sub-templates into it, then pass it to RenderWithShell. It is a
+// fresh template every call, so callers never share (or accidentally execute) a
+// common base.
 func Templates() *template.Template {
 	tpl, err := defaultFuncs().ParseFS(shellFS, "templates/console.gohtml")
 	if err != nil {

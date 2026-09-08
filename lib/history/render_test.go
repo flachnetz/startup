@@ -124,8 +124,31 @@ func TestLedgerShortTraceIsMeasuredInMilliseconds(t *testing.T) {
 	}
 }
 
-// A payload always starts collapsed behind a chip showing its field count, and
-// the panel is toggled through aria-expanded/hidden rather than <details>.
+// Only a row that has a payload can be opened, so only that row is a <details>
+// whose summary is the row itself. A row without one stays a plain div, so it
+// never lights up under the pointer promising a detail view that is not there.
+func TestLedgerOnlyRowsWithPayloadAreOpenable(t *testing.T) {
+	out := render(t, []RecordView{
+		withTrace(view(traceOld, at(41, 835), "OrderCreated", "created", `{"orderId":"o1"}`, ""), traceOld),
+		withTrace(view(traceOld, at(41, 902), "OrderFulfilled", "fulfilled", "{}", ""), traceOld),
+	})
+
+	if got := strings.Count(out, `<details class="ev-p"`); got != 1 {
+		t.Errorf("%d rows render as details, want 1:\n%s", got, out)
+	}
+	if got := strings.Count(out, `<summary class="ev">`); got != 1 {
+		t.Errorf("%d rows render as a summary, want 1:\n%s", got, out)
+	}
+	// The severity filter hides whole rows, so data-level sits on the outer
+	// element of both shapes - hiding a details takes its payload with it.
+	if got := strings.Count(out, `<div class="ev" data-level="">`); got != 1 {
+		t.Errorf("%d plain rows, want 1 (the record without a payload):\n%s", got, out)
+	}
+}
+
+// A payload sits inside a closed <details>, so it starts collapsed, opens
+// without any script, and find-in-page can reach into it. The chip is a label on
+// the row, not a second control nested inside the summary.
 func TestLedgerPayloadStartsCollapsed(t *testing.T) {
 	out := render(t, []RecordView{
 		withTrace(view(traceOld, at(41, 835), "OrderCreated", "created",
@@ -133,19 +156,24 @@ func TestLedgerPayloadStartsCollapsed(t *testing.T) {
 	})
 
 	for _, want := range []string{
-		`aria-expanded="false"`,
-		`{ } 3`,
-		`aria-label="Show payload, 3 fields"`,
-		` hidden>`,
+		// No open attribute, so the row starts closed.
+		`<details class="ev-p" data-level="" data-payload="ev-` + traceOld + `-OrderCreated">`,
+		`<summary class="ev">`,
+		`<span class="btn-payload">{ } 3</span>`,
+		`<pre class="payload">`,
 		`<span class="text-primary">"orderId":</span>`,
 	} {
 		if !strings.Contains(out, want) {
-			t.Errorf("payload chip missing %s:\n%s", want, out)
+			t.Errorf("payload row missing %s:\n%s", want, out)
 		}
 	}
 
-	if strings.Contains(out, "<details") {
-		t.Errorf("payload still renders as a details element:\n%s", out)
+	// The summary is the control, so none of the aria bookkeeping a scripted
+	// disclosure needs is left to keep in sync.
+	for _, unwanted := range []string{"aria-expanded", "aria-controls", " hidden>"} {
+		if strings.Contains(out, unwanted) {
+			t.Errorf("payload row still carries %s:\n%s", unwanted, out)
+		}
 	}
 }
 
@@ -324,6 +352,63 @@ func TestLedgerOrderIsConfigurablePerAxis(t *testing.T) {
 				t.Errorf("order = %v, want %v", got, c.want)
 			}
 		})
+	}
+}
+
+// A trace that comes back after another trace wrote in between opens a second
+// block. Pulling those later records back up next to the earlier ones would put
+// the page out of chronological order, which is the one thing the ledger is for.
+func TestLedgerSplitsInterleavedTracesIntoRuns(t *testing.T) {
+	views := []RecordView{
+		withTrace(view(traceOld, at(41, 835), "A1", "a1", "{}", ""), traceOld),
+		withTrace(view(traceNew, at(42, 100), "B1", "b1", "{}", ""), traceNew),
+		// The first trace resumes - a retry, a callback, a background task.
+		withTrace(view(traceOld, at(43, 305), "A2", "a2", "{}", ""), traceOld),
+	}
+
+	got := stepOrder(t, renderOrdered(t, views, TraceOrder{}))
+	if want := "A1,B1,A2"; strings.Join(got, ",") != want {
+		t.Errorf("order = %v, want %s", got, want)
+	}
+
+	// Three runs, not two traces: the resumed trace is its own block.
+	out := renderOrdered(t, views, TraceOrder{})
+	if !strings.Contains(out, "3 traces &middot; 3 events") {
+		t.Errorf("resumed trace was not counted as its own block:\n%s", out)
+	}
+	if blocks := strings.Count(out, `<div class="trace-head">`); blocks != 3 {
+		t.Errorf("rendered %d trace blocks, want 3:\n%s", blocks, out)
+	}
+}
+
+// Records arriving out of order are put back on the timeline before the runs are
+// cut, so an unsorted input renders the same page as a sorted one.
+func TestLedgerSortsBeforeGrouping(t *testing.T) {
+	shuffled := []RecordView{
+		withTrace(view(traceOld, at(43, 305), "A2", "a2", "{}", ""), traceOld),
+		withTrace(view(traceOld, at(41, 835), "A1", "a1", "{}", ""), traceOld),
+		withTrace(view(traceNew, at(42, 100), "B1", "b1", "{}", ""), traceNew),
+	}
+
+	got := stepOrder(t, renderOrdered(t, shuffled, TraceOrder{}))
+	if want := "A1,B1,A2"; strings.Join(got, ",") != want {
+		t.Errorf("order = %v, want %s", got, want)
+	}
+}
+
+// Reversing a run of an interleaved ledger flips the records inside each block
+// and the blocks themselves, without merging the two runs of the same trace.
+func TestLedgerReversedInterleavedTracesKeepTheirRuns(t *testing.T) {
+	views := []RecordView{
+		withTrace(view(traceOld, at(41, 835), "A1", "a1", "{}", ""), traceOld),
+		withTrace(view(traceOld, at(41, 902), "A2", "a2", "{}", ""), traceOld),
+		withTrace(view(traceNew, at(42, 100), "B1", "b1", "{}", ""), traceNew),
+		withTrace(view(traceOld, at(43, 305), "A3", "a3", "{}", ""), traceOld),
+	}
+
+	got := stepOrder(t, renderOrdered(t, views, TraceOrder{NewestTracesFirst: true, NewestEventsFirst: true}))
+	if want := "A3,B1,A2,A1"; strings.Join(got, ",") != want {
+		t.Errorf("order = %v, want %s", got, want)
 	}
 }
 
