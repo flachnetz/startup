@@ -86,37 +86,49 @@
 {{ end }}
 
 
+{{ define "boff/action-control" }}
+{{ $a := .Action }}{{ $id := .ID }}
+{{ if $a.StatusText }}
+    <span class="badge text-bg-secondary">{{ $a.StatusText }}</span>
+{{ else if $a.Link }}
+    <a class="btn btn-sm btn-outline-primary" href="{{ $a.Endpoint }}">{{ $a.ButtonText }}</a>
+{{ else if or $a.ConfirmMessage $a.Prompt }}
+    <button class="btn btn-sm btn-outline-danger" type="button"
+            data-bs-toggle="modal" data-bs-target="#action-confirm-{{ $id }}">{{ $a.ButtonText }}</button>
+    <div class="modal fade" id="action-confirm-{{ $id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form class="modal-content" method="POST" action="{{ $a.Endpoint }}">
+                <div class="modal-body">
+                    {{ with $a.ConfirmMessage }}<p class="mb-0">{{ . }}</p>{{ end }}
+                    {{ with $a.Prompt }}
+                    <label class="form-label mt-3 mb-1" for="action-prompt-{{ $id }}">{{ .Label }}</label>
+                    <input class="form-control" type="text" id="action-prompt-{{ $id }}"
+                           name="{{ .Name }}" autocomplete="off"{{ if .Required }} required{{ end }}>
+                    {{ end }}
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-sm btn-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-sm btn-danger" type="submit">{{ with $a.ConfirmText }}{{ . }}{{ else }}OK{{ end }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{{ else }}
+    <form method="POST" action="{{ $a.Endpoint }}">
+        <button class="btn btn-sm btn-outline-danger" type="submit">{{ $a.ButtonText }}</button>
+    </form>
+{{ end }}
+{{ end }}
+
 {{ define "block/actions" }}
 <div class="card mb-4 shadow-sm">
     <div class="card-body">
         <h5 class="card-title mb-3">Actions</h5>
         <ul class="list-unstyled mb-0">
-            {{ range $i, $a := . }}
+            {{ range $i, $c := . }}
             <li class="d-flex align-items-center gap-2{{ if $i }} mt-2{{ end }}">
-                {{ if $a.StatusText }}
-                    <span class="badge text-bg-secondary">{{ $a.StatusText }}</span>
-                {{ else if $a.Link }}
-                    <a class="btn btn-sm btn-outline-primary" href="{{ $a.Endpoint }}">{{ $a.ButtonText }}</a>
-                {{ else if $a.ConfirmMessage }}
-                    <button class="btn btn-sm btn-outline-danger" type="button"
-                            data-bs-toggle="modal" data-bs-target="#action-confirm-{{ $i }}">{{ $a.ButtonText }}</button>
-                    <div class="modal fade" id="action-confirm-{{ $i }}" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog">
-                            <form class="modal-content" method="POST" action="{{ $a.Endpoint }}">
-                                <div class="modal-body">{{ $a.ConfirmMessage }}</div>
-                                <div class="modal-footer">
-                                    <button class="btn btn-sm btn-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
-                                    <button class="btn btn-sm btn-danger" type="submit">{{ with $a.ConfirmText }}{{ . }}{{ else }}OK{{ end }}</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                {{ else }}
-                    <form method="POST" action="{{ $a.Endpoint }}">
-                        <button class="btn btn-sm btn-outline-danger" type="submit">{{ $a.ButtonText }}</button>
-                    </form>
-                {{ end }}
-                <span>{{ $a.Description }}</span>
+                {{ template "boff/action-control" $c }}
+                <span>{{ $c.Action.Description }}</span>
             </li>
             {{ end }}
         </ul>
@@ -169,7 +181,7 @@
     <tr>{{ range .Headers }}<th scope="col" class="fw-semibold py-3">{{ . }}</th>{{ end }}</tr>
     </thead>
     <tbody>
-    {{ range $row := .Rows }}
+    {{ range $rowIndex, $row := .Rows }}
     {{ $link := $row.Link }}
     <tr>
         {{ range $i, $text := $row.Cells }}
@@ -179,6 +191,13 @@
             {{ else if $cell.Tone }}{{ if $link }}<a class="text-reset text-decoration-none" href="{{ $link }}"><span class="badge text-bg-{{ $cell.Tone }}">{{ $cell.Text }}</span></a>{{ else }}<span class="badge text-bg-{{ $cell.Tone }}">{{ $cell.Text }}</span>{{ end }}
             {{ else if $link }}<a class="d-block text-reset text-decoration-none" href="{{ $link }}">{{ $cell.Text }}</a>
             {{ else }}{{ $cell.Text }}{{ end }}
+        </td>
+        {{ end }}
+        {{ if $.HasActions }}
+        <td class="py-3 text-nowrap">
+            <div class="d-flex align-items-center gap-2">
+                {{ range $row.ActionControls $rowIndex }}{{ template "boff/action-control" . }}{{ end }}
+            </div>
         </td>
         {{ end }}
     </tr>

@@ -37,6 +37,13 @@ type Action struct {
 	ConfirmText    string // label of the modal's confirm button; empty = "OK"
 	StatusText     string // non-empty = show label instead of button
 
+	// Prompt, when set, puts one text field in the confirmation dialog, posted
+	// with the form under Prompt.Name. It is for an action a server-side rule
+	// refuses without a written justification: without the field the operator
+	// only learns of the rule from the error page after the fact. Setting it
+	// implies the dialog, so ConfirmMessage may stay empty.
+	Prompt *ActionPrompt
+
 	// true renders a link to Endpoint instead of a form, for an action that only
 	// navigates. Ignores ConfirmMessage.
 	Link bool
@@ -51,6 +58,23 @@ type Action struct {
 
 // GatingRole implements HasRequiredRole.
 func (a Action) GatingRole() Role { return a.RequiredRole }
+
+// ActionPrompt is the single free-text field an Action collects before it is
+// submitted - a reason, a ticket reference. Required makes the browser refuse
+// an empty value, which mirrors the server-side rule rather than replacing it.
+type ActionPrompt struct {
+	Name     string
+	Label    string
+	Required bool
+}
+
+// ActionControl pairs an action with the id its dialog is addressed by, so one
+// template renders both the actions card and the buttons inside a table row
+// without their modal ids colliding.
+type ActionControl struct {
+	Action Action
+	ID     string
+}
 
 // SummaryItem is one label/value row shown above the page content, describing
 // the current state of the tracked object. Ordered slice (not a map) so the page

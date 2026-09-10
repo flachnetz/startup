@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"strconv"
 )
 
 // Block is one renderable section of a page. Blocks are rendered top to bottom
@@ -277,8 +278,13 @@ type ActionsBlock []Action
 
 func (b ActionsBlock) Render(rc RenderContext) (template.HTML, error) {
 	actions := GateSlice(rc, b)
+	controls := make([]ActionControl, len(actions))
 
-	return TemplateBlock{Name: "block/actions", Model: actions, Skip: len(actions) == 0, Template: shell}.Render(rc)
+	for i, a := range actions {
+		controls[i] = ActionControl{Action: a, ID: strconv.Itoa(i)}
+	}
+
+	return TemplateBlock{Name: "block/actions", Model: controls, Skip: len(controls) == 0, Template: shell}.Render(rc)
 }
 
 // PagerModel is the pagination state a PagerBlock renders. Both pagers (above
@@ -297,6 +303,10 @@ type PagerModel struct {
 type tableModel struct {
 	Headers []string
 	Rows    []OverviewRow
+	// HasActions is true when the table carries an actions column at all. It is
+	// computed before role gating, so a read-only viewer sees the same column
+	// count as a writer - an empty cell rather than a shifted row.
+	HasActions bool
 }
 
 // FiltersBlock renders the GET filter form on its own, outside any card. Reach
@@ -323,7 +333,29 @@ func PagerBlock(m PagerModel) Block {
 // inside a PanelBlock. Always renders (shows a "No records." row when rows is
 // empty).
 func tableRowsBlock(headers []string, rows []OverviewRow) Block {
-	return TemplateBlock{Name: "overview/table-flush", Model: tableModel{Headers: headers, Rows: rows}, Template: shell}
+	return BlockFunc(func(rc RenderContext) (template.HTML, error) {
+		// Row actions are gated like an ActionsBlock: a viewer who may not perform
+		// the action does not see the button, because a disabled one still names
+		// the endpoint to curl.
+		var hasActions bool
+
+		gated := make([]OverviewRow, len(rows))
+		for i, row := range rows {
+			if len(row.Actions) > 0 {
+				hasActions = true
+				row.Actions = GateSlice(rc, row.Actions)
+			}
+
+			gated[i] = row
+		}
+
+		return TemplateBlock{
+			Name:  "overview/table-flush",
+			Model: tableModel{Headers: headers, Rows: gated, HasActions: hasActions},
+
+			Template: shell,
+		}.Render(rc)
+	})
 }
 
 // filtersCardBodyBlock is the filter form padded as one card-body section,

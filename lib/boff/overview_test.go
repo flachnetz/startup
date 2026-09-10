@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/flachnetz/startup/v2/lib/jwt"
 )
 
 // The filter form only exists when the caller passes fields, and applied values
@@ -242,5 +244,38 @@ func TestRenderOverviewPagerJumpsToFirstAndLast(t *testing.T) {
 	unknown := render(OverviewConfig{Title: "t", Headers: []string{"ID"}, Page: 2, HasNext: true})
 	if strings.Contains(unknown, "Last") {
 		t.Errorf("last-page jump offered without a total:\n%s", unknown)
+	}
+}
+
+// An overview page gates against the viewer like any other page. Without the
+// viewer travelling into the render config, every role-gated element on every
+// list page is silently dropped - which is how row actions came to render as an
+// empty cell for a user who may act.
+func TestOverviewConfigCarriesTheViewerIntoGating(t *testing.T) {
+	rows := []OverviewRow{{Cells: []string{"a"}, Actions: []Action{{
+		ButtonText: "Mark replayed", Endpoint: "/parked/1/disposition", RequiredRole: RoleWrite,
+	}}}}
+
+	var denied bytes.Buffer
+	if err := RenderOverviewWithConfig(&denied, OverviewConfig{
+		Title: "t", Headers: []string{"Thing", "Actions"}, Rows: rows,
+	}); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+
+	if strings.Contains(denied.String(), "Mark replayed") {
+		t.Error("no viewer must deny a gated row action")
+	}
+
+	var allowed bytes.Buffer
+	if err := RenderOverviewWithConfig(&allowed, OverviewConfig{
+		Title: "t", Headers: []string{"Thing", "Actions"}, Rows: rows,
+		Viewer: &jwt.Identity{Subject: "ops", Roles: []string{jwt.RoleWrite}},
+	}); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+
+	if !strings.Contains(allowed.String(), "Mark replayed") {
+		t.Errorf("a viewer with the write role was not offered the action:\n%s", allowed.String())
 	}
 }
