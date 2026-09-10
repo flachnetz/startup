@@ -73,3 +73,92 @@ func TestActionsBlockConfirmTextOverridesTheConfirmButtonLabel(t *testing.T) {
 		t.Errorf("ConfirmText not used:\n%s", out)
 	}
 }
+
+// An action whose server-side rule refuses an empty reason renders the field
+// that collects one. Without it the operator learns of the rule from an error
+// page, which is what the parked-message exclusion did.
+func TestActionsBlockPromptRendersTheFieldInsideTheForm(t *testing.T) {
+	html, err := ActionsBlock([]Action{{
+		Description: "Exclude", ButtonText: "Exclude",
+		Endpoint:       "/finance/backoffice/parked/3/disposition?disposition=EXCLUDED",
+		ConfirmMessage: "Exclude this message permanently?",
+		Prompt:         &ActionPrompt{Name: "reason", Label: "Why is it excluded?", Required: true},
+	}}).Render(RenderContext{})
+	if err != nil {
+		t.Fatalf("execute template: %v", err)
+	}
+	out := string(html)
+
+	for _, want := range []string{
+		`<form class="modal-content" method="POST"`,
+		`name="reason"`,
+		` required`,
+		`Why is it excluded?`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("prompt missing %s:\n%s", want, out)
+		}
+	}
+}
+
+// A prompt alone opens the dialog: the field cannot be filled in by a form that
+// submits on click.
+func TestActionsBlockPromptImpliesTheDialog(t *testing.T) {
+	html, err := ActionsBlock([]Action{{
+		ButtonText: "Exclude", Endpoint: "/x",
+		Prompt: &ActionPrompt{Name: "reason", Label: "Reason", Required: true},
+	}}).Render(RenderContext{})
+	if err != nil {
+		t.Fatalf("execute template: %v", err)
+	}
+
+	if !strings.Contains(string(html), `data-bs-toggle="modal"`) {
+		t.Errorf("a prompt without a confirm message did not open a dialog:\n%s", html)
+	}
+}
+
+// Row actions get dialog ids of their own, or the second row's button opens the
+// first row's modal.
+func TestTableBlockRowActionsGetRowScopedDialogIds(t *testing.T) {
+	rows := []OverviewRow{
+		{Cells: []string{"a", ""}, Actions: []Action{{
+			ButtonText: "Mark replayed", Endpoint: "/parked/1/disposition", ConfirmMessage: "Replayed?",
+		}}},
+		{Cells: []string{"b", ""}, Actions: []Action{{
+			ButtonText: "Mark replayed", Endpoint: "/parked/2/disposition", ConfirmMessage: "Replayed?",
+		}}},
+	}
+
+	html, err := TableBlock([]string{"Thing", "Actions"}, rows).Render(RenderContext{})
+	if err != nil {
+		t.Fatalf("execute template: %v", err)
+	}
+	out := string(html)
+
+	for _, want := range []string{`id="action-confirm-row0-0"`, `id="action-confirm-row1-0"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("row action dialog id missing %s:\n%s", want, out)
+		}
+	}
+}
+
+// The actions column keeps its cell for a viewer who may perform none of them,
+// so the row does not shift left under the headers.
+func TestTableBlockActionsColumnSurvivesGating(t *testing.T) {
+	rows := []OverviewRow{{Cells: []string{"a"}, Actions: []Action{{
+		ButtonText: "Mark replayed", Endpoint: "/parked/1/disposition", RequiredRole: RoleWrite,
+	}}}}
+
+	html, err := TableBlock([]string{"Thing", "Actions"}, rows).Render(RenderContext{})
+	if err != nil {
+		t.Fatalf("execute template: %v", err)
+	}
+	out := string(html)
+
+	if strings.Contains(out, "Mark replayed") {
+		t.Errorf("a viewer without the write role was offered the action:\n%s", out)
+	}
+	if got := strings.Count(out, "<td"); got != 2 {
+		t.Errorf("row rendered %d cells, want 2 (the empty actions cell must stay):\n%s", got, out)
+	}
+}

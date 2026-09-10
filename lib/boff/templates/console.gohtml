@@ -29,6 +29,11 @@
 .pip-err{background:var(--bs-danger)}
 .pip-warn{background:var(--bs-warning)}
 .status{display:inline-flex;align-items:center;gap:.4rem;font-size:.8125rem;font-weight:500;white-space:nowrap}
+/* Inside the facts grid a toned value is a sentence as often as it is a chip -
+   an urgency note, "18, oldest ... (1h10m ago)". nowrap there let it run past
+   its own column and overlap the next fact, so it wraps like any other value.
+   The pip stays on the first line, and a chip in a row keeps its nowrap. */
+.fact .status{white-space:normal;align-items:baseline;overflow-wrap:anywhere}
 .status-ok{color:var(--bs-success-text-emphasis)}
 .status-err{color:var(--bs-danger-text-emphasis)}
 .status-warn{color:var(--bs-warning-text-emphasis)}

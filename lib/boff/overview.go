@@ -1,9 +1,12 @@
 package boff
 
 import (
+	"fmt"
 	"io"
 	"net/url"
 	"strconv"
+
+	"github.com/flachnetz/startup/v2/lib/jwt"
 )
 
 // OverviewFilter is one field of the overview filter form. Value is the
@@ -64,6 +67,12 @@ type OverviewConfig struct {
 	// those default blocks and returns the blocks to render in order - so a
 	// caller can reorder them, drop one, or splice its own Block in.
 	Blocks func(defaults DefaultOverviewBlocks) []Block
+
+	// Viewer is the identity every gated element on the page is measured
+	// against, the same value RenderConfig.Viewer takes - use ViewerOf on the
+	// request context. Nil denies everything gated, so a list page that offers
+	// role-gated row actions or summary links renders none of them without it.
+	Viewer *jwt.Identity
 }
 
 // DefaultOverviewBlocks are the built-in blocks an overview page renders out of
@@ -125,6 +134,27 @@ type OverviewRow struct {
 	// operator scans down rather than reads, e.g. a status. A cell link wins over
 	// a tone.
 	CellTones []string
+
+	// Actions render as buttons in one extra trailing cell, so a decision that
+	// needs no further reading is taken from the list instead of from a detail
+	// page per row. The caller adds the matching header itself; a row with no
+	// actions renders no extra cell, so give every row the same shape (an empty
+	// Actions slice is fine) when any row has one.
+	//
+	// Gated per action like an ActionsBlock: an action the viewer may not perform
+	// is not rendered at all.
+	Actions []Action
+}
+
+// ActionControls pairs this row's actions with dialog ids unique to the row, so
+// two rows offering the same action do not open each other's modal.
+func (r OverviewRow) ActionControls(rowIndex int) []ActionControl {
+	controls := make([]ActionControl, len(r.Actions))
+	for i, a := range r.Actions {
+		controls[i] = ActionControl{Action: a, ID: fmt.Sprintf("row%d-%d", rowIndex, i)}
+	}
+
+	return controls
 }
 
 // CellAt pairs a cell with its own link, so the template does not have to index
@@ -188,5 +218,5 @@ func RenderOverviewWithConfig(w io.Writer, cfg OverviewConfig) error {
 		blocks = cfg.Blocks(defaults)
 	}
 
-	return Render(w, RenderConfig{Title: cfg.Title, Blocks: blocks})
+	return Render(w, RenderConfig{Title: cfg.Title, Viewer: cfg.Viewer, Blocks: blocks})
 }
