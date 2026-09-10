@@ -74,6 +74,31 @@ func TestActionsBlockConfirmTextOverridesTheConfirmButtonLabel(t *testing.T) {
 	}
 }
 
+// A bare sentence over a footer reads like a browser alert(): the dialog says
+// which action is being confirmed, offers a close control, and sits in the
+// middle of the viewport instead of over the navigation bar.
+func TestActionsBlockConfirmationHasATitledCentredDialog(t *testing.T) {
+	html, err := ActionsBlock([]Action{{
+		Description: "Re-read the offset", ButtonText: "Reprocess now",
+		Endpoint: "/reprocess", ConfirmMessage: "Re-read this message?",
+	}}).Render(RenderContext{})
+	if err != nil {
+		t.Fatalf("execute template: %v", err)
+	}
+	out := string(html)
+
+	for _, want := range []string{
+		`class="modal-dialog modal-dialog-centered"`,
+		`aria-labelledby="action-title-0"`,
+		`id="action-title-0">Reprocess now</h5>`,
+		`class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("confirmation dialog missing %s:\n%s", want, out)
+		}
+	}
+}
+
 // An action whose server-side rule refuses an empty reason renders the field
 // that collects one. Without it the operator learns of the rule from an error
 // page, which is what the parked-message exclusion did.
