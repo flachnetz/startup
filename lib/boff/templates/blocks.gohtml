@@ -95,9 +95,14 @@
 {{ else if or $a.ConfirmMessage $a.Prompt }}
     <button class="btn btn-sm btn-outline-danger" type="button"
             data-bs-toggle="modal" data-bs-target="#action-confirm-{{ $id }}">{{ $a.ButtonText }}</button>
-    <div class="modal fade" id="action-confirm-{{ $id }}" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
+    <div class="modal fade" id="action-confirm-{{ $id }}" tabindex="-1"
+         aria-hidden="true" aria-labelledby="action-title-{{ $id }}">
+        <div class="modal-dialog modal-dialog-centered">
             <form class="modal-content" method="POST" action="{{ $a.Endpoint }}">
+                <div class="modal-header">
+                    <h5 class="modal-title fs-6" id="action-title-{{ $id }}">{{ $a.ButtonText }}</h5>
+                    <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
                 <div class="modal-body">
                     {{ with $a.ConfirmMessage }}<p class="mb-0">{{ . }}</p>{{ end }}
                     {{ with $a.Prompt }}
