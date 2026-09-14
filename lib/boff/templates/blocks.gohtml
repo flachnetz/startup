@@ -95,7 +95,10 @@
 {{ else if or $a.ConfirmMessage $a.Prompt }}
     <button class="btn btn-sm btn-outline-danger" type="button"
             data-bs-toggle="modal" data-bs-target="#action-confirm-{{ $id }}">{{ $a.ButtonText }}</button>
-    <div class="modal fade" id="action-confirm-{{ $id }}" tabindex="-1"
+    {{/* text-wrap: a row action renders inside the table's text-nowrap cell, and
+         the modal is a child of it, so without this the confirmation sentence
+         runs on one line straight out of the dialog. */}}
+    <div class="modal fade text-wrap" id="action-confirm-{{ $id }}" tabindex="-1"
          aria-hidden="true" aria-labelledby="action-title-{{ $id }}">
         <div class="modal-dialog modal-dialog-centered">
             <form class="modal-content" method="POST" action="{{ $a.Endpoint }}">
