@@ -187,3 +187,29 @@ func TestTableBlockActionsColumnSurvivesGating(t *testing.T) {
 		t.Errorf("row rendered %d cells, want 2 (the empty actions cell must stay):\n%s", got, out)
 	}
 }
+
+// A row action lives in the table's text-nowrap cell, and its modal is a child
+// of that cell, so the confirmation sentence inherits white-space: nowrap and
+// runs out of the dialog on one line. The modal carries text-wrap to put it
+// back.
+func TestActionsBlockConfirmationWrapsInsideANowrapTableCell(t *testing.T) {
+	html, err := TableBlock([]string{"Topic", ""}, []OverviewRow{{
+		Cells: []string{"payment_captured"},
+		Actions: []Action{{
+			ButtonText: "Reprocess now", Endpoint: "/reprocess",
+			ConfirmMessage: "Re-read this message from Kafka and journal it if the ledger accepts it now?",
+		}},
+	}}).Render(RenderContext{})
+	if err != nil {
+		t.Fatalf("execute template: %v", err)
+	}
+
+	out := string(html)
+
+	if !strings.Contains(out, `text-nowrap`) {
+		t.Fatalf("the action cell no longer sets text-nowrap, so this guard is measuring nothing:\n%s", out)
+	}
+	if !strings.Contains(out, `class="modal fade text-wrap"`) {
+		t.Errorf("modal does not undo the cell's nowrap:\n%s", out)
+	}
+}
