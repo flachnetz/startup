@@ -15,6 +15,19 @@
   --oc-row-pad: 5px;
 }
 
+/* ---- actions column pinned to the right edge ----
+   A wide table scrolls inside .table-responsive, and the row's buttons are the
+   last column: without pinning they sit off-screen and the decision looks
+   unavailable. The cell paints its own background because a scrolled cell would
+   otherwise show the content passing underneath it; .table-hover works through
+   an inset box-shadow and still tints it. */
+.table-responsive td.sticky-actions,.table-responsive th.sticky-actions{
+  position:sticky;right:0;z-index:1;
+  box-shadow:-.5rem 0 .5rem -.5rem rgba(0,0,0,.18);
+}
+.table-responsive td.sticky-actions{background-color:var(--bs-body-bg)}
+.table-responsive th.sticky-actions{background-color:var(--bs-tertiary-bg)}
+
 .font-mono{font-family:var(--oc-mono);font-variant-numeric:tabular-nums}
 .ell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .mw0{min-width:0}
@@ -347,12 +360,27 @@
     });
   });
 
+  // The actions cell is position:sticky, which makes it a stacking context: a
+  // modal nested in it cannot rise above the backdrop the modal appends to
+  // <body>, so the confirmation opens greyed out and unclickable. Moving the
+  // dialog to <body> keeps the pinned column and the dialog both working; the
+  // form carries its own action, so nothing depends on where it sits.
+  function freeStickyModals() {
+    document.querySelectorAll(".sticky-actions .modal").forEach(function (modal) {
+      document.body.appendChild(modal);
+    });
+  }
+
   // The rows above this script are already parsed, but the shell may still be
   // streaming the rest of the document - restore once the body is complete.
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", restore);
+    document.addEventListener("DOMContentLoaded", function () {
+      restore();
+      freeStickyModals();
+    });
   } else {
     restore();
+    freeStickyModals();
   }
 })();
 </script>

@@ -309,6 +309,12 @@ type tableModel struct {
 	HasActions bool
 }
 
+// StickyHeader reports whether the header at index i labels the actions column,
+// which by convention is the last header of a table that has actions.
+func (m tableModel) StickyHeader(i int) bool {
+	return m.HasActions && i == len(m.Headers)-1
+}
+
 // FiltersBlock renders the GET filter form on its own, outside any card. Reach
 // for FilterableTableBlock instead when the filters belong above a results
 // table - the common case, and the default overview layout. Renders nothing
