@@ -167,6 +167,27 @@ func TestTableBlockRowActionsGetRowScopedDialogIds(t *testing.T) {
 	}
 }
 
+// A wide table scrolls sideways, so the actions column is pinned to the right
+// edge: header and cell both carry the class the stylesheet makes sticky.
+func TestTableBlockActionsColumnIsPinnedToTheRightEdge(t *testing.T) {
+	rows := []OverviewRow{{Cells: []string{"a"}, Actions: []Action{{
+		ButtonText: "Mark replayed", Endpoint: "/parked/1/disposition",
+	}}}}
+
+	html, err := TableBlock([]string{"Thing", "Decide"}, rows).Render(RenderContext{})
+	if err != nil {
+		t.Fatalf("execute template: %v", err)
+	}
+	out := string(html)
+
+	if got := strings.Count(out, "sticky-actions"); got != 2 {
+		t.Errorf("sticky-actions appeared %d times, want 2 (header and cell):\n%s", got, out)
+	}
+	if !strings.Contains(out, `<th scope="col" class="fw-semibold py-3 sticky-actions">Decide</th>`) {
+		t.Errorf("the actions header is not the pinned one:\n%s", out)
+	}
+}
+
 // The actions column keeps its cell for a viewer who may perform none of them,
 // so the row does not shift left under the headers.
 func TestTableBlockActionsColumnSurvivesGating(t *testing.T) {

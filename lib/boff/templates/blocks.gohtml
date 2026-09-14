@@ -186,7 +186,7 @@
 {{ define "overview/table-rows" }}
 <table class="table table-hover align-middle mb-0">
     <thead class="table-light">
-    <tr>{{ range .Headers }}<th scope="col" class="fw-semibold py-3">{{ . }}</th>{{ end }}</tr>
+    <tr>{{ range $i, $h := .Headers }}<th scope="col" class="fw-semibold py-3{{ if $.StickyHeader $i }} sticky-actions{{ end }}">{{ $h }}</th>{{ end }}</tr>
     </thead>
     <tbody>
     {{ range $rowIndex, $row := .Rows }}
@@ -202,7 +202,7 @@
         </td>
         {{ end }}
         {{ if $.HasActions }}
-        <td class="py-3 text-nowrap">
+        <td class="py-3 text-nowrap sticky-actions">
             <div class="d-flex align-items-center gap-2">
                 {{ range $row.ActionControls $rowIndex }}{{ template "boff/action-control" . }}{{ end }}
             </div>
