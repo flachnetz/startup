@@ -32,7 +32,7 @@ type KafkaOptions struct {
 		DefaultConfig kafka.ConfigMap
 	}
 
-	KafkaAddresses        []string `long:"kafka-address" env:"KAFKA_ADDRESS" validate:"dive,hostport" description:"Address of kafka server to use. Can be specified multiple times to connect to multiple brokers."`
+	KafkaAddresses        []string `long:"kafka-address" env:"KAFKA_ADDRESS" env-delim:"," validate:"dive,hostport" description:"Address of kafka server to use. Can be specified multiple times, or as a ',' separated list in KAFKA_ADDRESS, to connect to multiple brokers."`
 	KafkaOffsetReset      string   `long:"kafka-offset-reset" env:"KAFKA_OFFSET_RESET" default:"smallest" description:"Offset reset for kafka topic" choice:"smallest" choice:"largest"` //nolint:staticcheck // go-flags reads repeated choice tags
 	KafkaReplication      int16    `long:"kafka-replication" env:"KAFKA_REPLICATION" default:"3" description:"Default kafka replication for new topics." validate:"gt=0"`
 	KafkaSecurityProtocol string   `long:"kafka-security-protocol" env:"KAFKA_SECURITY_PROTOCOL" default:"ssl" description:"Security protocol" choice:"ssl" choice:"plaintext" choice:"sasl_ssl"` //nolint:staticcheck // go-flags reads repeated choice tags
