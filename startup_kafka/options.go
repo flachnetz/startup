@@ -35,8 +35,13 @@ type KafkaOptions struct {
 	KafkaAddresses        []string `long:"kafka-address" env:"KAFKA_ADDRESS" validate:"dive,hostport" description:"Address of kafka server to use. Can be specified multiple times to connect to multiple brokers."`
 	KafkaOffsetReset      string   `long:"kafka-offset-reset" env:"KAFKA_OFFSET_RESET" default:"smallest" description:"Offset reset for kafka topic" choice:"smallest" choice:"largest"` //nolint:staticcheck // go-flags reads repeated choice tags
 	KafkaReplication      int16    `long:"kafka-replication" env:"KAFKA_REPLICATION" default:"3" description:"Default kafka replication for new topics." validate:"gt=0"`
-	KafkaSecurityProtocol string   `long:"kafka-security-protocol" env:"KAFKA_SECURITY_PROTOCOL" default:"ssl" description:"Security protocol" choice:"ssl" choice:"plaintext"` //nolint:staticcheck // go-flags reads repeated choice tags
-	KafkaProperties       []string `long:"kafka-property" env:"KAFKA_PROPERTY" description:"Rdkafka properties in key=value format"`
+	KafkaSecurityProtocol string   `long:"kafka-security-protocol" env:"KAFKA_SECURITY_PROTOCOL" default:"ssl" description:"Security protocol" choice:"ssl" choice:"plaintext" choice:"sasl_ssl"` //nolint:staticcheck // go-flags reads repeated choice tags
+	KafkaProperties       []string `long:"kafka-property" env:"KAFKA_PROPERTY" env-delim:";" description:"Rdkafka properties in key=value format. Can be specified multiple times, or as a ';' separated list in KAFKA_PROPERTY."`
+
+	// SASL credentials, e.g. SCRAM against AWS MSK. Only used with security protocol sasl_ssl.
+	KafkaSaslMechanism string `long:"kafka-sasl-mechanism" env:"KAFKA_SASL_MECHANISM" validate:"required_if=KafkaSecurityProtocol sasl_ssl" description:"SASL mechanism, e.g. SCRAM-SHA-512. Required for security protocol sasl_ssl."`
+	KafkaSaslUsername  string `long:"kafka-sasl-username" env:"KAFKA_SASL_USERNAME" description:"SASL username."`
+	KafkaSaslPassword  string `long:"kafka-sasl-password" env:"KAFKA_SASL_PASSWORD" description:"SASL password."`
 
 	DefaultConsumerGroup string `long:"kafka-default-consumer-group" env:"KAFKA_DEFAULT_CONSUMER_GROUP" description:"Set default consumer group. Can be set to RANDOM."`
 
@@ -174,6 +179,12 @@ func (opts *KafkaOptions) DefaultConfig(overrideConfig kafka.ConfigMap) kafka.Co
 		"go.logs.channel.enable": true,
 	}
 
+	if opts.KafkaSecurityProtocol == "sasl_ssl" {
+		config["sasl.mechanisms"] = opts.KafkaSaslMechanism
+		config["sasl.username"] = opts.KafkaSaslUsername
+		config["sasl.password"] = opts.KafkaSaslPassword
+	}
+
 	// extend with custom config from inputs
 	maps.Copy(config, opts.Inputs.DefaultConfig)
 
@@ -182,6 +193,11 @@ func (opts *KafkaOptions) DefaultConfig(overrideConfig kafka.ConfigMap) kafka.Co
 
 	// set values from cli
 	for _, prop := range opts.KafkaProperties {
+		// KAFKA_PROPERTY="a=1;b=2;" leaves an empty entry after the last ';'
+		if strings.TrimSpace(prop) == "" {
+			continue
+		}
+
 		err := config.Set(prop)
 		startup_base.FatalOnError(err, "Set kafka property %q", prop)
 	}
