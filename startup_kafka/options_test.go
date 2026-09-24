@@ -78,3 +78,14 @@ func TestKafkaOptionsPropertiesFromEnv(t *testing.T) {
 	require.Equal(t, pem, config["ssl.ca.pem"])
 	require.Equal(t, "broker,topic", config["debug"])
 }
+
+func TestKafkaOptionsAddressListFromEnv(t *testing.T) {
+	// AWS MSK hands out the bootstrap brokers as one comma separated string.
+	opts, err := parseKafkaOptions(t, map[string]string{
+		"KAFKA_ADDRESS": "b-1.msk:9096,b-2.msk:9096,b-3.msk:9096",
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, []string{"b-1.msk:9096", "b-2.msk:9096", "b-3.msk:9096"}, opts.KafkaAddresses)
+	require.Equal(t, "b-1.msk:9096,b-2.msk:9096,b-3.msk:9096", opts.DefaultConfig(nil)["bootstrap.servers"])
+}
