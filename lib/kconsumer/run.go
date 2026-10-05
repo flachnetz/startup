@@ -30,7 +30,10 @@ func RunConsumer(ctx context.Context, partitionConsumer *PartitionConsumer, hand
 
 			slog.InfoContext(ctx, "Starting kafka consumer", slog.Any("handler", handler))
 			err := partitionConsumer.Consume(ctx, handler)
-			if err != nil {
+			// DEV-NOTE: Consume returns the context error on every shutdown. That is not a
+			// failure and is logged at INFO below; logging it at ERROR made each pod stop
+			// look like a consumer fault in error-rate alerts.
+			if err != nil && ctx.Err() == nil {
 				log.ErrorContext(ctx, "Consumer stopped with error, restarting", slog.String("error", err.Error()))
 			}
 		}()
