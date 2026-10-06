@@ -2,9 +2,11 @@ package startup_base
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"sync/atomic"
 
@@ -23,10 +25,20 @@ var (
 
 var LogLevel slog.LevelVar
 
-var handlerVar slog.Handler = slog.NewTextHandler(
-	os.Stderr,
-	&slog.HandlerOptions{AddSource: true},
-)
+// handlerVar logs until Initialize installs the configured handler.
+var handlerVar = bootstrapHandler(os.Stderr)
+
+// bootstrapHandler returns the handler used before Initialize runs: JSON when
+// the LOG_JSON environment variable is true, text otherwise.
+func bootstrapHandler(w io.Writer) slog.Handler {
+	opts := &slog.HandlerOptions{AddSource: true}
+
+	if enabled, _ := strconv.ParseBool(os.Getenv("LOG_JSON")); enabled {
+		return slog.NewJSONHandler(w, opts)
+	}
+
+	return slog.NewTextHandler(w, opts)
+}
 
 var baseOptions atomic.Pointer[BaseOptions]
 
