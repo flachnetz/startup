@@ -34,12 +34,7 @@ func (opts *TracingOptions) Initialize(base startup_base.BaseOptions) {
 	opts.once.Do(func() {
 		ctx := context.Background()
 
-		res, err := resource.New(
-			ctx,
-			resource.WithAttributes(
-				semconv.ServiceName(base.ServiceName),
-			),
-		)
+		res, err := newResource(ctx, base.ServiceName)
 		startup_base.PanicOnError(err, "Unable to create otel resource")
 
 		var exporter sdktrace.SpanExporter
@@ -65,4 +60,19 @@ func (opts *TracingOptions) Initialize(base startup_base.BaseOptions) {
 			propagation.Baggage{},
 		))
 	})
+}
+
+// newResource returns the resource of the service's spans: service.name and the
+// telemetry.sdk.* attributes of the OpenTelemetry Go SDK.
+func newResource(ctx context.Context, serviceName string) (*resource.Resource, error) {
+	// DEV-NOTE: Elastic APM derives agent.name from telemetry.sdk.name/language
+	// ("opentelemetry/go"); without them it is "otlp", and Kibana's service Metrics
+	// tab finds no Go dashboard for the service.
+	return resource.New(
+		ctx,
+		resource.WithTelemetrySDK(),
+		resource.WithAttributes(
+			semconv.ServiceName(serviceName),
+		),
+	)
 }
