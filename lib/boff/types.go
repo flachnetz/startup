@@ -28,7 +28,8 @@ func RoleOf(audience, role string) Role {
 // copy-to-clipboard, but nothing an action depends on.) Endpoint must therefore be a
 // URL the browser can resolve - a service behind backoffice builds it from the
 // base path backoffice sends with the fragment request, not from its own
-// internal path.
+// internal path. The base path already carries the tenant scope; for a link
+// to another service's page use ScopedPath.
 type Action struct {
 	Description    string // e.g. "Cancel item Sword-Pack"
 	ButtonText     string // e.g. "Cancel"

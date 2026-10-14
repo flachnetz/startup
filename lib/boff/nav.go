@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"net/http"
 	"path"
+	"slices"
 	"strings"
 
 	"github.com/labstack/echo/v5"
@@ -70,16 +71,52 @@ type NavLink struct {
 	IsActive bool `json:"-"`
 }
 
+const (
+	// maxBreadcrumbCache is the number of ancestor entries (label and path by
+	// key) the breadcrumb cookie remembers.
+	maxBreadcrumbCache = 30
+
+	// maxNavigationSets is the number of navigation link sets, one per subject
+	// (e.g. one per player), the navigation cookie remembers.
+	maxNavigationSets = 6
+
+	// maxCookieValueLen is the largest encoded cookie value we write. Browsers
+	// drop a cookie above about 4096 bytes for name, value and attributes, so the
+	// oldest entries are evicted before that is reached.
+	maxCookieValueLen = 3800
+
+	// breadcrumbKeysContextKey holds the keys of the breadcrumb chain of the
+	// current request, deepest first, see ReconcileBreadcrumbs.
+	breadcrumbKeysContextKey = "boff.breadcrumb-keys"
+)
+
 // breadcrumbCookie is the JSON-serialized content stored in the breadcrumb
 // cookie.
+//
+// The cookie is shared by all browser tabs, so it must not describe one
+// trail: it is a cache of label and path by key, which any tab can read to
+// fill in the ancestors another service owns.
 type breadcrumbCookie struct {
-	Breadcrumbs []Breadcrumb `json:"e"`
+	// Breadcrumbs is only read, to pick up a cookie written before Cache existed.
+	Breadcrumbs []Breadcrumb `json:"e,omitempty"`
+
+	// Cache holds the most recently used entries first.
+	Cache []Breadcrumb `json:"c,omitempty"`
 }
 
 // navigationCookie is the JSON-serialized content stored in the navigation
 // cookie.
 type navigationCookie struct {
-	Links []NavLink `json:"n"`
+	// Sets holds the most recently stored set first.
+	Sets []navSet `json:"s,omitempty"`
+}
+
+// navSet is the navigation of one subject, identified by the key of the
+// deepest breadcrumb of the page that stored it (e.g. "player:123"). Tabs on
+// different subjects each find their own links.
+type navSet struct {
+	Key   string    `json:"k"`
+	Links []NavLink `json:"l"`
 }
 
 // Reconcile merges the given breadcrumb chain with the entries already
@@ -95,8 +132,8 @@ type navigationCookie struct {
 // entry from new is kept as-is (typically with an empty Path, meaning it
 // cannot be rendered as a link).
 func (c breadcrumbCookie) Reconcile(new []Breadcrumb) breadcrumbCookie {
-	known := make(map[string]Breadcrumb, len(c.Breadcrumbs))
-	for _, entry := range c.Breadcrumbs {
+	known := make(map[string]Breadcrumb, len(c.Cache)+len(c.Breadcrumbs))
+	for _, entry := range append(slices.Clone(c.Breadcrumbs), c.Cache...) {
 		known[entry.Key] = entry
 	}
 
@@ -127,15 +164,67 @@ func (c breadcrumbCookie) Reconcile(new []Breadcrumb) breadcrumbCookie {
 }
 
 // ReconcileBreadcrumbs loads the current breadcrumb cookie, reconciles it
-// with the given breadcrumb chain (see BreadcrumbCookie.Reconcile), saves
-// the result back to the cookie, and returns the reconciled breadcrumbs.
+// with the given breadcrumb chain (see BreadcrumbCookie.Reconcile), adds the
+// chain to the cookie's cache, and returns the reconciled breadcrumbs.
+//
+// It also records the keys of the chain on c. UpdateNavigation and
+// LoadNavigation use them to find the navigation of this page's subject, so
+// call it before them.
 func ReconcileBreadcrumbs(c *echo.Context, entries ...Breadcrumb) []Breadcrumb {
-	cookie, _ := loadBreadcrumbCookie(c)
+	keys := make([]string, 0, len(entries))
+	for i := len(entries) - 1; i >= 0; i-- {
+		if entries[i].Key != "" {
+			keys = append(keys, entries[i].Key)
+		}
+	}
 
-	reconciled := cookie.Reconcile(entries)
-	reconciled.Save(c)
+	c.Set(breadcrumbKeysContextKey, keys)
+
+	cookie, _ := loadBreadcrumbCookie(c)
+	for i := range cookie.Breadcrumbs {
+		cookie.Breadcrumbs[i].Path = unscopedPath(cookie.Breadcrumbs[i].Path)
+	}
+
+	for i := range cookie.Cache {
+		cookie.Cache[i].Path = unscopedPath(cookie.Cache[i].Path)
+	}
+
+	stripped := make([]Breadcrumb, len(entries))
+	for i, entry := range entries {
+		entry.Path = unscopedPath(entry.Path)
+		stripped[i] = entry
+	}
+
+	reconciled := cookie.Reconcile(stripped)
+	cookie.remember(reconciled.Breadcrumbs).Save(c)
+
+	// The cookie is shared by all tabs and holds no scope; the links on the page
+	// get the scope of this request.
+	for i := range reconciled.Breadcrumbs {
+		reconciled.Breadcrumbs[i].Path = ScopedPath(c, reconciled.Breadcrumbs[i].Path)
+	}
 
 	return reconciled.Breadcrumbs
+}
+
+// remember returns the cookie to store after rendering chain: the chain first,
+// then what was cached before, without entries that carry nothing to show.
+func (bc breadcrumbCookie) remember(chain []Breadcrumb) breadcrumbCookie {
+	seen := make(map[string]bool, maxBreadcrumbCache)
+	cache := make([]Breadcrumb, 0, maxBreadcrumbCache)
+
+	for _, group := range [][]Breadcrumb{chain, bc.Cache, bc.Breadcrumbs} {
+		for _, entry := range group {
+			if entry.Key == "" || (entry.Label == "" && entry.Path == "") || seen[entry.Key] {
+				continue
+			}
+
+			seen[entry.Key] = true
+			cache = append(cache, entry)
+		}
+	}
+
+	return breadcrumbCookie{Cache: cache[:min(len(cache), maxBreadcrumbCache)]}
 }
 
 // loadBreadcrumbCookie reads and decodes the breadcrumb cookie from the
@@ -163,15 +252,31 @@ func loadBreadcrumbCookie(c *echo.Context) (breadcrumbCookie, bool) {
 // Save encodes the BreadcrumbCookie and writes it as the breadcrumb cookie
 // on the response.
 func (bc breadcrumbCookie) Save(c *echo.Context) {
-	raw, err := json.Marshal(bc)
+	bc.Breadcrumbs = nil
+
+	value := encodeCookieValue(bc)
+	for len(value) > maxCookieValueLen && len(bc.Cache) > 0 {
+		bc.Cache = bc.Cache[:len(bc.Cache)-1]
+		value = encodeCookieValue(bc)
+	}
+
+	setCookie(c, breadcrumbCookieName, value)
+}
+
+func encodeCookieValue(v any) string {
+	raw, err := json.Marshal(v)
 	if err != nil {
-		// Breadcrumbs only ever contain plain strings, so this can't realistically fail.
+		// Only plain strings are marshaled, so this can't realistically fail.
 		panic(err)
 	}
 
+	return base64.RawURLEncoding.EncodeToString(raw)
+}
+
+func setCookie(c *echo.Context, name, value string) {
 	c.SetCookie(&http.Cookie{
-		Name:     breadcrumbCookieName,
-		Value:    base64.RawURLEncoding.EncodeToString(raw),
+		Name:     name,
+		Value:    value,
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   true,
@@ -201,19 +306,25 @@ func loadNavigationCookie(c *echo.Context) (navigationCookie, bool) {
 		return navigationCookie{}, false
 	}
 
-	updateNavigationIsActive(c, nc.Links)
+	for i := range nc.Sets {
+		for j := range nc.Sets[i].Links {
+			nc.Sets[i].Links[j].Path = unscopedPath(nc.Sets[i].Links[j].Path)
+		}
+	}
 
 	return nc, true
 }
 
 func updateNavigationIsActive(c *echo.Context, nav []NavLink) {
-	currentPath := path.Clean(getRealPathFromContext(c))
+	// Both sides are compared without scope: the stored links have none and
+	// Real-Path carries the one of this tab.
+	currentPath := path.Clean(unscopedPath(getRealPathFromContext(c)))
 	for i := range nav {
 		if nav[i].Path == "" {
 			continue
 		}
 
-		nav[i].IsActive = strings.HasPrefix(currentPath, path.Clean(nav[i].Path))
+		nav[i].IsActive = strings.HasPrefix(currentPath, path.Clean(unscopedPath(nav[i].Path)))
 	}
 }
 
@@ -225,39 +336,105 @@ func getRealPathFromContext(c *echo.Context) string {
 	return c.Request().URL.Path
 }
 
-// LoadNavigation returns the persistent top-level navigation links stored
-// in the navigation cookie. It returns nil if the cookie is missing or
-// could not be decoded.
+// navigationKeys are the breadcrumb keys of the current request, deepest
+// first. They are empty when ReconcileBreadcrumbs has not run yet.
+func navigationKeys(c *echo.Context) []string {
+	keys, _ := c.Get(breadcrumbKeysContextKey).([]string)
+	return keys
+}
+
+// LoadNavigation returns the navigation links of the subject of the current
+// page: the set stored under the deepest breadcrumb key of this request that
+// has one. The cookie is shared by all tabs but each tab finds the links of
+// its own subject. It returns nil if there is none.
+//
+// Without breadcrumb keys (ReconcileBreadcrumbs has not been called for this
+// request) the set stored last is returned.
 func LoadNavigation(c *echo.Context) []NavLink {
 	cookie, _ := loadNavigationCookie(c)
-	return cookie.Links
+
+	var links []NavLink
+
+	if keys := navigationKeys(c); len(keys) == 0 {
+		if len(cookie.Sets) > 0 {
+			links = cookie.Sets[0].Links
+		}
+	} else {
+	search:
+		for _, key := range keys {
+			for _, set := range cookie.Sets {
+				if set.Key == key {
+					links = set.Links
+					break search
+				}
+			}
+		}
+	}
+
+	updateNavigationIsActive(c, links)
+	scopeNavigation(c, links)
+
+	return links
 }
 
 // Save encodes the navigationCookie and writes it as the navigation cookie
-// on the response.
+// on the response, dropping the oldest sets until it is small enough.
 func (nc navigationCookie) Save(c *echo.Context) {
-	raw, err := json.Marshal(nc)
-	if err != nil {
-		// Links only ever contain plain strings, so this can't realistically fail.
-		panic(err)
+	value := encodeCookieValue(nc)
+	for len(value) > maxCookieValueLen && len(nc.Sets) > 0 {
+		nc.Sets = nc.Sets[:len(nc.Sets)-1]
+		value = encodeCookieValue(nc)
 	}
 
-	c.SetCookie(&http.Cookie{
-		Name:     navigationCookieName,
-		Value:    base64.RawURLEncoding.EncodeToString(raw),
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
-	})
+	setCookie(c, navigationCookieName, value)
 }
 
-// UpdateNavigation writes links to the navigation cookie as the persistent
-// top-level navigation, replacing whatever was stored before.
+// UpdateNavigation stores links as the navigation of the current page's
+// subject, replacing the set stored for it before (empty links remove it).
+// The subject is the deepest breadcrumb key of this request, so call
+// ReconcileBreadcrumbs first. Sets of other subjects, e.g. open in another tab,
+// are kept; the oldest ones are evicted.
+//
+// The cookie is shared by all tabs, so the links are stored without their
+// scope. links itself is updated for rendering: IsActive is set and every
+// path gets the scope of this request.
 func UpdateNavigation(c *echo.Context, links []NavLink) {
-	navigationCookie{Links: links}.Save(c)
+	var key string
+	if keys := navigationKeys(c); len(keys) > 0 {
+		key = keys[0]
+	}
+
+	cookie, _ := loadNavigationCookie(c)
+
+	sets := make([]navSet, 0, maxNavigationSets)
+
+	if len(links) > 0 {
+		stored := make([]NavLink, len(links))
+		for i, link := range links {
+			link.Path = unscopedPath(link.Path)
+			stored[i] = link
+		}
+
+		sets = append(sets, navSet{Key: key, Links: stored})
+	}
+
+	for _, set := range cookie.Sets {
+		if set.Key != key {
+			sets = append(sets, set)
+		}
+	}
+
+	navigationCookie{Sets: sets[:min(len(sets), maxNavigationSets)]}.Save(c)
 
 	updateNavigationIsActive(c, links)
+	scopeNavigation(c, links)
+}
+
+// scopeNavigation puts the scope of the request in front of every link path.
+func scopeNavigation(c *echo.Context, links []NavLink) {
+	for i := range links {
+		links[i].Path = ScopedPath(c, unscopedPath(links[i].Path))
+	}
 }
 
 // BreadcrumbsBlock renders the breadcrumb trail as a bootstrap breadcrumb.
