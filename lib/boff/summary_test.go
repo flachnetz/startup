@@ -110,7 +110,7 @@ func TestSummaryItemJSONRendersCollapsiblePayload(t *testing.T) {
 func TestSummaryRendersFactGrid(t *testing.T) {
 	var buf bytes.Buffer
 	err := Render(&buf, RenderConfig{Title: "t", Blocks: []Block{SummaryBlock([]SummaryItem{
-		{Label: "Shop", Value: "showmethemoney-pt"},
+		{Label: "Shop", Value: "example-shop"},
 		{Label: "Total charged", Value: "2.50 EUR"},
 		{Label: "Discount", Value: "0.00 EUR"},
 		{Label: "Request ID", Value: "01M1ETRDSW0QHC9Y6GAVX23ZQW"},
@@ -124,7 +124,7 @@ func TestSummaryRendersFactGrid(t *testing.T) {
 		`<dl class="fact-grid mb-0">`,
 		`<dt class="lbl">Shop</dt>`,
 		// A shop name is prose: not monospaced, not copyable.
-		`showmethemoney-pt`,
+		`example-shop`,
 		`class="text-break font-mono">`,
 		`class="text-break font-mono zero">`,
 		// An id is shown in full and is copyable.
@@ -140,7 +140,7 @@ func TestSummaryRendersFactGrid(t *testing.T) {
 		t.Errorf("summary still renders the old two-column list:\n%s", out)
 	}
 	// Prose is not turned into a copy button.
-	if strings.Contains(out, `data-copy="showmethemoney-pt"`) {
+	if strings.Contains(out, `data-copy="example-shop"`) {
 		t.Errorf("a shop name was rendered as a copyable id:\n%s", out)
 	}
 }
@@ -170,17 +170,17 @@ func TestSummaryLinkedIdRendersInFullWithACopyControl(t *testing.T) {
 func TestSummaryRowRendersItemRow(t *testing.T) {
 	var buf bytes.Buffer
 	err := Render(&buf, RenderConfig{Title: "t", Blocks: []Block{SummaryBlock([]SummaryItem{
-		{Label: "Shop", Value: "showmethemoney-pt"},
+		{Label: "Shop", Value: "example-shop"},
 		{Label: "Item 0", JSON: `{"offerId":"o1"}`, Row: &SummaryRow{
 			Tone:     "success",
-			Title:    "M\u00e1quina de Dinheiro (1)",
+			Title:    "Caf\u00e9 Cr\u00e8me (1)",
 			Subtitle: "\u00d71 \u00b7 2.50 EUR",
-			Tags:     []string{"competition"},
+			Tags:     []string{"subscription"},
 			State:    "ACTIVE", StateTone: "success",
 			Meta: []MetaPart{
 				{Text: "item 0"},
-				{Text: "fulfilled by draw-service 15:53:43"},
-				{Text: "draw history", Link: "/draws/backoffice/draw/d1"},
+				{Text: "fulfilled by order-service 15:53:43"},
+				{Text: "order history", Link: "/orders/backoffice/order/o1"},
 			},
 		}},
 	})}})
@@ -192,14 +192,14 @@ func TestSummaryRowRendersItemRow(t *testing.T) {
 	for _, want := range []string{
 		`<div class="item-row">`,
 		`<span class="pip pip-ok"></span>`,
-		`<span class="ev-name">M\u00e1quina de Dinheiro (1)</span>`,
-		`competition</span>`,
+		`<span class="ev-name">Caf\u00e9 Cr\u00e8me (1)</span>`,
+		`subscription</span>`,
 		`ACTIVE</span>`,
-		`<a href="/draws/backoffice/draw/d1">draw history</a>`,
+		`<a href="/orders/backoffice/order/o1">order history</a>`,
 		`aria-controls="summary-row-0"`,
 		`<pre class="payload payload-inline" id="summary-row-0" hidden>`,
 	} {
-		want = strings.ReplaceAll(want, `\u00e1`, "\u00e1")
+		want = strings.NewReplacer(`\u00e9`, "\u00e9", `\u00e8`, "\u00e8").Replace(want)
 		if !strings.Contains(out, want) {
 			t.Errorf("item row is missing %s:\n%s", want, out)
 		}
@@ -237,8 +237,8 @@ func TestSummaryCardsUseDistinctPayloadIds(t *testing.T) {
 func TestSummaryJSONItemWithoutRowStillLeavesTheGrid(t *testing.T) {
 	var buf bytes.Buffer
 	err := Render(&buf, RenderConfig{Title: "t", Blocks: []Block{SummaryBlock([]SummaryItem{
-		{Label: "Shop", Value: "showmethemoney-pt"},
-		{Label: "Item 0", Value: "Maquina de Dinheiro x1 = 1.85 EUR [competition] - CANCELLED", JSON: `{"id":0,"status":"CANCELLED"}`},
+		{Label: "Shop", Value: "example-shop"},
+		{Label: "Item 0", Value: "Cafe Creme x1 = 1.85 EUR [subscription] - CANCELLED", JSON: `{"id":0,"status":"CANCELLED"}`},
 	})}})
 	if err != nil {
 		t.Fatalf("execute template: %v", err)
@@ -248,7 +248,7 @@ func TestSummaryJSONItemWithoutRowStillLeavesTheGrid(t *testing.T) {
 	for _, want := range []string{
 		`<div class="item-row">`,
 		`<span class="lbl">Item 0</span>`,
-		`<span class="item-text">Maquina de Dinheiro x1 = 1.85 EUR [competition] - CANCELLED</span>`,
+		`<span class="item-text">Cafe Creme x1 = 1.85 EUR [subscription] - CANCELLED</span>`,
 		`<pre class="payload payload-inline" id="summary-row-0" hidden>`,
 	} {
 		if !strings.Contains(out, want) {
@@ -271,7 +271,7 @@ func TestSummaryStacksSeveralItemRows(t *testing.T) {
 
 	var buf bytes.Buffer
 	err := Render(&buf, RenderConfig{Title: "t", Blocks: []Block{SummaryBlock([]SummaryItem{
-		{Label: "Shop", Value: "showmethemoney-pt"},
+		{Label: "Shop", Value: "example-shop"},
 		item("Item 0", `{"a":1}`),
 		item("Item 1", `{"b":2}`),
 		item("Item 2", `{"c":3}`),

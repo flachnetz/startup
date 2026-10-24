@@ -40,7 +40,7 @@ func TestKafkaOptionsSASL(t *testing.T) {
 	opts, err := parseKafkaOptions(t, map[string]string{
 		"KAFKA_SECURITY_PROTOCOL": "sasl_ssl",
 		"KAFKA_SASL_MECHANISM":    "SCRAM-SHA-512",
-		"KAFKA_SASL_USERNAME":     "stardust",
+		"KAFKA_SASL_USERNAME":     "example-user",
 		"KAFKA_SASL_PASSWORD":     "secret",
 	})
 	require.NoError(t, err)
@@ -48,7 +48,7 @@ func TestKafkaOptionsSASL(t *testing.T) {
 	config := opts.DefaultConfig(nil)
 	require.Equal(t, "sasl_ssl", config["security.protocol"])
 	require.Equal(t, "SCRAM-SHA-512", config["sasl.mechanisms"])
-	require.Equal(t, "stardust", config["sasl.username"])
+	require.Equal(t, "example-user", config["sasl.username"])
 	require.Equal(t, "secret", config["sasl.password"])
 }
 

@@ -252,7 +252,7 @@ func TestTokenSource_AudiencesDoNotBlockEachOther(t *testing.T) {
 
 	fast := make(chan string, 1)
 	go func() {
-		token, err := src.Token(t.Context(), "limit-service")
+		token, err := src.Token(t.Context(), "inventory-service")
 		require.NoError(t, err)
 		fast <- token
 	}()

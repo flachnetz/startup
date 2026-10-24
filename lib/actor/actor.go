@@ -3,10 +3,8 @@
 // It is a leaf package on purpose: lib/history already imports lib/events, so
 // a type shared by both cannot live in either. It imports nothing but context.
 //
-// DEV-NOTE: see BauerMediaGroup-Stardust/platform-gitops
-// docs/plans/keycloak-service-auth.md section 8. The actor is audit
-// information, never an authorization input - a downstream service must not
-// decide anything from it.
+// DEV-NOTE: the actor is audit information, never an authorization input - a
+// downstream service must not decide anything from it.
 package actor
 
 import "context"

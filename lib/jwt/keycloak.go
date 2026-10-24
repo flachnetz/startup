@@ -50,10 +50,9 @@ type ClientRoles struct {
 
 // KeycloakClaims are the claims of a Keycloak access token.
 //
-// DEV-NOTE: resource_access is a generic map, not a per-service struct. Every
-// hand-written copy of this middleware hardcoded its own client key, which made
-// the code un-shareable and, in one case, mislabelled (a field named
-// PlayerService tagged limit-service).
+// DEV-NOTE: resource_access is a generic map, not a per-service struct. A
+// per-service struct hardcodes its own client key, which makes the middleware
+// un-shareable and lets a field name drift from the client it is tagged with.
 type KeycloakClaims struct {
 	Email          string                 `json:"email"`
 	ResourceAccess map[string]ClientRoles `json:"resource_access"`
@@ -163,10 +162,9 @@ func IdentityFrom(ctx context.Context) (Identity, bool) {
 // name. Passing no roles requires a valid token for the audience and nothing
 // more.
 //
-// DEV-NOTE: see BauerMediaGroup-Stardust/platform-gitops
-// docs/plans/keycloak-service-auth.md section 2. Authentication is the gateway's
-// job, authorization is this middleware's; the audience check is what stops a
-// token minted for another service from being replayed here.
+// DEV-NOTE: authentication is the gateway's job, authorization is this
+// middleware's; the audience check is what stops a token minted for another
+// service from being replayed here.
 func KeycloakRoleMiddleware(verifier Verifier, audience string, roles ...string) echo.MiddlewareFunc {
 	verified := Middleware(MiddlewareOptions[KeycloakClaims]{
 		TokenVerifier: verifier,

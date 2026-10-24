@@ -13,8 +13,8 @@ import (
 // optional "type:" prefix is part of the match (a GroupId, a prefixed request
 // id).
 //
-// The length floor is what keeps a slug out: "showmethemoney-pt" is a shop
-// name an operator reads, not an id they copy.
+// The length floor is what keeps a slug out: "example-shop" is a shop name an
+// operator reads, not an id they copy.
 var idPattern = regexp.MustCompile(`^(?:[A-Za-z][A-Za-z0-9_-]*:)?[A-Za-z0-9_-]{20,}$`)
 
 // IsId reports whether value looks like an identifier - used to decide whether a

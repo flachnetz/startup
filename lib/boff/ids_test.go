@@ -11,7 +11,7 @@ func TestIsId(t *testing.T) {
 	}
 
 	// Prose, amounts and short values are not ids: shortening them loses meaning.
-	prose := []string{"showmethemoney-pt", "2.50 EUR", "Maquina de Dinheiro (1)", "PAID", "2026-09-01 15:52:41 UTC"}
+	prose := []string{"example-shop", "2.50 EUR", "Cafe Creme (1)", "PAID", "2026-09-01 15:52:41 UTC"}
 	for _, value := range prose {
 		if IsId(value) {
 			t.Errorf("IsId(%q) = true, want false", value)

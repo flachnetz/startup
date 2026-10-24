@@ -201,7 +201,7 @@ func TestKeycloakRoleMiddleware_HumanWithUsernameStaysUserActor(t *testing.T) {
 func TestKeycloakRoleMiddleware_RejectsPlayerToken(t *testing.T) {
 	store, call := protectedRoute(t, jwt.RoleRead)
 
-	// a player-service session token has no audience for this service and no
+	// an end-user session token has no audience for this service and no
 	// resource_access at all
 	playerToken := store.Sign(jwt.NewBuilder().
 		Expiration(time.Now().Add(10 * time.Minute)).

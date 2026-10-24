@@ -11,10 +11,9 @@ import (
 // Actor header names. Same vocabulary as the HTTP hops, so an audit trail reads
 // identically whether a step arrived over HTTP or Kafka.
 //
-// DEV-NOTE: see BauerMediaGroup-Stardust/platform-gitops
-// docs/plans/keycloak-service-auth.md section 8. These headers are audit
-// information only. A consumer must never authorize on them: any producer can
-// set any value, so trusting them would let one service impersonate a human.
+// DEV-NOTE: these headers are audit information only. A consumer must never
+// authorize on them: any producer can set any value, so trusting them would let
+// one service impersonate a human.
 const (
 	HeaderActorType  = "Actor-Type"
 	HeaderActorId    = "Actor-Id"
