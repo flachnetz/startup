@@ -39,6 +39,8 @@ func (opts *TracingOptions) Initialize(base startup_base.BaseOptions) {
 			resource.WithAttributes(
 				semconv.ServiceName(base.ServiceName),
 			),
+			// telemetry.sdk.* lets backends identify the SDK, e.g. Elastic derives agent.name opentelemetry/go from it.
+			resource.WithTelemetrySDK(),
 		)
 		startup_base.PanicOnError(err, "Unable to create otel resource")
 

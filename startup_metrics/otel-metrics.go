@@ -72,6 +72,7 @@ func (opts *OTELMetricsOptions) createResource(serviceName string) (*resource.Re
 	return resource.New(
 		context.Background(),
 		resource.WithAttributes(attributes...),
+		resource.WithTelemetrySDK(),
 		resource.WithFromEnv(),
 		resource.WithHost(),
 		resource.WithContainer(),

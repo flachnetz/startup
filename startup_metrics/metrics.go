@@ -68,6 +68,7 @@ func (opts *MetricsOptions) createResource(serviceName string) (*resource.Resour
 	return resource.New(
 		context.Background(),
 		resource.WithAttributes(attributes...),
+		resource.WithTelemetrySDK(),
 		resource.WithFromEnv(),
 		resource.WithHost(),
 		resource.WithContainer(),
