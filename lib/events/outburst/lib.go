@@ -493,12 +493,11 @@ func sweepOutbox(ctx context.Context, db outboxDB, producer *kafka.Producer, bat
 				return nil
 			}
 
-			// A full batch hints there may be more waiting, so keep going after a
-			// short pause. A partial batch means we drained it and can hand control
-			// back to the scheduler.
+			// A full batch hints there may be more waiting, so keep going right
+			// away. A partial batch means we drained it and can hand control back
+			// to the scheduler.
 			if count == limit {
 				debugLog(ctx, log, "Published batch to kafka", "count", count)
-				time.Sleep(125 * time.Millisecond)
 				continue
 			}
 
