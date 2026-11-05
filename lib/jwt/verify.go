@@ -84,6 +84,10 @@ func (v *TokenVerifier) Verify(ctx context.Context, rawToken string) (jwt.Token,
 		// validate exp/nbf/iat automatically
 		jwt.WithValidate(true),
 
+		// pods' clocks differ by a few ms; without skew a token signed by another
+		// pod just across a second boundary has its iat "in the future"
+		jwt.WithAcceptableSkew(time.Second),
+
 		// take time from the global clock
 		jwt.WithClock(clock.GlobalClock),
 	)
