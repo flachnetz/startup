@@ -181,5 +181,5 @@ func IsStaging() bool {
 
 func IsProduction() bool {
 	environment := strings.ToLower(baseOptions.Load().Environment)
-	return environment == "production" || environment == "prod" || environment == "live"
+	return environment == "production" || environment == "prod" || environment == "prd" || environment == "live"
 }

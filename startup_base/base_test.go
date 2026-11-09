@@ -36,3 +36,22 @@ func TestBootstrapHandlerLogsTextWithoutLogJSON(t *testing.T) {
 		}
 	}
 }
+
+func TestIsProductionRecognisesProductionAliases(t *testing.T) {
+	previous := GetEnvironment()
+	t.Cleanup(func() { SetEnvironment(previous) })
+
+	for _, env := range []string{"production", "prod", "prd", "live", "PRD", "Prd"} {
+		SetEnvironment(env)
+		if !IsProduction() {
+			t.Errorf("IsProduction() = false for environment %q", env)
+		}
+	}
+
+	for _, env := range []string{"", "dev", "staging", "stage", "test", "prdx", "preprod"} {
+		SetEnvironment(env)
+		if IsProduction() {
+			t.Errorf("IsProduction() = true for environment %q", env)
+		}
+	}
+}
