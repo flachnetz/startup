@@ -463,3 +463,41 @@ func TestSendAsyncFlushesBatchedRecordsOnShutdown(t *testing.T) {
 		return nil
 	})
 }
+
+type valuesKey struct{}
+
+// The EventCreator reads the values of the Track context, also when the record
+// is encoded later by the async queue, but never the transaction.
+func TestRecordCarriesContextValues(t *testing.T) {
+	db := testx.NewConnection(t, "history_migrations")
+	testx.MustTransactErr(t, db, func(ctx ql.TxContext) error {
+		return CreateTable(ctx, "history")
+	})
+
+	captured := testx.CaptureEvents(t)
+
+	service := New(db, pgx.Identifier{"history"}, &EventSending{
+		EventSender:   captured,
+		EventCreator:  dummyEventCreator,
+		WriteToOutbox: true,
+	})
+	service.SendAsync(t.Context())
+
+	// tracked in a transaction
+	testx.MustTransact(t, db, func(ctx ql.TxContext) {
+		service.Track(context.WithValue(ctx, valuesKey{}, "in-tx"), item{}, GroupId{"order", "tx"})
+	})
+
+	// tracked without a transaction: queued, encoded by the background task
+	service.Track(context.WithValue(t.Context(), valuesKey{}, "queued"), item{}, GroupId{"order", "queued"})
+
+	require.Eventually(t, func() bool { return len(captured.Events()) == 2 }, 5*time.Second, 10*time.Millisecond)
+
+	for _, want := range []string{"in-tx", "queued"} {
+		event := testx.MockEventsGetSingle(t, captured, func(e dummyEvent) bool {
+			return e.rec.Values.Value(valuesKey{}) == want
+		})
+
+		require.Nil(t, ql.TxContextFromContext(event.rec.Values.(context.Context)))
+	}
+}

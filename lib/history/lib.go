@@ -202,6 +202,8 @@ func recordOf(ctx context.Context, item Item, groupIds []GroupId) RecordToSend {
 		Step:           reflect.Indirect(reflect.ValueOf(item)).Type().Name(),
 		Description:    item.HistoryString(),
 		Payload:        encoded,
+		// the transaction is hidden: the record may be encoded after it ended
+		Values: ql.ContextWithoutTx(ctx),
 	}
 }
 
@@ -529,6 +531,16 @@ type RecordToSend struct {
 	Payload        json.RawMessage
 	RequestTraceId RequestTraceId
 	Trigger        Trigger
+
+	// Values are the values of the context passed to Track or Pending, without
+	// its transaction. An EventCreator reads its own keys from it. Nil for a
+	// record built by hand.
+	Values Valuer
+}
+
+// Valuer is the Value lookup of a context.Context.
+type Valuer interface {
+	Value(key any) any
 }
 
 type GroupIds []GroupId
