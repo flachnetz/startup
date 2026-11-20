@@ -51,7 +51,7 @@ func (o *Options) Initialize(ctx context.Context, kubeOpts kube.KubernetesOption
 	applyConfigMapValues(ctx, values, &o.timeOffset)
 
 	// create mock clock
-	clock.GlobalClock = createMockClock(&o.timeOffset)
+	clock.Set(createMockClock(&o.timeOffset))
 
 	go func() {
 		err := kube.ObserveConfigMap(ctx, kubeClient, o.Namespace, o.ResourceName, func(values kube.ConfigMapValues) error {

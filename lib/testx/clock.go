@@ -14,16 +14,16 @@ import (
 // on test cleanup. It panics if a mock clock is already installed, since the global
 // clock cannot be shared across concurrent tests.
 func MockClock(t *testing.T) *clock.Mock {
-	if _, ok := cl.GlobalClock.(*clock.Mock); ok {
+	mockClock := clock.NewMock()
+	mockClock.Set(time.Date(2026, 1, 1, 9, 0, 0, 0, tz.UTC))
+
+	prevClock := cl.Set(mockClock)
+	if _, ok := prevClock.(*clock.Mock); ok {
+		cl.Set(prevClock)
 		panic("MockClock is not supported in concurrent tests")
 	}
 
-	prevClock := cl.GlobalClock
-	t.Cleanup(func() { cl.GlobalClock = prevClock })
-
-	mockClock := clock.NewMock()
-	mockClock.Set(time.Date(2026, 1, 1, 9, 0, 0, 0, tz.UTC))
-	cl.GlobalClock = mockClock
+	t.Cleanup(func() { cl.Set(prevClock) })
 
 	return mockClock
 }
