@@ -50,7 +50,13 @@ def main():
         tag_prefix = submodule + "/v"
 
     print("Synchronize git tags with remote")
-    subprocess.check_call(["git", "fetch"], cwd=str(root))
+    subprocess.check_call(["git", "fetch", "origin"], cwd=str(root))
+
+    # a HEAD behind origin/main would tag an old commit and publish it as a new version
+    behind = subprocess.call(["git", "merge-base", "--is-ancestor", "origin/main", "HEAD"], cwd=str(root))
+    if behind != 0:
+        print("HEAD does not contain origin/main, please pull first.")
+        return False
 
     print("Lookup version of go module")
     git_tags_output = subprocess.check_output(["git", "tag"], cwd=str(root)).decode("utf8")
@@ -65,11 +71,17 @@ def main():
     print("Create release tag {}".format(release_tag))
     subprocess.check_call(["git", "tag", release_tag], cwd=str(root))
 
+    # push only the new tag: local copies of old tags may differ from the remote ones;
+    # --atomic keeps the tag off the remote when main is rejected
     print("Push to go remote")
-    subprocess.check_call(["git", "push", "origin", "main", "--tags"], cwd=str(root))
+    try:
+        subprocess.check_call(["git", "push", "--atomic", "origin", "HEAD:main", "refs/tags/" + release_tag], cwd=str(root))
+    except subprocess.CalledProcessError:
+        subprocess.check_call(["git", "tag", "-d", release_tag], cwd=str(root))
+        raise
 
     return True
 
 
 if __name__ == "__main__":
-    sys.exit(0 if main() else 0)
+    sys.exit(0 if main() else 1)
