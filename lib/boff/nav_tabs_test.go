@@ -170,7 +170,7 @@ func TestNavigationSetsAreBounded(t *testing.T) {
 
 func TestCookieWrittenBeforeTheCacheExistedStillResolvesAncestors(t *testing.T) {
 	legacy := `{"e":[{"k":"player:1","l":"Player 1","p":"/players/app/player/1"}]}`
-	j := jar{breadcrumbCookieName: {Name: breadcrumbCookieName, Value: base64.RawURLEncoding.EncodeToString([]byte(legacy))}}
+	j := jar{breadcrumbCookieName: {Name: breadcrumbCookieName, Value: base64.RawURLEncoding.EncodeToString([]byte(legacy)), HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode}}
 
 	j.page("", "/orders/app", func(c *echo.Context) {
 		trail := ReconcileBreadcrumbs(c, BreadcrumbRemote("player:1"), BreadcrumbLocal("order:1", "Order 1", "/orders/app/1"))

@@ -33,7 +33,7 @@ func scopePrefixOf(c *echo.Context) string {
 		return ""
 	}
 
-	for _, segment := range strings.Split(prefix, "/") {
+	for segment := range strings.SplitSeq(prefix, "/") {
 		if segment == "." || segment == ".." {
 			return ""
 		}

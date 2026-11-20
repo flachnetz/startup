@@ -172,9 +172,9 @@ func (c breadcrumbCookie) Reconcile(new []Breadcrumb) breadcrumbCookie {
 // call it before them.
 func ReconcileBreadcrumbs(c *echo.Context, entries ...Breadcrumb) []Breadcrumb {
 	keys := make([]string, 0, len(entries))
-	for i := len(entries) - 1; i >= 0; i-- {
-		if entries[i].Key != "" {
-			keys = append(keys, entries[i].Key)
+	for _, entry := range slices.Backward(entries) {
+		if entry.Key != "" {
+			keys = append(keys, entry.Key)
 		}
 	}
 
@@ -285,25 +285,24 @@ func setCookie(c *echo.Context, name, value string) {
 }
 
 // loadNavigationCookie reads and decodes the navigation cookie from the
-// request. It returns false if the cookie is missing or could not be
-// decoded, in which case the caller should treat the link list as empty.
+// request. It returns an empty navigationCookie if the cookie is missing or
+// could not be decoded, in which case the link list is empty.
 //
-// Each NavLink's IsActive field is set to true if its Path is a prefix of
-// the current request path.
-func loadNavigationCookie(c *echo.Context) (navigationCookie, bool) {
+// Link paths are returned without scope.
+func loadNavigationCookie(c *echo.Context) navigationCookie {
 	cookie, err := c.Cookie(navigationCookieName)
 	if err != nil {
-		return navigationCookie{}, false
+		return navigationCookie{}
 	}
 
 	raw, err := base64.RawURLEncoding.DecodeString(cookie.Value)
 	if err != nil {
-		return navigationCookie{}, false
+		return navigationCookie{}
 	}
 
 	var nc navigationCookie
 	if err := json.Unmarshal(raw, &nc); err != nil {
-		return navigationCookie{}, false
+		return navigationCookie{}
 	}
 
 	for i := range nc.Sets {
@@ -312,7 +311,7 @@ func loadNavigationCookie(c *echo.Context) (navigationCookie, bool) {
 		}
 	}
 
-	return nc, true
+	return nc
 }
 
 func updateNavigationIsActive(c *echo.Context, nav []NavLink) {
@@ -351,7 +350,7 @@ func navigationKeys(c *echo.Context) []string {
 // Without breadcrumb keys (ReconcileBreadcrumbs has not been called for this
 // request) the set stored last is returned.
 func LoadNavigation(c *echo.Context) []NavLink {
-	cookie, _ := loadNavigationCookie(c)
+	cookie := loadNavigationCookie(c)
 
 	var links []NavLink
 
@@ -404,7 +403,7 @@ func UpdateNavigation(c *echo.Context, links []NavLink) {
 		key = keys[0]
 	}
 
-	cookie, _ := loadNavigationCookie(c)
+	cookie := loadNavigationCookie(c)
 
 	sets := make([]navSet, 0, maxNavigationSets)
 

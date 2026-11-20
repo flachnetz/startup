@@ -247,7 +247,7 @@ func TestPartitionConsumer_MultiTopic(t *testing.T) {
 		require.Fail(t, "timed out waiting for messages")
 	}
 
-	<-errCh
+	require.ErrorIs(t, <-errCh, context.Canceled)
 
 	require.Len(t, received, msgCount)
 
@@ -367,7 +367,7 @@ func readOnce(t *testing.T, cluster *testx.Kafka, groupID, topic string) *sync.M
 	}
 
 	cancel()
-	<-errCh
+	require.ErrorIs(t, <-errCh, context.Canceled)
 
 	return &values
 }
@@ -458,8 +458,8 @@ func TestPartitionConsumer_Rebalance(t *testing.T) {
 
 	cancel1()
 	cancel2()
-	<-errCh1
-	<-errCh2
+	require.ErrorIs(t, <-errCh1, context.Canceled)
+	require.ErrorIs(t, <-errCh2, context.Canceled)
 
 	// The key assertion: total handled across both consumers should equal the
 	// total message count. If offsets weren't committed on revoke, the second
