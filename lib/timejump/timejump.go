@@ -9,7 +9,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	clock2 "github.com/benbjohnson/clock"
 	"github.com/flachnetz/startup/v2/lib/clock"
 	"github.com/flachnetz/startup/v2/startup_base"
 	kube "github.com/flachnetz/startup/v2/startup_kube"
@@ -50,12 +49,17 @@ func (o *Options) Initialize(ctx context.Context, kubeOpts kube.KubernetesOption
 	o.timeOffset.Store(new(0 * time.Second))
 	applyConfigMapValues(ctx, values, &o.timeOffset)
 
-	// create mock clock
-	clock.Set(createMockClock(&o.timeOffset))
+	oc := newOffsetClock(&o.timeOffset)
+	clock.Set(oc)
 
 	go func() {
 		err := kube.ObserveConfigMap(ctx, kubeClient, o.Namespace, o.ResourceName, func(values kube.ConfigMapValues) error {
-			applyConfigMapValues(ctx, values, &o.timeOffset)
+			if prev, next, changed := applyConfigMapValues(ctx, values, &o.timeOffset); changed {
+				slog.InfoContext(ctx, "Performing time-jump now",
+					slog.Duration("jump", next-prev),
+					slog.Time("newTime", oc.Now()))
+				oc.onJump()
+			}
 			return nil
 		})
 
@@ -136,24 +140,24 @@ func (j *Timejumper) JumpTo(ctx context.Context, t time.Time) error {
 	return nil
 }
 
-func applyConfigMapValues(ctx context.Context, values kube.ConfigMapValues, timeOffset *atomic.Pointer[time.Duration]) {
+func applyConfigMapValues(ctx context.Context, values kube.ConfigMapValues, timeOffset *atomic.Pointer[time.Duration]) (time.Duration, time.Duration, bool) {
 	previousOffset := *timeOffset.Load()
 
 	offset, ok := values["offsetInSeconds"]
 	if !ok {
-		return
+		return previousOffset, previousOffset, false
 	}
 
 	offsetStr, ok := offset.(string)
 	if !ok {
 		slog.WarnContext(ctx, "offsetInSeconds is not a string")
-		return
+		return previousOffset, previousOffset, false
 	}
 
 	offsetVal, err := strconv.Atoi(offsetStr)
 	if err != nil {
 		slog.WarnContext(ctx, "offsetInSeconds cannot be parsed", slog.String("value", offsetStr), sl.Error(err))
-		return
+		return previousOffset, previousOffset, false
 	}
 
 	off := time.Duration(offsetVal) * time.Second
@@ -161,44 +165,16 @@ func applyConfigMapValues(ctx context.Context, values kube.ConfigMapValues, time
 		slog.WarnContext(ctx, "offsetInSeconds cannot be less than previous value",
 			slog.Duration("prevValue", *timeOffset.Load()),
 			slog.Duration("newValue", off))
-		return
+		return previousOffset, previousOffset, false
 	}
 
 	if off == previousOffset {
 		// no change
-		return
+		return previousOffset, previousOffset, false
 	}
 
 	slog.InfoContext(ctx, "Got new offset", slog.Duration("offset", off))
 
 	timeOffset.Store(new(off))
-}
-
-func createMockClock(offset *atomic.Pointer[time.Duration]) clock.Clock {
-	mockClock := clock2.NewMock()
-	mockClock.Set(time.Now())
-
-	go func() {
-		var previousOffset time.Duration
-
-		for {
-			offset := *offset.Load()
-			newTime := time.Now().Add(offset)
-
-			if previousOffset != offset {
-				slog.Info("Performing time-jump now",
-					slog.Duration("jump", offset-previousOffset),
-					slog.Time("newTime", newTime))
-
-				previousOffset = offset
-			}
-
-			// calculate the new current time
-			mockClock.Set(newTime)
-
-			time.Sleep(25 * time.Millisecond)
-		}
-	}()
-
-	return mockClock
+	return previousOffset, off, true
 }
