@@ -11,7 +11,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/flachnetz/startup/v2/lib/clock"
 	sl "github.com/flachnetz/startup/v2/startup_logging"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/jackc/pgx/v5"
@@ -153,9 +152,9 @@ func scheduleJobs(ctx context.Context, opts Options, db outboxDB, producer *kafk
 	ownScheduler := scheduler == nil
 	if ownScheduler {
 		var err error
-		scheduler, err = gocron.NewScheduler(
-			gocron.WithClock(clock.ToClockworkClock(clock.GlobalClock)),
-		)
+		// Outbox sweeping, backlog sizing, and VACUUM are wall-clock maintenance;
+		// keep them off clock.GlobalClock so timejumps do not trigger gocron catch-up spins.
+		scheduler, err = gocron.NewScheduler()
 		if err != nil {
 			return fmt.Errorf("create cron scheduler: %w", err)
 		}

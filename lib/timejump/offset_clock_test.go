@@ -156,3 +156,51 @@ func TestOffsetClock_GocronBigJumpRunsOnceAtTargetTime(t *testing.T) {
 		require.Empty(t, runs, "jump should trigger exactly one pass, not an intermediate storm")
 	}
 }
+
+func TestOffsetClock_GocronShortIntervalFromCompletionDoesNotSpin(t *testing.T) {
+	var offset atomic.Pointer[time.Duration]
+	offset.Store(new(0 * time.Second))
+	oc := newOffsetClock(&offset)
+
+	scheduler, err := gocron.NewScheduler(gocron.WithClock(clock.ToClockworkClock(oc)))
+	require.NoError(t, err)
+	defer func() { _ = scheduler.Shutdown() }()
+
+	runs := make(chan time.Time, 16)
+	job, err := scheduler.NewJob(
+		gocron.DurationJob(100*time.Millisecond),
+		gocron.NewTask(func() {
+			runs <- oc.Now()
+		}),
+		gocron.WithSingletonMode(gocron.LimitModeReschedule),
+		gocron.WithStartAt(gocron.WithStartImmediately()),
+		gocron.WithIntervalFromCompletion(),
+	)
+	require.NoError(t, err)
+	scheduler.Start()
+
+	select {
+	case <-runs:
+	case <-time.After(time.Second):
+		t.Fatal("initial gocron run did not start")
+	}
+
+	// Without WithIntervalFromCompletion, a 7-year jump on a 100ms DurationJob
+	// would spin ~2.2 billion iterations in gocron's advancePastNow.
+	jump := 7 * 365 * 24 * time.Hour
+	expectedMin := oc.Now().Add(jump - time.Second)
+	jumpOffset(&offset, oc, jump)
+
+	select {
+	case got := <-runs:
+		require.True(t, !got.Before(expectedMin), "post-jump run saw %s, want >= %s", got, expectedMin)
+	case <-time.After(time.Second):
+		t.Fatal("gocron job did not run after 7-year jump")
+	}
+
+	// NextRun queries the scheduler goroutine; it times out if the scheduler is stuck in advancePastNow.
+	require.Eventually(t, func() bool {
+		next, err := job.NextRun()
+		return err == nil && !next.Before(expectedMin)
+	}, time.Second, 10*time.Millisecond, "next run should be scheduled at jumped time >= %s", expectedMin)
+}
