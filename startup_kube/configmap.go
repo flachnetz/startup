@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"reflect"
+	"time"
 
 	sl "github.com/flachnetz/startup/v2/startup_logging"
 	v1 "k8s.io/api/core/v1"
@@ -37,12 +38,25 @@ type ConfigMapUpdate func(ConfigMapValues) error
 // is invoked immediately. Otherwise, the callback is invoked when the ConfigMap is created.
 // The callback is invoked with nil when the ConfigMap is deleted.
 //
-// ObserveConfigMap will block forever, or until an error occurs.
+// ObserveConfigMap blocks until ctx is cancelled or an unrecoverable error occurs. When the
+// underlying watch closes (for example on 410 Gone after an expired resourceVersion), it relists
+// the ConfigMap, emits any missed change, and restarts the watcher.
 func ObserveConfigMap(ctx context.Context, cs *kubernetes.Clientset, namespace, name string, callback ConfigMapUpdate) error {
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", name)
+	listWatcher := cache.NewListWatchFromClient(cs.CoreV1().RESTClient(), "configmaps", namespace, fieldSelector)
+	return observeConfigMap(ctx, listWatcher, namespace, name, time.Second, callback)
+}
+
+func observeConfigMap(
+	ctx context.Context,
+	listWatcher cache.ListerWatcherWithContext,
+	namespace, name string,
+	baseBackoff time.Duration,
+	callback ConfigMapUpdate,
+) error {
 	log := sl.LoggerOf(ctx)
 
 	var previousValue ConfigMapValues
-
 	emitIfChanged := func(values ConfigMapValues) error {
 		if reflect.DeepEqual(values, previousValue) {
 			return nil
@@ -52,39 +66,123 @@ func ObserveConfigMap(ctx context.Context, cs *kubernetes.Clientset, namespace, 
 		return callback(values)
 	}
 
-	fieldSelector := fields.OneTermEqualSelector("metadata.name", name)
+	backoff := baseBackoff
+	maxBackoff := 30 * baseBackoff
 
-	// get initial version of the resource list so we can use it as a start when watching
-	// for updates
-	list, err := cs.CoreV1().ConfigMaps(namespace).List(ctx, metav1.ListOptions{
-		FieldSelector: fieldSelector.String(),
-	})
-	if err != nil {
-		return fmt.Errorf("initial list: %w", err)
-	}
-
-	if len(list.Items) > 0 {
-		// emit initial state
-		err := emitIfChanged(configmapToValues(&list.Items[0]))
-		if err != nil {
-			return fmt.Errorf("initial callback: %w", err)
+	sleepBackoff := func() bool {
+		t := time.NewTimer(backoff)
+		defer t.Stop()
+		select {
+		case <-ctx.Done():
+			return false
+		case <-t.C:
+			backoff = min(backoff*2, maxBackoff)
+			return true
 		}
 	}
 
-	// create a new watcher for lists of configmaps filtered by name
-	listWatcher := cache.NewListWatchFromClient(cs.CoreV1().RESTClient(), "configmaps", namespace, fieldSelector)
-	retryWatcher, err := watch.NewRetryWatcherWithContext(ctx, list.ResourceVersion, listWatcher)
-	if err != nil {
-		return fmt.Errorf("create watcher: %w", err)
-	}
+	for attempt := 0; ; attempt++ {
+		if ctx.Err() != nil {
+			return nil
+		}
 
+		obj, err := listWatcher.ListWithContext(ctx, metav1.ListOptions{})
+		if err != nil {
+			if attempt == 0 {
+				return fmt.Errorf("initial list: %w", err)
+			}
+			if ctx.Err() != nil {
+				return nil
+			}
+			log.WarnContext(ctx, "Failed to relist configmap, retrying",
+				slog.String("namespace", namespace),
+				slog.String("name", name),
+				slog.Duration("backoff", backoff),
+				sl.Error(err))
+			if !sleepBackoff() {
+				return nil
+			}
+			continue
+		}
+
+		list, ok := obj.(*v1.ConfigMapList)
+		if !ok {
+			return fmt.Errorf("unexpected list object type %T", obj)
+		}
+
+		var values ConfigMapValues
+		if len(list.Items) > 0 {
+			values = configmapToValues(&list.Items[0])
+		}
+		if err := emitIfChanged(values); err != nil {
+			if attempt == 0 {
+				return fmt.Errorf("initial callback: %w", err)
+			}
+			return fmt.Errorf("run callback: %w", err)
+		}
+
+		retryWatcher, err := watch.NewRetryWatcherWithContext(ctx, list.ResourceVersion, listWatcher)
+		if err != nil {
+			if attempt == 0 {
+				return fmt.Errorf("create watcher: %w", err)
+			}
+			if ctx.Err() != nil {
+				return nil
+			}
+			log.WarnContext(ctx, "Failed to restart configmap watcher, retrying",
+				slog.String("namespace", namespace),
+				slog.String("name", name),
+				slog.Duration("backoff", backoff),
+				sl.Error(err))
+			if !sleepBackoff() {
+				return nil
+			}
+			continue
+		}
+
+		watchStart := time.Now()
+		sawEvent, err := consumeWatchEvents(ctx, log, retryWatcher, namespace, name, emitIfChanged)
+		if err != nil {
+			return err
+		}
+
+		if ctx.Err() != nil {
+			return nil
+		}
+
+		if sawEvent || time.Since(watchStart) >= maxBackoff {
+			backoff = baseBackoff
+		}
+
+		log.WarnContext(ctx, "ConfigMap watcher closed, relisting",
+			slog.String("namespace", namespace),
+			slog.String("name", name),
+			slog.Duration("backoff", backoff))
+
+		if !sleepBackoff() {
+			return nil
+		}
+	}
+}
+
+func consumeWatchEvents(
+	ctx context.Context,
+	log *slog.Logger,
+	retryWatcher *watch.RetryWatcher,
+	namespace, name string,
+	emitIfChanged func(ConfigMapValues) error,
+) (bool, error) {
 	defer retryWatcher.Stop()
 
+	sawEvent := false
 	for event := range retryWatcher.ResultChan() {
-		log.Debug("Got event", slog.String("type", string(event.Type)))
+		log.DebugContext(ctx, "Got event", slog.String("type", string(event.Type)))
 
 		if event.Type == apiWatch.Error {
-			log.Warn("Ignoring error while observing configmap", slog.String("namespace", namespace), slog.String("name", name), slog.Any("object", event.Object))
+			log.WarnContext(ctx, "Ignoring error while observing configmap",
+				slog.String("namespace", namespace),
+				slog.String("name", name),
+				slog.Any("object", event.Object))
 			continue
 		}
 
@@ -93,6 +191,8 @@ func ObserveConfigMap(ctx context.Context, cs *kubernetes.Clientset, namespace, 
 			continue
 		}
 
+		sawEvent = true
+		var err error
 		switch event.Type {
 		case apiWatch.Added, apiWatch.Modified:
 			err = emitIfChanged(configmapToValues(cm))
@@ -101,11 +201,11 @@ func ObserveConfigMap(ctx context.Context, cs *kubernetes.Clientset, namespace, 
 		}
 
 		if err != nil {
-			return fmt.Errorf("run callback: %w", err)
+			return sawEvent, fmt.Errorf("run callback: %w", err)
 		}
 	}
 
-	return nil
+	return sawEvent, nil
 }
 
 func WriteConfigMap(ctx context.Context, cs *kubernetes.Clientset, writer, namespace, name string, data ConfigMapValues) error {
